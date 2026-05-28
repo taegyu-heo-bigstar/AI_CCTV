@@ -3,11 +3,59 @@
 AI CCTV 소스 코드의 파일별 클래스와 함수를 정리한 문서입니다.
 정상값과 에러값은 코드의 일반 반환 흐름과 예외 처리 방식을 기준으로 요약했습니다.
 
+## `src/ai_cctv/alerts/dispatcher.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `AlertChannel` | 알림 채널 구현체의 공통 인터페이스입니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `send` | 알림 메시지를 채널로 전송합니다. | 성공 시 상태 반영 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `DiscordChatBotChannel` | 기존 Discord 챗봇 모듈을 알림 채널로 감쌉니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `__init__` | Discord 챗봇 채널을 초기화합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
+| `send` | Discord 챗봇으로 알림 메시지를 전송합니다. | 성공 시 상태 반영 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `AlertDispatcher` | 알림 메시지를 등록된 채널로 전달합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `__init__` | 알림 채널 목록을 초기화합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
+| `add_channel` | 알림 채널을 추가합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `dispatch_anomaly` | 이상 상황 이벤트를 알림 메시지로 변환해 전송합니다. | 성공 시 상태 반영 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `dispatch` | 알림 메시지를 전체 채널로 전송합니다. | 성공 시 상태 반영 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+
+## `src/ai_cctv/alerts/message.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `AlertMessage` | 사용자 알림 메시지를 표현합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `from_anomaly_event` | 이상 상황 이벤트에서 알림 메시지를 생성합니다. | 생성된 객체 또는 값 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `to_text` | 채팅 채널로 보낼 텍스트 메시지를 생성합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+
+## `src/ai_cctv/anomaly/detector.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `AnomalyRule` | 이상 상황 판단 규칙의 공통 인터페이스입니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `evaluate` | 감지 결과를 평가하여 이상 상황 이벤트를 반환합니다. | 결과 목록 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `ObjectPresenceRule` | 특정 객체가 새로 감지되면 이상 상황으로 판단합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `__init__` | 객체 등장 규칙을 초기화합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
+| `evaluate` | 새로운 객체 추적 ID를 이상 상황 이벤트로 변환합니다. | 결과 목록 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `_build_object_key` | 감지 객체를 중복 판단하기 위한 식별자를 생성합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
+| `DwellTimeRule` | 객체가 일정 시간 이상 감지되면 이상 상황으로 판단합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `__init__` | 체류 시간 판단 규칙을 초기화합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
+| `evaluate` | 객체별 체류 시간을 계산하여 이상 상황 이벤트를 생성합니다. | 결과 목록 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `_forget_missing_objects` | 현재 프레임에서 사라진 객체의 체류 상태를 정리합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
+| `AnomalyDetector` | 여러 이상 상황 판단 규칙을 실행하는 조정자입니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `__init__` | 이상 상황 판단 규칙 목록을 초기화합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
+| `evaluate` | 감지 결과를 전체 규칙으로 평가합니다. | 결과 목록 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+
+## `src/ai_cctv/anomaly/events.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `AnomalyEvent` | 이상 상황 이벤트 정보를 표현합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `to_worker_event` | PyQt VideoWorker 신호로 전달할 이벤트 딕셔너리를 생성합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+
 ## `src/ai_cctv/client/chat_bot/chat_bot.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `send_msg` | VLM 분석 결과를 Discord 알림 큐에 등록합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `send_msg` | VLM 분석 결과를 Discord 알림 큐에 등록합니다. | 성공 시 상태 반영 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 | `stop` | 알림 worker thread를 종료합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 | `_ensure_worker_started` | 알림 worker thread를 lazy-start 방식으로 시작합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
 | `_worker_loop` | 큐에서 메시지를 하나씩 꺼내 Discord 전송 함수로 넘깁니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
@@ -21,11 +69,11 @@ AI CCTV 소스 코드의 파일별 클래스와 함수를 정리한 문서입니
 | `DiscordBotSender` | Discord 봇 로그인과 메시지 전송을 담당하는 클래스입니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
 | `__init__` | Discord 전송 객체를 초기화합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
 | `start` | Discord client를 시작하고 준비 완료까지 기다립니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
-| `send_message` | Discord 채널로 메시지를 전송합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `send_message` | Discord 채널로 메시지를 전송합니다. | 성공 시 상태 반영 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 | `_send_message_async` | Discord event loop 안에서 실제 메시지를 전송합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
 | `close` | Discord client와 event loop thread를 종료합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 | `_run_event_loop` | 별도 thread에서 Discord client용 asyncio event loop를 실행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
-| `send_message` | 기본 Discord sender를 사용해 메시지를 보냅니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `send_message` | 기본 Discord sender를 사용해 메시지를 보냅니다. | 성공 시 상태 반영 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 | `close` | 기본 Discord sender를 종료합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 | `_split_message` | Discord 전송용으로 긴 문자열을 여러 조각으로 나눕니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
 
@@ -69,13 +117,19 @@ AI CCTV 소스 코드의 파일별 클래스와 함수를 정리한 문서입니
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `normalize_embedding` | normalize_embedding 함수의 주요 기능을 수행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
-| `cosine_similarity` | cosine_similarity 함수의 주요 기능을 수행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
-| `get_largest_face` | get_largest_face 함수의 주요 기능을 수행합니다. | 조회된 값 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
-| `expand_box` | expand_box 함수의 주요 기능을 수행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
-| `load_known_faces` | load_known_faces 함수의 주요 기능을 수행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
-| `recognize_face` | recognize_face 함수의 주요 기능을 수행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
-| `detect_face_with_tasks` | detect_face_with_tasks 함수의 주요 기능을 수행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `get_yolo_model` | YOLO 모델을 지연 로딩하여 반환합니다. | 조회된 값 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `get_face_app` | InsightFace 분석 객체를 지연 로딩하여 반환합니다. | 조회된 값 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `normalize_embedding` | 얼굴 임베딩 벡터를 정규화합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `cosine_similarity` | 두 정규화 임베딩 사이의 코사인 유사도를 계산합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `get_largest_face` | 검출된 얼굴 목록에서 가장 큰 얼굴을 선택합니다. | 조회된 값 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `expand_box` | 바운딩 박스를 지정 비율만큼 확장하고 이미지 경계 안으로 보정합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `load_known_faces` | 등록 얼굴 폴더에서 인물별 얼굴 임베딩 DB를 생성합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `recognize_face` | 얼굴 crop 이미지를 등록 얼굴 DB와 비교합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `detect_face_with_tasks` | MediaPipe FaceDetector로 ROI 안의 가장 큰 얼굴 박스를 찾습니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `run_demo` | YOLO와 얼굴 인식을 함께 실행하는 데모 루프를 시작합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `_draw_detection_result` | 데모 프레임에 객체 및 얼굴 인식 결과를 그립니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
+| `_build_person_face_label` | 사람 객체의 얼굴 인식 라벨과 표시 색상을 생성합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
+| `main` | 얼굴 인식 데모 실행 진입점입니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 
 ## `src/ai_cctv/client/full_body_checker.py`
 
@@ -117,9 +171,9 @@ AI CCTV 소스 코드의 파일별 클래스와 함수를 정리한 문서입니
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `PersonTracker` | PersonTracker 클래스의 주요 책임을 수행합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
-| `__init__` | __init__ 함수의 주요 기능을 수행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
-| `track` | YOLO 추론 + 객체 추적 수행 | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `PersonTracker` | YOLO와 ByteTrack으로 대상 객체를 추적합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `__init__` | 객체 추적 모델과 대상 클래스 설정을 초기화합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
+| `track` | 프레임에서 대상 객체를 탐지하고 추적합니다. | 결과 목록 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 
 ## `src/ai_cctv/client/pipeline/person_frame_processor.py`
 
@@ -236,6 +290,12 @@ AI CCTV 소스 코드의 파일별 클래스와 함수를 정리한 문서입니
 | `stop` | 영상 처리 루프를 중지하고 스레드 종료를 기다립니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 | `_cleanup` | 사용 중인 분석 작업자, 녹화기, 영상 스트림을 정리합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
 
+## `src/ai_cctv/client/vlm_person_analyzer.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `PersonAnalyzer` | 운영 코드에서 사용할 인물 이미지 VLM 분석기입니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+
 ## `src/ai_cctv/client/vlm_person_analyzer_qwen.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
@@ -267,6 +327,25 @@ AI CCTV 소스 코드의 파일별 클래스와 함수를 정리한 문서입니
 | `_run` | _run 함수의 주요 기능을 수행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
 | `stop` | stop 함수의 주요 기능을 수행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 | `cleanup` | cleanup 함수의 주요 기능을 수행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+
+## `src/ai_cctv/edge/failover.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `FailoverAction` | 네트워크 상태에 따른 엣지 장치 동작을 표현합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `NetworkFailoverPolicy` | Raspberry Pi 네트워크 장애 대응 동작을 결정합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `__init__` | 장애 대응 정책을 초기화합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
+| `decide` | 네트워크 상태에 맞는 엣지 장치 동작을 결정합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+
+## `src/ai_cctv/edge/streaming.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `PiStreamingConfig` | Raspberry Pi 영상 송출 설정을 표현합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `RpicamMediaMtxCommandBuilder` | rpicam-vid 기반 MediaMTX 송출 명령을 생성합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `__init__` | 송출 명령 생성 설정을 초기화합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
+| `build_command` | rpicam-vid 송출 명령 인자 목록을 생성합니다. | 생성된 객체 또는 값 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `build_shell_text` | 문서와 운영 스크립트에 표시할 송출 명령 문자열을 생성합니다. | 생성된 객체 또는 값 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 
 ## `src/ai_cctv/streaming/legacy_rtsp_receiver.py`
 

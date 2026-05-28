@@ -50,6 +50,9 @@ class EventPresenter:
             return EventDisplay(f"ID {person_id} disappeared", "#f97316", event_type)
         if event_type == "error":
             return EventDisplay(event.get("message", "Error"), "#ef4444", event_type)
+        if event_type == "anomaly":
+            message = event.get("message", "Anomaly detected")
+            return EventDisplay(message, "#facc15", event_type)
 
         return EventDisplay(f"ID {person_id} {event_type}", "#38bdf8", event_type)
 

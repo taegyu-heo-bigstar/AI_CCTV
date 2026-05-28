@@ -13,7 +13,7 @@ import queue
 import torch
 import gc
 
-from .vlm_person_analyzer_qwen_test import PersonAnalyzer
+from .vlm_person_analyzer import PersonAnalyzer
 from .chat_bot import chat_bot as chatbot
 
 class VLMWorker:

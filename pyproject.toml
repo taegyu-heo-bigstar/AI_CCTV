@@ -27,9 +27,17 @@ dependencies = [
     "PyQt5",
 ]
 
+[project.optional-dependencies]
+edge = [
+    "pygobject",
+]
+vision-demo = [
+    "mediapipe",
+    "torch",
+]
+
 [project.scripts]
 ai-cctv = "ai_cctv.client.gui:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
