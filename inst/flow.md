@@ -24,7 +24,7 @@ AI_CCTV/
 |           |-- main.py             # AI server GUI/분석 진입점
 |           |-- analysis.py         # 서버 분석 계층 재노출
 |           |-- stream_receiver.py  # MediaMTX RTSP 수신 수동 점검 도구
-|           |-- client/             # GUI, 영상 루프, 추적, 녹화, VLM 구현
+|           |-- control_center/     # GUI, 영상 루프, 추적, 녹화, VLM 구현
 |           |-- anomaly/            # 이상 상황 판정 규칙과 이벤트
 |           |-- alerts/             # Discord 알림 메시지와 디스패처
 |           `-- common/             # 서버 노드 내부 공통 값 객체 재노출
@@ -51,7 +51,7 @@ flowchart LR
     StreamBuilder --> MediaMTX["MediaMTX RTSP publish"]
     MediaMTX --> RTSP["RTSP Stream"]
     RTSP --> Windows["ai_cctv/ai_server/main.py"]
-    Windows --> VideoWorker["ai_server/client/video_worker.py"]
+    Windows --> VideoWorker["ai_server/control_center/video_worker.py"]
     VideoWorker --> Tracker["PersonTracker"]
     Tracker --> Processor["PersonFrameProcessor"]
     Tracker --> RuleEngine["AnomalyRuleEngine"]

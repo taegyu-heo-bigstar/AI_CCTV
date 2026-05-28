@@ -13,7 +13,7 @@
 | 프로젝트 형태 | 루트 주변의 여러 스크립트를 직접 실행 | `src/ai_cctv` 중심의 Python 패키지 |
 | 실행 단위 | 파일 경로를 기억해서 실행 | `ai-cctv-edge`, `ai-cctv-ai-server` 콘솔 명령 제공 |
 | Edge node | RTSP 송출 실험 코드가 독립 폴더에 존재 | `edge_node`에서 GStreamer + MediaMTX 송출 명령 생성 |
-| AI server | GUI, 탐지, 알림 코드가 혼재 | `ai_server/client`, `ai_server/anomaly`, `ai_server/alerts`로 서버 내부 책임 분리 |
+| AI server | GUI, 탐지, 알림 코드가 혼재 | `ai_server/control_center`, `ai_server/anomaly`, `ai_server/alerts`로 서버 내부 책임 분리 |
 | 알림 | 여러 알림 가능성이 설계와 코드에 섞임 | 현시점 구현은 Discord 중심, 확장은 인터페이스로 남김 |
 | 레거시 코드 | 오래된 GUI/RTSP/stub 코드가 함께 존재 | 사용 경로가 없는 레거시 파일 제거 |
 | 검증 | 구조를 확인하는 자동 테스트 부족 | `tests/test_project_structure.py`로 구조와 핵심 도메인 동작 검증 |
@@ -39,7 +39,7 @@ src/ai_cctv/
 
 ```text
 src/ai_cctv/ai_server/
-  client/         # GUI, 영상 루프, 추적, 녹화, VLM 구현
+  control_center/ # GUI, 영상 루프, 추적, 녹화, VLM 구현
   anomaly/        # 이상 상황 판정 규칙과 이벤트
   alerts/         # Discord 알림 메시지와 디스패처
   common/         # 서버 노드 내부 공통 값 객체 재노출
@@ -66,7 +66,7 @@ AI server는 `src/ai_cctv/ai_server` 아래에 서버 노드 실행 코드와 �
 | `ai_server/main.py` | GUI 기반 AI server 실행 |
 | `ai_server/analysis.py` | 분석 계층 public API 재노출 |
 | `ai_server/stream_receiver.py` | MediaMTX RTSP 수신 수동 점검 |
-| `ai_server/client/` | PyQt GUI, OpenCV 영상 루프, YOLO 추적, 녹화, VLM 분석 |
+| `ai_server/control_center/` | PyQt GUI, OpenCV 영상 루프, YOLO 추적, 녹화, VLM 분석 |
 | `ai_server/anomaly/` | 감지 결과를 이상 상황 이벤트로 변환 |
 | `ai_server/alerts/` | 이상 상황 이벤트를 Discord 알림 메시지로 전송 |
 | `ai_server/common/` | 서버 내부에서 공유하는 값 객체 재노출 |
@@ -100,7 +100,7 @@ AI server는 `src/ai_cctv/ai_server` 아래에 서버 노드 실행 코드와 �
 
 | 제거 파일 | 제거 이유 |
 |---|---|
-| `src/ai_cctv/ai_server/client/legacy_cctv_gui.py` | 현재 GUI 진입점은 `ai_server/client/gui.py`와 `ai_server/client/ui/main_window.py` |
+| `src/ai_cctv/ai_server/control_center/legacy_cctv_gui.py` | 현재 GUI 진입점은 `ai_server/control_center/gui.py`와 `ai_server/control_center/ui/main_window.py` |
 | `src/ai_cctv/server/fail_over.py` | `print("test")` 수준의 stub로 실제 서버 기능이 아님 |
 | `src/ai_cctv/streaming/sender.py` | Edge node 송출 책임은 `edge_node/streaming.py`로 통합 |
 | `src/ai_cctv/streaming/receiver.py` | RTSP 수신 점검은 `ai_server/stream_receiver.py`로 이동 |
@@ -114,7 +114,7 @@ AI server는 `src/ai_cctv/ai_server` 아래에 서버 노드 실행 코드와 �
 |---|---|
 | Raspberry Pi에서 카메라 송출이나 장애 대응에 필요한가? | `src/ai_cctv/edge_node` |
 | Windows AI server 실행, 수신, 분석, UI, 알림에 필요한가? | `src/ai_cctv/ai_server` |
-| 서버 내부 GUI/영상 처리 구현인가? | `src/ai_cctv/ai_server/client` |
+| 서버 내부 GUI/영상 처리 구현인가? | `src/ai_cctv/ai_server/control_center` |
 | 서버 내부 이상 상황 판정 규칙인가? | `src/ai_cctv/ai_server/anomaly` |
 | 서버 내부 Discord 알림인가? | `src/ai_cctv/ai_server/alerts` |
 

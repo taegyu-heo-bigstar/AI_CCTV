@@ -52,7 +52,7 @@ src/
 `-- ai_cctv/
     |-- edge_node/    # Edge node 전용 실행 코드
     `-- ai_server/    # AI server 전용 실행 코드와 서버 소유 하위 도메인
-        |-- client/   # GUI, 영상 루프, 추적, 녹화, VLM 분석 구현
+        |-- control_center/  # GUI, 영상 루프, 추적, 녹화, VLM 분석 구현
         |-- anomaly/  # 이상 상황 판정 규칙과 이벤트
         |-- alerts/   # Discord 중심 알림 계층
         `-- common/   # 서버 노드 내부 공통 값 객체 재노출

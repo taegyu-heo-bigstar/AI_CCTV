@@ -1,22 +1,14 @@
-
-# vlm_person_analyzer_qwen.py 파일입니다.
-# AI CCTV 프로젝트의 client 영역에서 사용하는 소스 코드입니다.
+# vlm_person_analyzer_qwen_test.py 파일입니다.
+# AI CCTV 프로젝트의 control_center 영역에서 사용하는 소스 코드입니다.
 # 이 파일의 클래스와 함수 책임은 각 국문 docstring에 정리되어 있습니다.
 
-# vlm_person_analyzer_qwen.py ?????.
+# vlm_person_analyzer_qwen_test.py ?????.
 # AI CCTV ????? client ???? ???? ?? ?????.
 # ? ??? ???? ?? ??? ? ?? docstring? ???? ????.
 
-"""
-VLM 모듈 파일입니다.
-외부 파일에서 실행시 아래와같이 진행.
-from .vlm_person_analyzer_qwen import PersonAnalyzer
-
-analyzer = PersonAnalyzer()
-result1 = analyzer.analyze("1.jpg")
-result2 = analyzer.analyze("2.jpg")
-
-"""
+# vlm_person_analyzer_qwen_test.py ?? ?????.
+# AI CCTV ????? client ?? ??? ?????.
+# ???? ??? ?? ??? ? ?? docstring? ?????.
 
 import time
 import torch
@@ -84,7 +76,10 @@ class PersonAnalyzer:
         end = time.time()
         print("모델 로딩 완료")
         print(f"모델 로딩 시간: {end - start:.2f}초")
-        print(self.model.hf_device_map)
+        if hasattr(self.model, "hf_device_map"):
+            print(self.model.hf_device_map)
+        else:
+            print("hf_device_map 없음")
     def _build_messages(self, image):
         """_build_messages 함수의 주요 기능을 수행합니다.
         

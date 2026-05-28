@@ -1,5 +1,5 @@
 # person_state_manager.py 파일입니다.
-# AI CCTV 프로젝트의 client 영역에서 사용하는 소스 코드입니다.
+# AI CCTV 프로젝트의 control_center 영역에서 사용하는 소스 코드입니다.
 # 이 파일의 클래스와 함수 책임은 각 국문 docstring에 정리되어 있습니다.
 
 # person_state_manager.py ?????.
