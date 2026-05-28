@@ -68,7 +68,7 @@ AI server는 `src/ai_cctv/ai_server` 아래에 서버 노드 실행 코드와 �
 | `ai_server/stream_receiver.py` | MediaMTX RTSP 수신 수동 점검 |
 | `ai_server/control_center/` | PyQt GUI, OpenCV 영상 루프, YOLO 추적, 녹화, VLM 분석 |
 | `ai_server/anomaly/` | 감지 결과를 이상 상황 이벤트로 변환 |
-| `ai_server/alerts/` | 이상 상황 이벤트를 Discord 알림 메시지로 전송 |
+| `ai_server/alerts/` | 이상 상황 이벤트를 Discord 알림 메시지로 전송하고 챗봇 전송 구현을 보관 |
 | `ai_server/common/` | 서버 내부에서 공유하는 값 객체 재노출 |
 
 `ai_server/__init__.py`는 의도적으로 가볍게 유지합니다. 테스트나 하위 패키지 import 시점에 PyQt, YOLO, VLM 같은 무거운 의존성이 로드되지 않도록 하기 위해서입니다. 실제 GUI 실행은 `ai_server/main.py`의 `main()` 안에서 지연 import합니다.
@@ -93,6 +93,7 @@ AI server는 `src/ai_cctv/ai_server` 아래에 서버 노드 실행 코드와 �
 | `NotificationChannel` | 알림 전송 채널 공통 인터페이스 |
 | `DiscordNotificationChannel` | 기존 Discord 챗봇 모듈 어댑터 |
 | `NotificationDispatcher` | 알림 메시지를 등록 채널로 전달 |
+| `alerts/chat_bot` | Discord API 연결과 메시지 큐 worker 구현 |
 
 ## 7. 제거한 코드
 

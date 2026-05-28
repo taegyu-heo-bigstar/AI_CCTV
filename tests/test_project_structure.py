@@ -205,6 +205,7 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(Path("src/ai_cctv/ai_server/control_center").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/anomaly").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/alerts").is_dir())
+        self.assertTrue(Path("src/ai_cctv/ai_server/alerts/chat_bot").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/common").is_dir())
         self.assertFalse(Path("src/ai_cctv/edge").exists())
         self.assertFalse(Path("src/ai_cctv/edge_pi").exists())
@@ -216,6 +217,7 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertFalse(Path("src/ai_cctv/alerts").exists())
         self.assertFalse(Path("src/ai_cctv/common").exists())
         self.assertFalse(Path("src/ai_cctv/ai_server/client").exists())
+        self.assertFalse(Path("src/ai_cctv/ai_server/control_center/chat_bot").exists())
         self.assertFalse(
             Path("src/ai_cctv/ai_server/control_center/legacy_cctv_gui.py").exists()
         )

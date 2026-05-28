@@ -26,7 +26,7 @@ AI_CCTV/
 |           |-- stream_receiver.py  # MediaMTX RTSP 수신 수동 점검 도구
 |           |-- control_center/     # GUI, 영상 루프, 추적, 녹화, VLM 구현
 |           |-- anomaly/            # 이상 상황 판정 규칙과 이벤트
-|           |-- alerts/             # Discord 알림 메시지와 디스패처
+|           |-- alerts/             # Discord 알림 메시지, 디스패처, 챗봇 전송 구현
 |           `-- common/             # 서버 노드 내부 공통 값 객체 재노출
 |-- tests/                          # 구조와 도메인 경계 단위 테스트
 |-- docs/                           # 설계/학습 문서

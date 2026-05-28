@@ -14,7 +14,7 @@ import torch
 import gc
 
 from .vlm_person_analyzer import PersonAnalyzer
-from .chat_bot import chat_bot as chatbot
+from ..alerts.chat_bot import chat_bot as chatbot
 
 class VLMWorker:
     """VLMWorker 클래스의 주요 책임을 수행합니다.

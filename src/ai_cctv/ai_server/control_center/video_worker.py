@@ -182,6 +182,6 @@ class VideoWorker(QThread):
             Discord 채널이 등록된 NotificationDispatcher 객체를 반환합니다.
         """
 
-        from .chat_bot import chat_bot as chatbot
+        from ..alerts.chat_bot import chat_bot as chatbot
 
         return NotificationDispatcher([DiscordNotificationChannel(chatbot)])

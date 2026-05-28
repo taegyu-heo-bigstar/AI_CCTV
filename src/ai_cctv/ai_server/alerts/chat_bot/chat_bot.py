@@ -12,12 +12,6 @@ import queue
 import threading
 from typing import Any
 
-# 같은 chat_bot 디렉터리 안의 discord_bot.py를 import합니다.
-# "from chat_bot import chat_bot as chatbot" 형태로 이 모듈을 불러올 예정이므로,
-# 패키지 기준 import를 사용합니다.
-from . import discord_bot
-
-
 # Discord로 보낼 메시지를 저장하는 FIFO 큐입니다.
 # Queue는 thread-safe이므로 VLMWorker thread와 알림 worker thread 사이에서 안전하게 사용할 수 있습니다.
 _message_queue: queue.Queue[object] = queue.Queue()
@@ -129,7 +123,7 @@ def _worker_loop() -> None:
 
                 # 실제 Discord API 호출은 discord_bot.py에 위임합니다.
                 # 이 호출은 네트워크 I/O가 끝날 때까지 worker thread 안에서만 대기합니다.
-                discord_bot.send_message(text)
+                _send_to_discord(text)
 
             except Exception as exc:
                 # 알림 실패가 VLM 분석 thread를 죽이지 않도록 여기서 예외를 흡수합니다.
@@ -144,7 +138,7 @@ def _worker_loop() -> None:
     finally:
         # worker가 종료될 때 Discord client도 닫습니다.
         # 네트워크 연결과 event loop thread를 정리하기 위한 호출입니다.
-        discord_bot.close()
+        _close_discord_sender()
 
 
 def _normalize_message(message: Any) -> str:
@@ -158,6 +152,34 @@ def _normalize_message(message: Any) -> str:
         return "VLM 분석 결과가 비어 있습니다."
 
     return text
+
+
+def _send_to_discord(text: str) -> None:
+    """Discord 전송 모듈을 지연 import하여 메시지를 전송합니다.
+
+    인자:
+        text: Discord 채널로 보낼 문자열입니다.
+    반환값:
+        없음.
+    """
+
+    from . import discord_bot
+
+    discord_bot.send_message(text)
+
+
+def _close_discord_sender() -> None:
+    """Discord 전송 모듈을 지연 import하여 연결을 정리합니다.
+
+    인자:
+        없음.
+    반환값:
+        없음.
+    """
+
+    from . import discord_bot
+
+    discord_bot.close()
 
 
 # Python 프로세스가 종료될 때 worker thread와 Discord client를 정리합니다.
