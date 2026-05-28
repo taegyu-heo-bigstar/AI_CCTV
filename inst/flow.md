@@ -29,9 +29,6 @@ AI_CCTV/
 │     ├─ client/                   # 기존 Windows GUI/분석 구현
 │     ├─ anomaly/                  # 이상 상황 판단 구현
 │     ├─ alerts/                   # 현재 Discord 중심 알림 구현과 확장 인터페이스
-│     ├─ edge/                     # 기존 edge import 호환 레이어
-│     ├─ edge_pi/                  # 기존 edge_pi import 호환 레이어
-│     ├─ windows_server/           # 기존 windows_server import 호환 레이어
 │     ├─ streaming/                # RTSP 데모/레거시 유틸리티
 │     └─ server/                   # 서버 보조 모듈 자리
 ├─ tests/                          # 장비 비의존 구조 테스트
@@ -44,7 +41,7 @@ AI_CCTV/
 | 실행 묶음 | 설치 extras | console script | 주요 책임 |
 |---|---|---|---|
 | Edge node | `ai-cctv[edge-node]` | `ai-cctv-edge` | 카메라 송출, MediaMTX publish, 네트워크 장애 정책 |
-| AI server | `ai-cctv[ai-server]` | `ai-cctv-windows-server` 또는 `ai-cctv` | RTSP 수신, OpenCV/YOLO 분석, 이상 상황 판단, Discord 알림, GUI |
+| AI server | `ai-cctv[ai-server]` | `ai-cctv-ai-server` 또는 `ai-cctv` | RTSP 수신, OpenCV/YOLO 분석, 이상 상황 판단, Discord 알림, GUI |
 
 ## System Flow
 
@@ -129,7 +126,7 @@ ai-cctv-edge
 
 ```bash
 pip install -e ".[ai-server]"
-ai-cctv-windows-server
+ai-cctv-ai-server
 ```
 
 검증 명령은 다음과 같습니다.

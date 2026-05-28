@@ -7,7 +7,7 @@ Raspberry Pi 기반 CCTV 송출 장치와 Windows 서버 기반 AI 영상 분석
 | 묶음 | 역할 | 실행 명령 |
 |---|---|---|
 | Edge node | Raspberry Pi 카메라 영상 송출, GStreamer + MediaMTX RTSP publish, 네트워크 장애 정책 | `ai-cctv-edge` |
-| AI server | RTSP 수신, OpenCV/YOLO 분석, 이상 상황 판단, Discord 알림, GUI | `ai-cctv-windows-server` |
+| AI server | RTSP 수신, OpenCV/YOLO 분석, 이상 상황 판단, Discord 알림, GUI | `ai-cctv-ai-server` |
 
 ## 설치
 
@@ -28,7 +28,7 @@ AI server 실행 환경:
 
 ```bash
 pip install -e ".[ai-server]"
-ai-cctv-windows-server
+ai-cctv-ai-server
 ```
 
 전통적인 requirements 파일이 필요한 환경에서는 다음 파일을 사용할 수 있습니다.
@@ -55,8 +55,7 @@ src/
    ├─ common/       # 공통 이벤트/메시지 값 객체
    ├─ client/       # AI server GUI/영상 분석 구현
    ├─ anomaly/      # 이상 상황 판단 규칙
-   ├─ alerts/       # Discord 중심 알림 계층
-   └─ edge/         # 기존 import 호환 레이어
+   └─ alerts/       # Discord 중심 알림 계층
 ```
 
 ## 검증

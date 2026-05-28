@@ -177,16 +177,21 @@ class ProjectStructureTest(unittest.TestCase):
 
         self.assertEqual(scripts["ai-cctv-edge"], "ai_cctv.edge_node.main:main")
         self.assertEqual(
-            scripts["ai-cctv-windows-server"],
+            scripts["ai-cctv-ai-server"],
             "ai_cctv.ai_server.main:main",
         )
         self.assertEqual(scripts["ai-cctv"], "ai_cctv.ai_server.main:main")
         self.assertIn("edge-node", extras)
         self.assertIn("ai-server", extras)
-        self.assertIn("edge-pi", extras)
-        self.assertIn("windows-server", extras)
+        self.assertNotIn("edge-pi", extras)
+        self.assertNotIn("windows-server", extras)
+        self.assertNotIn("edge", extras)
+        self.assertNotIn("ai-cctv-windows-server", scripts)
         self.assertTrue(Path("src/ai_cctv/edge_node").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server").is_dir())
+        self.assertFalse(Path("src/ai_cctv/edge").exists())
+        self.assertFalse(Path("src/ai_cctv/edge_pi").exists())
+        self.assertFalse(Path("src/ai_cctv/windows_server").exists())
         self.assertTrue(Path("requirements/edge-node.txt").is_file())
         self.assertTrue(Path("requirements/ai-server.txt").is_file())
 
