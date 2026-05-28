@@ -1,13 +1,13 @@
 # AI CCTV
 
-Raspberry Pi 기반 CCTV 송출 장치와 Windows 서버 기반 AI 영상 분석기를 분리해 구성하는 프로젝트입니다.
+Raspberry Pi 기반 Edge node와 Windows 기반 AI server를 분리해 구성하는 AI CCTV 프로젝트입니다.
 
 ## 실행 묶음
 
 | 묶음 | 역할 | 실행 명령 |
 |---|---|---|
-| Edge node | Raspberry Pi 카메라 영상 송출, GStreamer + MediaMTX RTSP publish, 네트워크 장애 정책 | `ai-cctv-edge` |
-| AI server | RTSP 수신, OpenCV/YOLO 분석, 이상 상황 판단, Discord 알림, GUI | `ai-cctv-ai-server` |
+| Edge node | 카메라 영상 송출, GStreamer + MediaMTX RTSP publish, 네트워크 장애 대응 정책 | `ai-cctv-edge` |
+| AI server | RTSP 수신, OpenCV/YOLO 분석, 이상 상황 판정, Discord 알림, GUI | `ai-cctv-ai-server` |
 
 ## 설치
 
@@ -37,7 +37,7 @@ ai-cctv-ai-server
 pip install -r requirements/ai-server.txt
 ```
 
-로컬 개발 환경에서 기존 방식으로 AI server를 실행할 수도 있습니다.
+로컬 개발 환경에서 AI server를 바로 실행할 수도 있습니다.
 
 ```bash
 python main.py
@@ -46,16 +46,16 @@ python main.py
 ## 구조
 
 ```text
-inst/                 # 구조/흐름/변경 설명 문서와 보관 자료
+inst/                 # 구조, 흐름, 변경 설명 문서
 requirements/         # 실행 환경별 의존성 목록
 src/
-└─ ai_cctv/
-   ├─ edge_node/    # Edge node 전용 실행 코드
-   ├─ ai_server/    # AI server 전용 실행 코드
-   ├─ common/       # 공통 이벤트/메시지 값 객체
-   ├─ client/       # AI server GUI/영상 분석 구현
-   ├─ anomaly/      # 이상 상황 판단 규칙
-   └─ alerts/       # Discord 중심 알림 계층
+`-- ai_cctv/
+    |-- edge_node/    # Edge node 전용 실행 코드
+    |-- ai_server/    # AI server 전용 실행 코드
+    |-- client/       # AI server GUI와 영상 분석 구현
+    |-- anomaly/      # 이상 상황 판정 규칙
+    |-- alerts/       # Discord 중심 알림 계층
+    `-- common/       # 공통 이벤트와 메시지 값 객체 재노출
 ```
 
 ## 검증

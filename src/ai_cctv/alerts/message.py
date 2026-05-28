@@ -1,12 +1,12 @@
 # AI CCTV 알림 메시지 값 객체 파일입니다.
 # 이상 상황 이벤트를 사용자에게 전달할 텍스트와 첨부 정보로 변환합니다.
-# 알림 채널 구현체가 같은 메시지 형식을 공유하게 합니다.
+# 채널별 전송 구현과 분리된 공통 메시지 형식을 제공합니다.
 
 from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
-class AlertMessage:
+class NotificationMessage:
     """사용자 알림 메시지를 표현합니다.
 
     인자:
@@ -15,7 +15,7 @@ class AlertMessage:
         image_path: 첨부할 이미지 경로입니다.
         metadata: 채널별 추가 정보입니다.
     반환값:
-        AlertMessage 인스턴스를 반환합니다.
+        NotificationMessage 인스턴스를 반환합니다.
     """
 
     title: str
@@ -30,7 +30,7 @@ class AlertMessage:
         인자:
             event: AnomalyEvent 객체입니다.
         반환값:
-            AlertMessage 인스턴스를 반환합니다.
+            NotificationMessage 인스턴스를 반환합니다.
         """
 
         body = (
@@ -56,4 +56,3 @@ class AlertMessage:
         """
 
         return f"{self.title}\n{self.body}"
-

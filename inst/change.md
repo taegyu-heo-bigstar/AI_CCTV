@@ -1,411 +1,153 @@
-﻿# develop 브랜치 대비 refactor 브랜치 변경 설명
+# develop 브랜치 대비 refactor 브랜치 변경 설명
 
-이 문서는 `origin/develop...refactor` 기준으로 현재 `refactor` 브랜치가 `develop` 브랜치와 어떻게 달라졌는지 설명한다.
-대상 독자는 프로젝트 구조를 처음 보는 주니어 개발자이며, 단순히 "무엇이 바뀌었는가"뿐 아니라 "왜 그렇게 나누었는가"를 이해하는 데 초점을 둔다.
+이 문서는 `origin/develop...refactor` 기준으로 현재 `refactor` 브랜치가 `develop` 브랜치와 어떻게 달라졌는지 설명합니다. 대상 독자는 프로젝트 구조를 처음 보는 주니어 개발자이며, “무엇을 옮겼는지”보다 “왜 그렇게 책임을 나누었는지”에 초점을 둡니다.
 
 ## 1. 전체 요약
 
-`develop` 브랜치는 기능 실험 코드, 클라이언트 코드, 서버 코드, RTSP 송수신 코드, 학습용 정리 자료가 여러 폴더에 섞여 있는 상태였다.
-반면 `refactor` 브랜치는 최종 실행 목표에 맞추어 코드를 `src/ai_cctv` Python 패키지로 묶고, 라즈베리 파이에서 실행할 코드와 윈도우 서버에서 실행할 코드를 분리했다.
+`develop` 브랜치는 GUI, 영상 처리, RTSP 송수신, Discord 알림, 실험 자료가 여러 폴더에 섞여 있었습니다. `refactor` 브랜치는 최종 실행 환경을 기준으로 `src/ai_cctv` 패키지를 만들고, 라즈베리 파이에서 실행할 Edge node 코드와 Windows 데스크탑에서 실행할 AI server 코드를 분리했습니다.
 
 | 구분 | develop 브랜치 | refactor 브랜치 |
-| --- | --- | --- |
-| 프로젝트 형태 | 여러 스크립트와 자료 폴더가 루트에 흩어져 있음 | `src/ai_cctv` 중심의 Python 패키지 구조 |
-| 실행 단위 | 파일을 직접 실행하는 방식이 많음 | 콘솔 명령과 패키지 엔트리포인트 제공 |
-| 라즈베리 파이 코드 | RTSP 송출 실험 코드가 별도 폴더에 존재 | `edge_node` 패키지로 GStreamer + MediaMTX 송출 책임 분리 |
-| 윈도우 서버 코드 | GUI, 탐지, 알림 코드가 클라이언트/서버 폴더에 혼재 | `ai_server`, `client`, `anomaly`, `alerts` 등으로 책임 분리 |
-| 공통 모델 | 이벤트/메시지 구조가 명확하지 않음 | `common`, `anomaly.events`, `alerts.message`로 공통 데이터 구조 정리 |
-| 알림 방식 | 여러 가능성이 코드와 설계에 섞여 있음 | 현시점 실행 경로는 Discord 중심, 다른 채널은 확장 영역으로 둠 |
-| 문서화 | 실험 자료와 구현 자료가 섞여 있음 | `README.md`, `inst/flow.md`, `inst/structure.md`, `inst/change.md`, `docs/`로 정리 |
-| 검증 | 자동 검증 기준이 약함 | `tests/test_project_structure.py`로 구조와 엔트리포인트 검증 |
+|---|---|---|
+| 프로젝트 형태 | 루트 주변의 여러 스크립트를 직접 실행 | `src/ai_cctv` 중심의 Python 패키지 |
+| 실행 단위 | 파일 경로를 기억해서 실행 | `ai-cctv-edge`, `ai-cctv-ai-server` 콘솔 명령 제공 |
+| Edge node | RTSP 송출 실험 코드가 독립 폴더에 존재 | `edge_node`에서 GStreamer + MediaMTX 송출 명령 생성 |
+| AI server | GUI, 탐지, 알림 코드가 혼재 | `ai_server`, `client`, `anomaly`, `alerts`로 책임 분리 |
+| 알림 | 여러 알림 가능성이 설계와 코드에 섞임 | 현시점 구현은 Discord 중심, 확장은 인터페이스로 남김 |
+| 레거시 코드 | 오래된 GUI/RTSP/stub 코드가 함께 존재 | 사용 경로가 없는 레거시 파일 제거 |
+| 검증 | 구조를 확인하는 자동 테스트 부족 | `tests/test_project_structure.py`로 구조와 핵심 도메인 동작 검증 |
 
-핵심 변화는 "기능별 파일 이동"이 아니라 "실행 환경과 책임 기준으로 구조를 다시 잡은 것"이다.
+## 2. 배포 목표에 맞춘 구조
 
-## 2. 왜 구조를 다시 나누었는가
+최종 시스템은 한 프로그램이 모든 일을 하는 구조가 아닙니다.
 
-이 프로젝트의 최종 형태는 하나의 프로그램이 모든 일을 하는 구조가 아니다.
-최종 실행 환경은 크게 두 덩어리다.
+| 실행 환경 | 실제 장비 | 주요 책임 |
+|---|---|---|
+| Edge node | 카메라가 장착된 Raspberry Pi | 카메라 영상 촬영, GStreamer 송출, MediaMTX publish, 네트워크 장애 정책 |
+| AI server | Windows 데스크탑 | RTSP 수신, YOLO 분석, 이상 상황 판정, Discord 알림, GUI 표시 |
 
-| 실행 환경 | 주요 책임 | 예시 |
-| --- | --- | --- |
-| 라즈베리 파이 | CCTV 카메라 영상을 네트워크로 송출 | GStreamer 파이프라인 실행, MediaMTX로 RTSP 송출 |
-| 윈도우 서버 | 영상을 받아 분석하고 사용자에게 알림 | 영상 수신, 사람 탐지, 이상 상황 판단, Discord 알림, GUI 표시 |
+따라서 코드도 장비 기준으로 먼저 나누고, 그 안에서 세부 책임을 다시 나누었습니다. Raspberry Pi에는 PyQt, YOLO, VLM 같은 무거운 AI server 의존성이 필요하지 않습니다. 반대로 Windows AI server에는 카메라 송출 명령 생성보다 수신, 분석, 알림, UI가 중요합니다.
 
-따라서 코드도 이 실행 환경을 기준으로 나누는 것이 자연스럽다.
-라즈베리 파이에서 필요한 패키지와 윈도우 서버에서 필요한 패키지는 다르며, 둘을 한 환경에 모두 설치하도록 만들면 배포와 디버깅이 어려워진다.
-
-예를 들어 라즈베리 파이는 영상 송출만 하면 되므로 거대한 AI 모델, PyQt GUI, Discord 봇 실행 코드가 필요하지 않다.
-반대로 윈도우 서버는 영상을 분석해야 하므로 Qwen-VL, YOLO, PyQt, Discord 관련 의존성이 필요하다.
-`refactor` 브랜치는 이 차이를 구조와 의존성 선언에 반영했다.
-
-## 3. 패키징과 실행 방식 변경
-
-### 3.1 `pyproject.toml` 추가 및 정리
-
-`refactor` 브랜치는 프로젝트를 Python 패키지로 설치할 수 있도록 `pyproject.toml`을 정리했다.
-이 파일은 프로젝트 이름, Python 버전, 의존성, 실행 명령을 정의한다.
-
-중요한 변화는 선택 의존성 그룹이 나뉘었다는 점이다.
-
-| 의존성 그룹 | 목적 |
-| --- | --- |
-| `edge-node` | 라즈베리 파이 Edge node 송출 코드 실행에 필요한 의존성 |
-| `ai-server` | AI server 분석, GUI, Discord 알림 실행에 필요한 의존성 |
-| `vision-demo` | 실험 또는 데모성 비전 코드 실행용 의존성 |
-
-주니어 개발자가 알아야 할 점은, 모든 의존성을 한 번에 설치하는 방식은 간단해 보이지만 배포 환경이 나뉘는 프로젝트에서는 장기적으로 불리하다는 것이다.
-라즈베리 파이에 윈도우 서버용 GUI/AI 의존성을 설치하려 하면 설치 시간, 디스크 용량, 플랫폼 호환성 문제가 생길 수 있다.
-
-### 3.2 콘솔 명령 추가
-
-`refactor` 브랜치에서는 다음 실행 명령이 정의되었다.
-
-| 명령 | 실행 대상 |
-| --- | --- |
-| `ai-cctv` | 기본 AI server 실행 진입점 |
-| `ai-cctv-ai-server` | AI server 실행 진입점 |
-| `ai-cctv-edge` | Edge node 송출 실행 진입점 |
-
-`develop` 브랜치에서는 특정 `.py` 파일을 직접 찾아 실행하는 방식이 많았다.
-이 방식은 개발자가 파일 위치와 실행 순서를 모두 알고 있어야 한다.
-반면 콘솔 명령을 제공하면 설치 후 어떤 명령을 실행해야 하는지 명확해진다.
-
-변경 전 예시는 다음과 같다.
-
-```powershell
-python "클라이언트 코드\gui.py"
-python "rtsp\sender.py"
-```
-
-변경 후에는 실행 의도가 명확해진다.
-
-```powershell
-ai-cctv-ai-server
-ai-cctv-edge
-```
-
-## 4. 최상위 구조 변경
-
-`develop` 브랜치의 주요 코드는 루트 주변의 여러 폴더에 나뉘어 있었다.
-`refactor` 브랜치에서는 소스 코드를 `src/ai_cctv` 아래로 모았다.
-
-현재 핵심 구조는 다음과 같다.
+## 3. 현재 핵심 폴더 책임
 
 ```text
 src/ai_cctv/
-  edge_node/
-  ai_server/
-  alerts/
-  anomaly/
-  client/
-  common/
-  server/
-  streaming/
+  edge_node/      # Raspberry Pi 실행 묶음
+  ai_server/      # Windows AI server 실행 묶음
+  client/         # GUI, 영상 처리, 추적, 녹화 구현
+  anomaly/        # 이상 상황 판정 규칙과 이벤트
+  alerts/         # Discord 알림 메시지와 디스패처
+  common/         # 공통 값 객체 재노출
 ```
 
-각 폴더의 책임은 다음과 같다.
+이전 리팩터링 과정에서 남아 있던 `src/ai_cctv/server`와 `src/ai_cctv/streaming`은 이번 변경에서 제거했습니다. 두 폴더는 최종 실행 묶음 기준으로 읽기 어렵고, 일부 파일은 `print("test")` 같은 stub 또는 `legacy_*` 이름의 오래된 코드였습니다. 유효한 RTSP 수신 점검 기능은 `src/ai_cctv/ai_server/stream_receiver.py`로 이동했습니다.
 
-| 폴더 | 책임 |
-| --- | --- |
-| `alerts` | 이상 상황 메시지를 외부 채널로 보내는 알림 계층 |
-| `anomaly` | 이상 상황 이벤트 모델과 탐지 판단 로직 |
-| `client` | 윈도우 서버 GUI, 영상 표시, 프레임 처리 |
-| `common` | 여러 실행 묶음이 함께 쓰는 공통 이벤트/메시지 재노출 |
-| `edge_node` | 라즈베리 파이 Edge node 송출과 장애 대응 실행 계층 |
-| `server` | 서버 관점의 보조 기능과 호환 코드 |
-| `streaming` | RTSP/GStreamer 관련 송수신 코드와 레거시 코드 |
-| `ai_server` | AI server 실행 묶음의 상위 진입점 |
+## 4. Edge node 변경
 
-이 구조의 장점은 "파일 이름"이 아니라 "책임"을 기준으로 코드를 찾을 수 있다는 것이다.
-예를 들어 Discord 알림을 수정하고 싶으면 `alerts`를 먼저 보면 되고, 라즈베리 파이 송출 명령을 수정하고 싶으면 `edge_node`를 먼저 보면 된다.
+Edge node의 핵심 코드는 `src/ai_cctv/edge_node` 아래에만 둡니다.
 
-## 5. Edge node 실행 묶음 변경
+| 파일 | 책임 |
+|---|---|
+| `main.py` | 기본 GStreamer 송출 명령을 출력하는 실행 진입점 |
+| `streaming.py` | MediaMTX에 publish할 GStreamer 명령 인자 생성 |
+| `failover.py` | 네트워크 장애 시 송출/로컬 저장/최소 알림 정책 결정 |
 
-### 5.1 `edge_node` 패키지 추가
+이름도 책임 중심으로 바꾸었습니다.
 
-라즈베리 파이 Edge node에서 실행할 코드는 `src/ai_cctv/edge_node`로 분리되었다.
-이 패키지는 CCTV 영상을 분석하지 않는다.
-주요 목표는 카메라 영상을 안정적으로 송출하는 것이다.
+| 이전 이름 | 현재 이름 | 이유 |
+|---|---|---|
+| `PiStreamingConfig` | `EdgeStreamConfig` | Raspberry Pi라는 장비명보다 Edge node 송출 설정이라는 책임을 드러냄 |
+| `GStreamerMediaMtxCommandBuilder` | `MediaMtxGStreamerCommandBuilder` | MediaMTX publish를 위한 GStreamer 명령 생성기임을 명확히 함 |
+| `build_command()` | `build_command_args()` | 반환값이 문자열이 아니라 subprocess용 인자 목록임을 드러냄 |
+| `build_shell_text()` | `build_shell_command_text()` | 운영자가 보는 셸 명령 문자열임을 명확히 함 |
+| `NetworkFailoverPolicy` | `EdgeNetworkFailoverPolicy` | AI server가 아니라 Edge node의 장애 정책임을 명확히 함 |
+| `FailoverAction` | `EdgeFailoverDecision` | 정책이 “실행”하는 것이 아니라 “결정값”을 반환한다는 점을 드러냄 |
 
-| 파일 | 주요 역할 |
-| --- | --- |
-| `edge_node/main.py` | Edge node 실행 진입점 |
-| `edge_node/streaming.py` | GStreamer + MediaMTX 기반 송출 명령 생성 |
-| `edge_node/failover.py` | 네트워크 장애 상황에서 재시도 여부 판단 |
-| `edge_node/__init__.py` | 라즈베리 파이 패키지 공개 API 정리 |
+## 5. AI server 변경
 
-### 5.2 GStreamer + MediaMTX 기준 반영
+AI server는 `src/ai_cctv/ai_server`가 실행 묶음의 입구 역할을 합니다. 실제 GUI와 영상 처리 구현은 `client`에 남기고, 이상 상황 판단은 `anomaly`, 알림 전송은 `alerts`로 분리했습니다.
 
-사용자 요구에 따라 송출 구조는 GStreamer + MediaMTX 기반으로 정리되었다.
-즉, 라즈베리 파이 코드는 직접 AI 분석을 수행하는 것이 아니라 GStreamer 파이프라인을 통해 영상을 MediaMTX로 보낸다.
+| 파일 | 책임 |
+|---|---|
+| `ai_server/main.py` | GUI 기반 AI server 실행 |
+| `ai_server/analysis.py` | 분석 계층 public API 재노출 |
+| `ai_server/alerts.py` | 알림 계층 public API 재노출 |
+| `ai_server/stream_receiver.py` | MediaMTX RTSP 수신 수동 점검 |
 
-주니어 개발자가 이해해야 할 흐름은 다음과 같다.
+`VideoWorker`는 여전히 전체 프레임 처리 루프를 조정하지만, 이상 상황 판정과 알림 전송의 실제 책임은 주입된 객체로 분리했습니다. 내부 이름도 `anomaly_rule_engine`, `notification_dispatcher`로 바꾸어 어떤 객체가 어떤 일을 하는지 드러나게 했습니다.
 
-```text
-카메라
-  -> GStreamer 파이프라인
-  -> MediaMTX
-  -> 윈도우 서버가 RTSP 스트림 수신
-```
+## 6. 이상 상황 판정 변경
 
-이 구조에서 라즈베리 파이는 "영상 송출 장치"에 가깝고, 윈도우 서버는 "분석 및 알림 장치"에 가깝다.
+`anomaly.detector`는 “감지 결과를 이상 상황 이벤트로 바꾸는 순수 판정 계층”입니다. GUI, 영상 수신, Discord 전송을 알지 않습니다.
 
-## 6. AI server 실행 묶음 변경
+| 이전 이름 | 현재 이름 | 이유 |
+|---|---|---|
+| `AnomalyDetector` | `AnomalyRuleEngine` | 여러 규칙을 실행하는 엔진 역할임을 명확히 함 |
+| `ObjectPresenceRule` | `ObjectAppearanceRule` | 객체가 “존재한다”가 아니라 “새로 등장했다”는 이벤트 조건을 표현 |
+| `DwellTimeRule` | `DwellTimeAnomalyRule` | 체류 시간 초과가 이상 상황 규칙임을 명확히 함 |
+| `evaluate()` | `evaluate_detections()` | 입력이 YOLO 감지 결과 목록임을 드러냄 |
 
-### 6.1 `ai_server` 패키지 추가
+주니어 개발자가 이 계층을 수정할 때의 기준은 단순합니다. 새로운 이상 상황 조건을 추가한다면 `AnomalyDetectionRule`을 구현하고, 그 규칙을 `AnomalyRuleEngine`에 넣으면 됩니다. Discord 전송이나 UI 업데이트 코드는 이 계층에 넣지 않습니다.
 
-AI server에서 실행할 상위 진입점은 `src/ai_cctv/ai_server`로 분리되었다.
-이 패키지는 영상 수신, 분석, 알림, GUI 실행을 연결하는 역할을 한다.
+## 7. 알림 변경
 
-| 파일 | 주요 역할 |
-| --- | --- |
-| `ai_server/main.py` | AI server 실행 진입점 |
-| `ai_server/analysis.py` | 분석 관련 기능을 AI server 계층에서 사용할 수 있게 정리 |
-| `ai_server/alerts.py` | 알림 관련 기능을 AI server 계층에서 사용할 수 있게 정리 |
-| `ai_server/__init__.py` | AI server 패키지 공개 API 정리 |
+현시점에서 이상 상황 알림은 Discord로만 보냅니다. 다만 추후 확장을 위해 전송 채널 인터페이스는 유지했습니다.
 
-### 6.2 GUI와 영상 처리 책임 분리
+| 이전 이름 | 현재 이름 | 이유 |
+|---|---|---|
+| `AlertMessage` | `NotificationMessage` | 채널에 전달되는 일반 알림 메시지 값 객체임을 표현 |
+| `AlertChannel` | `NotificationChannel` | 알림 전송 채널의 공통 인터페이스임을 표현 |
+| `DiscordChatBotChannel` | `DiscordNotificationChannel` | Discord 전송 채널임을 직접 표현 |
+| `AlertDispatcher` | `NotificationDispatcher` | 메시지를 여러 채널로 분배하는 책임을 표현 |
+| `dispatch_anomaly()` | `dispatch_anomaly_event()` | 입력값이 이상 상황 이벤트임을 명확히 함 |
 
-`develop` 브랜치에서는 GUI, 영상 처리, 탐지 코드가 하나의 파일 또는 가까운 위치에 섞여 있었다.
-`refactor` 브랜치에서는 `client` 하위 구조로 나뉘었다.
+중요한 점은 “Discord 외 알림을 지금 구현하지 않는다”는 것입니다. 다른 방식은 확장 지점으로만 열어두고, 현재 실행 경로는 Discord 중심으로 단순하게 유지했습니다.
 
-대표적인 역할 분리는 다음과 같다.
+## 8. 제거한 코드
 
-| 구성 요소 | 책임 |
-| --- | --- |
-| `client/ui/main_window.py` | 메인 윈도우 UI 구성과 사용자 화면 표시 |
-| `client/settings_window.py` | 설정 창 관리 |
-| `client/video_worker.py` | 영상 프레임 수신과 백그라운드 작업 |
-| `client/pipeline/person_frame_processor.py` | 프레임 단위 사람 탐지 처리 |
-| `client/person_tracker.py` | 사람 추적 상태 관리 |
-| `client/gui.py` | 기존 GUI 진입점 호환 |
+다음 파일은 현재 실행 경로에서 사용되지 않거나, 최종 구조의 책임 경계를 흐리기 때문에 제거했습니다.
 
-객체 지향 관점에서 보면, 이 변경은 "하나의 객체가 너무 많은 일을 하지 않게 만드는 것"이다.
-GUI 클래스가 영상 분석 알고리즘까지 직접 알면 테스트와 수정이 어려워진다.
-반대로 GUI는 화면 표시를 담당하고, 영상 처리는 worker나 processor가 담당하면 각 부분을 따로 수정할 수 있다.
+| 제거 파일 | 제거 이유 |
+|---|---|
+| `src/ai_cctv/client/legacy_cctv_gui.py` | 현재 GUI 진입점은 `client/gui.py`와 `client/ui/main_window.py`이며 레거시 GUI는 사용 경로가 없음 |
+| `src/ai_cctv/server/fail_over.py` | `print("test")` 수준의 stub로 실제 서버 기능이 아님 |
+| `src/ai_cctv/streaming/sender.py` | Edge node 송출 책임은 `edge_node/streaming.py`로 통합 |
+| `src/ai_cctv/streaming/receiver.py` | RTSP 수신 점검은 AI server 책임으로 이동 |
+| `src/ai_cctv/streaming/legacy_rtsp_receiver.py` | legacy 수신 구현으로 현재 구조와 중복 |
 
-## 7. 이상 상황 탐지와 알림 구조 변경
+삭제 기준은 “파일이 낡았는가”가 아니라 “현재 목표 구조에서 명확한 책임과 호출 경로가 있는가”입니다.
 
-### 7.1 이상 상황 이벤트 모델 분리
+## 9. 테스트와 문서 변경
 
-이상 상황은 단순 문자열보다 구조화된 이벤트로 다루는 것이 좋다.
-`refactor` 브랜치에서는 `anomaly` 영역에 이상 상황 이벤트와 탐지 로직을 분리했다.
+`tests/test_project_structure.py`는 다음을 검증합니다.
 
-| 구성 요소 | 책임 |
-| --- | --- |
-| `anomaly/events.py` | 이상 상황 이벤트 데이터 구조 |
-| `anomaly/detector.py` | 프레임 분석 결과를 이상 상황 이벤트로 판단 |
+| 검증 항목 | 의미 |
+|---|---|
+| 객체 등장 규칙은 같은 추적 ID를 한 번만 보고 | 이상 상황 중복 알림 방지 |
+| 체류 시간 규칙은 기준 시간 이후 이벤트 생성 | 시간 기반 이상 상황 판정 유지 |
+| 알림 디스패처는 이상 상황 이벤트를 메시지로 전송 | Discord 전송 전 단계의 메시지 변환 유지 |
+| Edge failover 정책은 장애 시 로컬 저장과 최소 알림 선택 | Raspberry Pi 장애 대응 정책 유지 |
+| GStreamer 명령은 MediaMTX RTSP 목적지를 포함 | 송출 구조가 GStreamer + MediaMTX 기준임을 유지 |
+| 배포 묶음과 레거시 파일 제거 상태 확인 | Edge node와 AI server 중심 구조 유지 |
 
-이렇게 나누면 탐지 로직과 알림 로직이 서로 강하게 묶이지 않는다.
-탐지기는 "이상 상황이 발생했다"는 이벤트를 만들고, 알림 계층은 그 이벤트를 받아 메시지로 전송한다.
+문서는 다음 기준으로 갱신했습니다.
 
-### 7.2 Discord 알림 중심으로 정리
+| 문서 | 역할 |
+|---|---|
+| `inst/flow.md` | 실행 흐름과 책임 경계를 새 이름 기준으로 설명 |
+| `inst/structure.md` | 실제 AST를 읽어 파일별 클래스/함수 표를 생성 |
+| `inst/change.md` | develop 대비 구조 변경과 설계 이유 설명 |
 
-현시점의 알림 방식은 Discord로 제한했다.
-KakaoTalk, SMS, 이메일 같은 방식은 차후 확장 영역으로 남겨두는 것이 맞다.
+## 10. 개발자가 따라야 할 기준
 
-`refactor` 브랜치의 알림 구조는 다음과 같이 이해할 수 있다.
-
-```text
-이상 상황 이벤트
-  -> 알림 메시지 생성
-  -> Discord 전송
-```
-
-관련 구성 요소는 다음과 같다.
-
-| 구성 요소 | 책임 |
-| --- | --- |
-| `alerts/message.py` | 이상 상황 이벤트를 사람이 읽을 수 있는 알림 메시지로 변환 |
-| `alerts/dispatcher.py` | 알림 메시지를 실제 외부 채널로 보내는 디스패처 |
-| `ai_server/alerts.py` | 윈도우 서버 실행 묶음에서 알림 기능을 사용하기 위한 연결 계층 |
-
-주니어 개발자가 주의해야 할 점은 "확장 가능성"과 "지금 구현할 기능"을 구분해야 한다는 것이다.
-코드 구조상 다른 알림 채널을 나중에 추가할 수는 있지만, 현재 실행 경로는 Discord를 기준으로 평가해야 한다.
-
-## 8. 문서와 자료 폴더 정리
-
-`develop` 브랜치에는 공부 자료, 발표 자료, 실험 로그, 샘플 이미지, 임시 파일이 코드와 가까운 위치에 섞여 있었다.
-`refactor` 브랜치에서는 이런 자료를 성격에 맞게 정리했다.
-
-| 변경 방향 | 설명 |
-| --- | --- |
-| `docs/` | 설계 메모, 공부 자료, 발표 자료 등 문서성 파일 정리 |
-| `scripts/` | 실행 보조 스크립트 정리 |
-| `inst/archive/tmp/` | 임시 또는 샘플 데이터 성격의 파일 정리 |
-| `inst/structure.md` | 현재 소스 코드의 클래스/함수 목록 정리 |
-| `inst/flow.md` | 현재 구조 기준 실행 흐름 문서화 |
-| `inst/change.md` | develop 대비 refactor 변경 사항 설명 |
-
-문서와 코드를 분리하는 이유는 유지보수성 때문이다.
-소스 코드 폴더 안에는 실행에 필요한 코드가 있어야 하고, 설계 설명이나 학습 자료는 문서 폴더에 있어야 한다.
-이 구분이 없으면 새 개발자가 "어떤 파일이 실제 실행에 필요한지" 판단하기 어려워진다.
-
-## 9. 테스트 추가
-
-`refactor` 브랜치에는 `tests/test_project_structure.py`가 추가되었다.
-이 테스트는 세부 알고리즘의 정확도를 모두 검증하는 테스트라기보다, 리팩터링 후 프로젝트 구조가 의도대로 유지되는지 확인하는 구조 테스트에 가깝다.
-
-검증하는 대표 항목은 다음과 같다.
-
-| 검증 항목 | 이유 |
-| --- | --- |
-| 패키지 import 가능 여부 | 파일 이동 후 import 경로가 깨졌는지 확인 |
-| 콘솔 스크립트 정의 여부 | 설치 후 실행 명령이 유지되는지 확인 |
-| 라즈베리 파이/윈도우 서버 의존성 분리 여부 | 배포 환경별 설치 구조가 유지되는지 확인 |
-| 문서 파일 존재 여부 | 리팩터링 산출 문서가 누락되지 않았는지 확인 |
-
-리팩터링에서는 기능을 바꾸지 않는 것이 중요하다.
-따라서 구조 변경 후에는 적어도 import, 엔트리포인트, 패키징 설정이 깨지지 않았는지 자동으로 확인해야 한다.
-
-## 10. 주니어 개발자가 알아야 할 주요 개념
-
-### 10.1 패키지와 스크립트의 차이
-
-스크립트는 보통 특정 파일을 직접 실행하는 방식이다.
-패키지는 여러 모듈을 하나의 설치 가능한 단위로 묶은 것이다.
-
-작은 실험에서는 스크립트 방식이 빠르다.
-하지만 프로젝트가 커지고 실행 환경이 나뉘면 패키지 구조가 더 안정적이다.
-`refactor` 브랜치가 `src/ai_cctv` 구조를 사용하는 이유가 여기에 있다.
-
-### 10.2 엔트리포인트
-
-엔트리포인트는 프로그램 실행이 시작되는 지점이다.
-예를 들어 `ai-cctv-edge`는 Edge node 송출 코드의 엔트리포인트이고, `ai-cctv-ai-server`는 AI server 코드의 엔트리포인트다.
-
-엔트리포인트를 명확히 하면 개발자와 운영자가 "무엇을 실행해야 하는지" 쉽게 알 수 있다.
-
-### 10.3 배포 묶음
-
-배포 묶음은 특정 실행 환경에 필요한 코드와 의존성을 말한다.
-이 프로젝트에서는 라즈베리 파이 묶음과 윈도우 서버 묶음이 다르다.
-
-라즈베리 파이 묶음은 송출 중심이고, 윈도우 서버 묶음은 분석과 알림 중심이다.
-두 묶음을 분리하면 설치 실패, 불필요한 의존성, 실행 환경 충돌을 줄일 수 있다.
-
-### 10.4 호환성 제거
-
-호환 래퍼는 이전 import 경로를 유지하는 데 도움이 되지만, 구조를 읽기 어렵게 만들 수 있다.
-현재 구조에서는 호환 래퍼를 제거하고 `ai_cctv.edge_node`, `ai_cctv.ai_server`만 공식 실행 경로로 사용한다.
-
-### 10.5 이벤트 기반 흐름
-
-이상 상황을 처리할 때 탐지 코드가 Discord 전송까지 직접 담당하면 코드가 강하게 결합된다.
-대신 탐지 코드는 이벤트를 만들고, 알림 코드는 이벤트를 메시지로 바꾸어 전송하는 구조가 더 좋다.
-
-이렇게 하면 나중에 알림 방식이 추가되어도 탐지 로직을 크게 바꾸지 않아도 된다.
-
-## 11. 파일 이동과 역할 변경의 큰 흐름
-
-모든 파일을 한 줄씩 설명하면 오히려 핵심이 흐려질 수 있다.
-따라서 중요한 이동 방향을 중심으로 정리한다.
-
-| develop 쪽 위치/성격 | refactor 쪽 위치/성격 | 의미 |
-| --- | --- | --- |
-| `클라이언트 코드` | `src/ai_cctv/client` | GUI와 영상 처리 코드를 패키지 내부로 이동 |
-| `서버 코드` | `src/ai_cctv/server`, `src/ai_cctv/ai_server` | 서버성 기능과 윈도우 실행 묶음 분리 |
-| `rtsp`, `rtspv1.0` | `src/ai_cctv/streaming`, `src/ai_cctv/edge_node`, `scripts` | RTSP/GStreamer 관련 코드를 실행 코드와 보조 스크립트로 분리 |
-| 공부/정리 자료 폴더 | `docs` | 문서성 자료를 코드 실행 경로 밖으로 이동 |
-| 임시 이미지/샘플 데이터 | `tmp` | 실행 코드와 임시 자료를 분리 |
-
-이 변경의 기준은 "나중에 파일을 찾기 쉬운가"이다.
-개발자는 파일 이름만 보고도 대략 어떤 책임을 가진 코드인지 예측할 수 있어야 한다.
-
-## 12. 현재 구조에서 잘된 점
-
-현재 `refactor` 브랜치의 좋은 점은 다음과 같다.
-
-| 항목 | 설명 |
-| --- | --- |
-| 실행 환경 분리 | 라즈베리 파이와 윈도우 서버의 책임이 분리되었다. |
-| 패키지 구조 도입 | `src/ai_cctv` 아래에서 import 경로를 일관되게 관리할 수 있다. |
-| 의존성 분리 | 라즈베리 파이에 불필요한 윈도우 서버 의존성을 설치하지 않아도 된다. |
-| 문서 보강 | `README.md`, `inst/flow.md`, `inst/structure.md`로 구조를 설명할 수 있다. |
-| 호환성 제거 | 오래된 실행 경로를 제거하고 공식 실행 묶음만 남겼다. |
-| Discord 중심 정리 | 현시점에 실제 사용할 알림 방식을 기준으로 구현 범위를 줄였다. |
-
-## 13. 아직 남은 점과 주의할 점
-
-리팩터링이 되었다고 해서 모든 운영 기능이 완성된 것은 아니다.
-현재 구조에서 특히 주의해야 할 점은 다음과 같다.
-
-| 항목 | 설명 |
-| --- | --- |
-| 실제 라즈베리 파이 검증 | GStreamer, 카메라 장치, MediaMTX 연결은 실제 장비에서 검증해야 한다. |
-| MediaMTX 운영 설정 | MediaMTX 설정 파일, 서비스 등록, 포트 정책은 별도 운영 작업이 필요하다. |
-| AI 모델 런타임 | Qwen-VL, YOLO, PyTorch 계열 의존성은 윈도우 서버 사양과 GPU 환경에 맞춰 검증해야 한다. |
-| Discord 토큰 관리 | 토큰은 코드에 직접 넣지 말고 환경 변수나 비밀 설정으로 관리해야 한다. |
-| 레거시 코드 정리 | 데모/학습 코드는 남아 있으므로, 안정화 후 제거 여부를 결정해야 한다. |
-| 통합 테스트 부족 | 현재 테스트는 구조 검증 중심이며, 실제 카메라-서버-알림 전체 흐름 테스트는 추가가 필요하다. |
-
-주니어 개발자는 "테스트가 통과한다"와 "현장에서 정상 운영된다"를 구분해야 한다.
-현재 테스트는 코드 구조와 import 안정성을 확인하는 데 의미가 있고, 하드웨어와 네트워크까지 포함한 운영 검증은 별도 단계다.
-
-## 14. 검증한 명령
-
-이번 리팩터링 과정에서 구조와 기본 실행 가능성을 확인하기 위해 다음 명령을 사용했다.
-
-```powershell
-python -m compileall src main.py tests
-$env:PYTHONPATH='src'; python -m unittest discover -s tests
-```
-
-문서 추가 후에는 Git diff의 공백 오류 여부도 확인한다.
-
-```powershell
-git diff --check
-```
-
-## 15. 커밋 단위로 본 변경 흐름
-
-`origin/develop` 이후 `refactor` 브랜치에는 다음 커밋들이 쌓였다.
-
-| 커밋 | 의미 |
-| --- | --- |
-| `046d32f refactor project structure` | 루트에 흩어진 코드를 패키지 구조로 옮기는 1차 정리 |
-| `7811d1e Refactor AI CCTV responsibilities` | 객체와 모듈의 책임을 더 명확히 분리 |
-| `c3f5e13 Align structure with AI CCTV design` | 프로젝트 문서 기준에 맞추어 구조를 보정 |
-| `fbc2077 Fix alert and streaming design alignment` | Discord 알림과 GStreamer 송출 방향에 맞게 보정 |
-| `c76c707 Split edge pi and windows server bundles` | 라즈베리 파이 묶음과 윈도우 서버 묶음을 명확히 분리 |
-| `2da7da4 Nest runtime bundles under ai_cctv package` | 실행 묶음을 단일 루트 패키지 아래로 정리 |
-
-이 흐름을 보면, 리팩터링은 한 번에 끝난 작업이 아니라 프로젝트 목표가 명확해질수록 구조를 점진적으로 맞춘 작업이다.
-
-## 16. 앞으로 코드를 수정할 때의 기준
-
-앞으로 새 기능을 추가할 때는 다음 기준으로 위치를 정하면 된다.
-
-| 추가하려는 기능 | 넣을 위치 |
-| --- | --- |
-| 라즈베리 파이 카메라 송출, GStreamer 명령, 송출 장애 대응 | `src/ai_cctv/edge_node` |
-| 윈도우 서버 실행 흐름 연결 | `src/ai_cctv/ai_server` |
-| GUI 화면, 설정 창, 영상 표시 | `src/ai_cctv/client` |
-| 프레임 분석, 사람 탐지, 추적 | `src/ai_cctv/client/pipeline`, `src/ai_cctv/client/person_tracker.py` |
-| 이상 상황 판단 | `src/ai_cctv/anomaly` |
-| Discord 알림 메시지와 전송 | `src/ai_cctv/alerts` |
-| 여러 실행 묶음이 함께 쓰는 데이터 구조 | `src/ai_cctv/common` |
-| 실행 보조 셸 스크립트 | `scripts` |
-| 설계 문서와 학습 자료 | `docs` |
-
-가장 중요한 원칙은 "어떤 파일을 수정해야 하는지 설명할 수 있어야 한다"는 것이다.
-예를 들어 Discord 메시지 문구를 바꾸는데 GUI 파일을 수정해야 한다면 구조가 잘못된 신호일 수 있다.
-반대로 각 기능이 자기 책임을 가진 폴더에 있다면 유지보수와 협업이 쉬워진다.
-
-## 17. 추가 정리: 호환성 제거와 실행 묶음 확정
-
-프로젝트의 실행 책임을 더 분명히 하되 Python 패키지 가독성을 유지하기 위해 Edge node 전용 디렉토리 `src/ai_cctv/edge_node`와 AI server 전용 디렉토리 `src/ai_cctv/ai_server`를 단일 루트 패키지 `src/ai_cctv` 아래에 확정했다.
-
-| 디렉토리 | 역할 |
-| --- | --- |
-| `src/ai_cctv/edge_node` | 라즈베리 파이 Edge node 송출 및 장애 대응 |
-| `src/ai_cctv/ai_server` | AI server 실행 진입점, 분석/알림 재노출 |
-
-함께 수정한 문제점은 다음과 같다.
-
-1. 실행 진입점이 `ai_cctv` 내부 호환 경로에 묶여 보이던 문제를 `src/ai_cctv/edge_node/main.py`, `src/ai_cctv/ai_server/main.py`로 분리해 해결했다.
-2. 콘솔 스크립트 `ai-cctv-edge`가 `ai_cctv.edge_node.main`을 직접 사용하도록 수정했다.
-3. 콘솔 스크립트 `ai-cctv`, `ai-cctv-ai-server`가 `ai_cctv.ai_server.main`을 직접 사용하도록 수정했다.
-4. `edge`, `edge_pi`, `windows_server` 호환 패키지와 `edge-pi`, `windows-server` 호환 extras를 제거했다.
-
-이 변경으로 신규 코드와 문서는 `ai_cctv.edge_node`와 `ai_cctv.ai_server`만 기준으로 읽으면 된다.
+새 코드를 추가할 때는 먼저 실행 위치를 결정해야 합니다.
+
+| 질문 | 들어갈 위치 |
+|---|---|
+| Raspberry Pi에서 카메라 송출이나 장애 대응에 필요한가? | `edge_node` |
+| Windows AI server 실행 진입점이나 수신 점검인가? | `ai_server` |
+| GUI, 영상 루프, 추적, 녹화 구현인가? | `client` |
+| 감지 결과를 이상 상황으로 판정하는 규칙인가? | `anomaly` |
+| Discord 알림 메시지와 전송인가? | `alerts` |
+| 여러 계층이 함께 쓰는 값 객체 재노출인가? | `common` |
+
+이 기준을 지키면 폴더 수가 많아도 구조가 흐트러지지 않습니다. 반대로 `server`, `streaming`, `legacy`처럼 실행 묶음과 책임이 동시에 애매한 폴더를 다시 만들면 프로젝트를 읽는 사람이 어떤 파일이 실제 운영 코드인지 판단하기 어려워집니다.

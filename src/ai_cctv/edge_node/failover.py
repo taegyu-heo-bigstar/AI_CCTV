@@ -1,21 +1,21 @@
 # Edge node 네트워크 장애 대응 정책 파일입니다.
-# 네트워크 상태에 따라 스트리밍, 로컬 저장, 최소 알림 동작을 결정합니다.
-# microSD 저장과 LoRa 알림 구현을 연결할 정책 계층을 제공합니다.
+# 네트워크 상태에 따라 송출, 로컬 저장, 최소 알림 동작을 결정합니다.
+# 실제 저장과 알림 구현은 이 정책의 결정값을 사용하는 계층에서 수행합니다.
 
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class FailoverAction:
-    """네트워크 상태에 따른 Edge node 동작을 표현합니다.
+class EdgeFailoverDecision:
+    """네트워크 상태에 따른 Edge node 동작 결정을 표현합니다.
 
     인자:
         should_stream: Windows 서버로 RTSP 송출을 시도할지 여부입니다.
         should_record_local: Raspberry Pi 로컬 저장을 수행할지 여부입니다.
-        should_send_minimal_alert: LoRa 같은 최소 알림을 보낼지 여부입니다.
+        should_send_minimal_alert: 최소 알림을 보낼지 여부입니다.
         reason: 동작을 선택한 이유입니다.
     반환값:
-        FailoverAction 인스턴스를 반환합니다.
+        EdgeFailoverDecision 인스턴스를 반환합니다.
     """
 
     should_stream: bool
@@ -24,13 +24,13 @@ class FailoverAction:
     reason: str
 
 
-class NetworkFailoverPolicy:
+class EdgeNetworkFailoverPolicy:
     """Edge node 네트워크 장애 대응 동작을 결정합니다.
 
     인자:
         enable_minimal_alert: 장애 시 최소 알림을 사용할지 여부입니다.
     반환값:
-        NetworkFailoverPolicy 인스턴스를 반환합니다.
+        EdgeNetworkFailoverPolicy 인스턴스를 반환합니다.
     """
 
     def __init__(self, enable_minimal_alert=True):
@@ -44,24 +44,24 @@ class NetworkFailoverPolicy:
 
         self.enable_minimal_alert = enable_minimal_alert
 
-    def decide(self, network_available):
-        """네트워크 상태에 맞는 엣지 장치 동작을 결정합니다.
+    def decide_for_network(self, network_available):
+        """네트워크 상태에 맞는 Edge node 동작을 결정합니다.
 
         인자:
             network_available: 네트워크 연결 가능 여부입니다.
         반환값:
-            FailoverAction 객체를 반환합니다.
+            EdgeFailoverDecision 객체를 반환합니다.
         """
 
         if network_available:
-            return FailoverAction(
+            return EdgeFailoverDecision(
                 should_stream=True,
                 should_record_local=False,
                 should_send_minimal_alert=False,
                 reason="네트워크 연결 정상",
             )
 
-        return FailoverAction(
+        return EdgeFailoverDecision(
             should_stream=False,
             should_record_local=True,
             should_send_minimal_alert=self.enable_minimal_alert,

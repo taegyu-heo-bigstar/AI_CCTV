@@ -5,8 +5,8 @@
 from datetime import datetime
 from PyQt5.QtCore import QThread, pyqtSignal
 
-from ..alerts.dispatcher import AlertDispatcher, DiscordChatBotChannel
-from ..anomaly.detector import AnomalyDetector
+from ..alerts.dispatcher import DiscordNotificationChannel, NotificationDispatcher
+from ..anomaly.detector import AnomalyRuleEngine
 from .crop_manager import CropManager
 from .full_body_checker import FullBodyChecker
 from .pipeline.person_frame_processor import PersonFrameProcessor
@@ -39,8 +39,8 @@ class VideoWorker(QThread):
         use_vlm=False,
         ai_cctv_path="",
         original_segment_seconds=10,
-        anomaly_detector=None,
-        alert_dispatcher=None,
+        anomaly_rule_engine=None,
+        notification_dispatcher=None,
     ):
         """영상 처리 스레드와 협력 객체를 초기화합니다.
 
@@ -49,8 +49,8 @@ class VideoWorker(QThread):
             use_vlm: VLM 분석 사용 여부입니다.
             ai_cctv_path: 녹화 파일 저장 루트 경로입니다.
             original_segment_seconds: 원본 녹화 파일 분할 초 단위입니다.
-            anomaly_detector: 감지 결과를 이상 상황으로 변환하는 객체입니다.
-            alert_dispatcher: 이상 상황 알림을 전송하는 객체입니다.
+            anomaly_rule_engine: 감지 결과를 이상 상황으로 변환하는 규칙 엔진입니다.
+            notification_dispatcher: 이상 상황 알림을 전송하는 디스패처입니다.
         반환값:
             없음.
         """
@@ -68,8 +68,10 @@ class VideoWorker(QThread):
         self.ai_cctv_path = ai_cctv_path
         self.original_segment_seconds = original_segment_seconds
         self.recording_manager = None
-        self.anomaly_detector = anomaly_detector or AnomalyDetector()
-        self.alert_dispatcher = alert_dispatcher or self._create_default_alert_dispatcher()
+        self.anomaly_rule_engine = anomaly_rule_engine or AnomalyRuleEngine()
+        self.notification_dispatcher = (
+            notification_dispatcher or self._create_default_notification_dispatcher()
+        )
 
         self.vlm_worker = VLMWorker(self.state_manager) if self.use_vlm else None
         self.person_processor = PersonFrameProcessor(
@@ -123,9 +125,9 @@ class VideoWorker(QThread):
                 for event in self.person_processor.process(frame, person):
                     self.event_ready.emit(event)
 
-            for anomaly_event in self.anomaly_detector.evaluate(persons):
+            for anomaly_event in self.anomaly_rule_engine.evaluate_detections(persons):
                 self.event_ready.emit(anomaly_event.to_worker_event())
-                self.alert_dispatcher.dispatch_anomaly(anomaly_event)
+                self.notification_dispatcher.dispatch_anomaly_event(anomaly_event)
 
             for removed_id in self.state_manager.remove_disappeared_persons():
                 self.event_ready.emit({
@@ -171,15 +173,15 @@ class VideoWorker(QThread):
 
         self.stream.release()
 
-    def _create_default_alert_dispatcher(self):
+    def _create_default_notification_dispatcher(self):
         """기본 Discord 이상 상황 알림 디스패처를 생성합니다.
 
         인자:
             없음.
         반환값:
-            Discord 채널이 등록된 AlertDispatcher 객체를 반환합니다.
+            Discord 채널이 등록된 NotificationDispatcher 객체를 반환합니다.
         """
 
         from .chat_bot import chat_bot as chatbot
 
-        return AlertDispatcher([DiscordChatBotChannel(chatbot)])
+        return NotificationDispatcher([DiscordNotificationChannel(chatbot)])

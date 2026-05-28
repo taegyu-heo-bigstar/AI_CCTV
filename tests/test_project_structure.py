@@ -1,25 +1,29 @@
 # 문서 기준 구조 보강 모듈의 단위 테스트 파일입니다.
-# 장비나 AI 모델 없이 이상 상황, 알림, 엣지 장애 정책을 검증합니다.
-# 종합설계 문서의 핵심 계층이 코드로 동작하는지 확인합니다.
+# 서비스와 AI 모델 없이 이상 상황, 알림, 엣지 송출 역할 경계를 검증합니다.
+# 종합설계 문서의 핵심 실행 단위가 코드로 유지되는지 확인합니다.
 
 import unittest
 import tomllib
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from ai_cctv.alerts.dispatcher import AlertChannel, AlertDispatcher
-from ai_cctv.anomaly.detector import AnomalyDetector, DwellTimeRule, ObjectPresenceRule
-from ai_cctv.edge_node.failover import NetworkFailoverPolicy
-from ai_cctv.edge_node.streaming import GStreamerMediaMtxCommandBuilder, PiStreamingConfig
+from ai_cctv.alerts.dispatcher import NotificationChannel, NotificationDispatcher
+from ai_cctv.anomaly.detector import (
+    AnomalyRuleEngine,
+    DwellTimeAnomalyRule,
+    ObjectAppearanceRule,
+)
+from ai_cctv.edge_node.failover import EdgeNetworkFailoverPolicy
+from ai_cctv.edge_node.streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
 
 
-class MemoryAlertChannel(AlertChannel):
+class MemoryNotificationChannel(NotificationChannel):
     """테스트용 메모리 알림 채널입니다.
 
     인자:
         없음.
     반환값:
-        MemoryAlertChannel 인스턴스를 반환합니다.
+        MemoryNotificationChannel 인스턴스를 반환합니다.
     """
 
     def __init__(self):
@@ -37,7 +41,7 @@ class MemoryAlertChannel(AlertChannel):
         """전송된 알림 메시지를 메모리에 저장합니다.
 
         인자:
-            message: AlertMessage 객체입니다.
+            message: NotificationMessage 객체입니다.
         반환값:
             없음.
         """
@@ -54,8 +58,8 @@ class ProjectStructureTest(unittest.TestCase):
         ProjectStructureTest 인스턴스를 반환합니다.
     """
 
-    def test_object_presence_rule_emits_once_per_track(self):
-        """동일 추적 ID에 대해 객체 등장 이벤트가 한 번만 생성되는지 검증합니다.
+    def test_object_appearance_rule_emits_once_per_track(self):
+        """동일 추적 ID에 대한 객체 등장 이벤트가 한 번만 생성되는지 검증합니다.
 
         인자:
             없음.
@@ -63,7 +67,7 @@ class ProjectStructureTest(unittest.TestCase):
             없음.
         """
 
-        detector = AnomalyDetector([ObjectPresenceRule(target_class="person")])
+        rule_engine = AnomalyRuleEngine([ObjectAppearanceRule(target_class="person")])
         detection = {
             "person_id": 1,
             "class_name": "person",
@@ -71,10 +75,16 @@ class ProjectStructureTest(unittest.TestCase):
             "bbox": (1, 2, 3, 4),
         }
 
-        first_events = detector.evaluate([detection], now=datetime(2026, 5, 28))
-        second_events = detector.evaluate([detection], now=datetime(2026, 5, 28))
+        first_events = rule_engine.evaluate_detections(
+            [detection], evaluated_at=datetime(2026, 5, 28)
+        )
+        second_events = rule_engine.evaluate_detections(
+            [detection], evaluated_at=datetime(2026, 5, 28)
+        )
         moved_detection = dict(detection, bbox=(2, 3, 4, 5))
-        moved_events = detector.evaluate([moved_detection], now=datetime(2026, 5, 28))
+        moved_events = rule_engine.evaluate_detections(
+            [moved_detection], evaluated_at=datetime(2026, 5, 28)
+        )
 
         self.assertEqual(len(first_events), 1)
         self.assertEqual(len(second_events), 0)
@@ -90,7 +100,7 @@ class ProjectStructureTest(unittest.TestCase):
             없음.
         """
 
-        rule = DwellTimeRule(target_class="person", dwell_seconds=10)
+        rule = DwellTimeAnomalyRule(target_class="person", dwell_seconds=10)
         detection = {
             "person_id": 7,
             "class_name": "person",
@@ -99,13 +109,13 @@ class ProjectStructureTest(unittest.TestCase):
         }
         started_at = datetime(2026, 5, 28, 10, 0, 0)
 
-        self.assertEqual(rule.evaluate([detection], started_at), [])
-        events = rule.evaluate([detection], started_at + timedelta(seconds=11))
+        self.assertEqual(rule.evaluate_detections([detection], started_at), [])
+        events = rule.evaluate_detections([detection], started_at + timedelta(seconds=11))
 
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].event_type, "dwell_time_exceeded")
 
-    def test_alert_dispatcher_sends_anomaly_message(self):
+    def test_notification_dispatcher_sends_anomaly_message(self):
         """이상 상황 이벤트가 알림 메시지로 변환되어 채널로 전달되는지 검증합니다.
 
         인자:
@@ -114,9 +124,9 @@ class ProjectStructureTest(unittest.TestCase):
             없음.
         """
 
-        channel = MemoryAlertChannel()
-        dispatcher = AlertDispatcher([channel])
-        event = AnomalyDetector().evaluate([
+        channel = MemoryNotificationChannel()
+        dispatcher = NotificationDispatcher([channel])
+        event = AnomalyRuleEngine().evaluate_detections([
             {
                 "person_id": 3,
                 "class_name": "person",
@@ -125,13 +135,13 @@ class ProjectStructureTest(unittest.TestCase):
             }
         ])[0]
 
-        sent_count = dispatcher.dispatch_anomaly(event)
+        sent_count = dispatcher.dispatch_anomaly_event(event)
 
         self.assertEqual(sent_count, 1)
         self.assertIn("감지 객체: person", channel.messages[0].to_text())
 
     def test_edge_failover_policy_matches_project_document(self):
-        """네트워크 장애 시 로컬 저장과 최소 알림이 선택되는지 검증합니다.
+        """네트워크 장애 시 로컬 저장과 최소 알림을 선택하는지 검증합니다.
 
         인자:
             없음.
@@ -139,8 +149,8 @@ class ProjectStructureTest(unittest.TestCase):
             없음.
         """
 
-        policy = NetworkFailoverPolicy(enable_minimal_alert=True)
-        action = policy.decide(network_available=False)
+        policy = EdgeNetworkFailoverPolicy(enable_minimal_alert=True)
+        action = policy.decide_for_network(network_available=False)
 
         self.assertFalse(action.should_stream)
         self.assertTrue(action.should_record_local)
@@ -155,8 +165,8 @@ class ProjectStructureTest(unittest.TestCase):
             없음.
         """
 
-        config = PiStreamingConfig(mediamtx_url="rtsp://127.0.0.1:8554/test")
-        command = GStreamerMediaMtxCommandBuilder(config).build_command()
+        config = EdgeStreamConfig(mediamtx_url="rtsp://127.0.0.1:8554/test")
+        command = MediaMtxGStreamerCommandBuilder(config).build_command_args()
 
         self.assertIn("gst-launch-1.0", command)
         self.assertIn("libcamerasrc", command)
@@ -192,6 +202,11 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertFalse(Path("src/ai_cctv/edge").exists())
         self.assertFalse(Path("src/ai_cctv/edge_pi").exists())
         self.assertFalse(Path("src/ai_cctv/windows_server").exists())
+        self.assertFalse(Path("src/ai_cctv/server").exists())
+        self.assertFalse(Path("src/ai_cctv/streaming").exists())
+        self.assertFalse(Path("src/ai_cctv/client/legacy_cctv_gui.py").exists())
+        self.assertFalse(Path("src/ai_cctv/streaming/legacy_rtsp_receiver.py").exists())
+        self.assertFalse(Path("src/ai_cctv/server/fail_over.py").exists())
         self.assertTrue(Path("requirements/edge-node.txt").is_file())
         self.assertTrue(Path("requirements/ai-server.txt").is_file())
 

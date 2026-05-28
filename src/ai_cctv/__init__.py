@@ -1,6 +1,5 @@
 # AI CCTV 공통 패키지 초기화 파일입니다.
-# Edge node와 AI server 외의 공통 구현, 호환 래퍼, 도메인 모듈을 포함합니다.
-# 실제 실행 진입점은 src/ai_cctv/edge_node와 src/ai_cctv/ai_server에 분리되어 있습니다.
+# Edge node와 AI server 실행 묶음 아래에 실제 기능을 배치합니다.
+# 공통 도메인 값 객체는 common, anomaly, alerts 패키지에서 제공합니다.
 
 """AI CCTV package."""
-
