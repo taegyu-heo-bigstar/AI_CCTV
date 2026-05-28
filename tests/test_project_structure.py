@@ -178,10 +178,18 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertEqual(scripts["ai-cctv-edge"], "ai_cctv.edge_pi.main:main")
         self.assertEqual(
             scripts["ai-cctv-windows-server"],
-            "ai_cctv.windows_server.main:main",
+            "ai_cctv.ai_server.main:main",
         )
         self.assertIn("edge-pi", extras)
         self.assertIn("windows-server", extras)
+
+    def test_top_level_responsibility_packages_exist(self):
+        """1차 책임 분리용 top-level 패키지가 존재하는지 검증합니다."""
+
+        self.assertTrue(Path("src/edge_node/__init__.py").exists())
+        self.assertTrue(Path("src/AI_server/__init__.py").exists())
+        self.assertTrue(Path("src/util/__init__.py").exists())
+
 
 
 if __name__ == "__main__":

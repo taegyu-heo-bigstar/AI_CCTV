@@ -21,7 +21,7 @@ AI_CCTV/
 │  │  ├─ main.py                   # Pi 송출 명령 진입점
 │  │  ├─ streaming.py              # GStreamer + MediaMTX RTSP publish 명령
 │  │  └─ failover.py               # 네트워크 장애 대응 정책
-│  ├─ windows_server/              # Windows 서버 전용 실행 묶음
+│  ├─ ai_server/                   # AI 서버 전용 실행 묶음 (신규 기본 경로)
 │  │  ├─ main.py                   # Windows 서버 GUI/분석 진입점
 │  │  ├─ analysis.py               # 분석 계층 재노출
 │  │  └─ alerts.py                 # Discord 알림 계층 재노출
@@ -41,7 +41,7 @@ AI_CCTV/
 | 실행 묶음 | 설치 extras | console script | 주요 책임 |
 |---|---|---|---|
 | Raspberry Pi | `ai-cctv[edge-pi]` | `ai-cctv-edge` | 카메라 송출, MediaMTX publish, 네트워크 장애 정책 |
-| Windows 서버 | `ai-cctv[windows-server]` | `ai-cctv-windows-server` 또는 `ai-cctv` | RTSP 수신, OpenCV/YOLO 분석, 이상 상황 판단, Discord 알림, GUI |
+| AI 서버(Windows) | `ai-cctv[windows-server]` | `ai-cctv-windows-server` 또는 `ai-cctv` | RTSP 수신, OpenCV/YOLO 분석, 이상 상황 판단, Discord 알림, GUI |
 
 ## System Flow
 
@@ -52,7 +52,7 @@ flowchart LR
     EdgeMain --> GStreamer["edge_pi/streaming.py<br/>GStreamer + MediaMTX"]
     Pi --> Failover["edge_pi/failover.py<br/>network policy"]
     GStreamer --> RTSP["RTSP Stream"]
-    RTSP --> Windows["windows_server/main.py"]
+    RTSP --> Windows["ai_server/main.py"]
     Windows --> VideoWorker["client/video_worker.py"]
     VideoWorker --> Tracker["client/person_tracker.py<br/>YOLO + ByteTrack"]
     Tracker --> Processor["client/pipeline/person_frame_processor.py"]
@@ -135,3 +135,16 @@ ai-cctv-windows-server
 python -m compileall src main.py tests
 $env:PYTHONPATH="src"; python -m unittest discover -s tests
 ```
+
+
+## 2026-05 1차 책임 분리
+
+가독성 향상을 위해 `src/ai_cctv`의 기존 구현은 유지하면서, top-level 경로에 책임 기준 재노출 패키지를 추가했다.
+
+| 경로 | 1차 책임 |
+|---|---|
+| `src/edge_node/` | 라즈베리 파이 엣지 송출/장애 대응 진입점 재노출 |
+| `src/AI_server/` | Windows AI 서버 실행/분석/알림 진입점 재노출 |
+| `src/util/` | 공통 이벤트/메시지 타입 재노출 |
+
+이 단계는 대규모 파일 이동 없이 책임 경계를 먼저 드러내는 1차 리팩토링이며, 기존 `ai_cctv.*` import 호환성을 유지한다.
