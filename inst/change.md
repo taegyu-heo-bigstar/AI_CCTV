@@ -423,20 +423,3 @@ git diff --check
 3. 콘솔 스크립트 `ai-cctv`, `ai-cctv-windows-server`가 새 AI 서버 진입점을 사용하도록 수정했다.
 
 이 변경으로 신규 코드는 `ai_server`를 기준으로 읽고, 기존 코드는 `windows_server` 경로를 유지해도 동작하도록 호환성을 보장한다.
-
-
-## 17. 1차 책임 분리 리팩토링
-
-요구사항에 맞춰 `src/ai_cctv` 내부 구현을 그대로 유지하면서, 프로젝트 루트 `src` 아래에 책임 구분용 top-level 패키지를 추가했다.
-
-| 추가 경로 | 내용 |
-| --- | --- |
-| `src/edge_node/__init__.py` | `ai_cctv.edge_pi` 계층의 핵심 API 재노출 |
-| `src/AI_server/__init__.py` | `ai_cctv.ai_server` 계층의 실행/분석/알림 API 재노출 |
-| `src/util/__init__.py` | `ai_cctv.common`의 공통 타입 재노출 |
-
-함께 해결한 문제는 다음과 같다.
-
-1. 경로 가독성 문제: `ai_cctv` 단일 네임스페이스만으로는 실행 책임(엣지/서버/공통)이 즉시 드러나지 않던 점을 top-level 패키지로 보완했다.
-2. 진입점 일관성 문제: 로컬 실행 파일 `main.py`가 구 경로(`windows_server`)를 바라보던 부분을 `ai_server` 기준으로 정렬했다.
-3. 코드 품질 문제: `src/ai_cctv/__init__.py`의 깨진 주석을 정리해 패키지 설명을 명확히 했다.
