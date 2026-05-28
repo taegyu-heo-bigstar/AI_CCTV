@@ -15,7 +15,7 @@ from typing import Any
 # 같은 chat_bot 디렉터리 안의 discord_bot.py를 import합니다.
 # "from chat_bot import chat_bot as chatbot" 형태로 이 모듈을 불러올 예정이므로,
 # 패키지 기준 import를 사용합니다.
-from chat_bot import discord_bot
+from . import discord_bot
 
 
 # Discord로 보낼 메시지를 저장하는 FIFO 큐입니다.

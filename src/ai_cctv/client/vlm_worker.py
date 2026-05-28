@@ -5,8 +5,8 @@ import queue
 import torch
 import gc
 
-from vlm_person_analyzer_Qwen_test import PersonAnalyzer
-from chat_bot import chat_bot as chatbot
+from .vlm_person_analyzer_qwen_test import PersonAnalyzer
+from .chat_bot import chat_bot as chatbot
 
 class VLMWorker:
     def __init__(self, state_manager):

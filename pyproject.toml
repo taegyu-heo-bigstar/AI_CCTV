@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-cctv"
+version = "0.1.0"
+description = "AI CCTV client and streaming utilities"
+requires-python = ">=3.11"
+dependencies = [
+    "transformers>=4.51.0",
+    "accelerate",
+    "pillow",
+    "qwen-vl-utils",
+    "bitsandbytes",
+    "opencv-python",
+    "ultralytics",
+    "numpy",
+    "matplotlib",
+    "scipy",
+    "pyyaml",
+    "requests",
+    "psutil",
+    "insightface",
+    "onnxruntime",
+    "discord.py>=2.0.0",
+    "PyQt5",
+]
+
+[project.scripts]
+ai-cctv = "ai_cctv.client.gui:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

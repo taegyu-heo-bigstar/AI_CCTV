@@ -29,7 +29,7 @@ _default_sender: DiscordBotSender | None = None
 
 def _read_proj_env_value(key: str) -> str:
     """루트의 .proj_env 파일에서 지정한 값을 읽습니다."""
-    proj_env_path = Path(__file__).resolve().parents[2] / ".proj_env"
+    proj_env_path = Path(__file__).resolve().parents[4] / ".proj_env"
 
     try:
         for line in proj_env_path.read_text(encoding="utf-8").splitlines():

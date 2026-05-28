@@ -2,7 +2,7 @@
 """
 VLM 모듈 파일입니다.
 외부 파일에서 실행시 아래와같이 진행.
-from vlm_person_analyzer_Qwen import PersonAnalyzer
+from .vlm_person_analyzer_qwen import PersonAnalyzer
 
 analyzer = PersonAnalyzer()
 result1 = analyzer.analyze("1.jpg")

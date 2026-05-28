@@ -1,4 +1,4 @@
-from face_identifier import FaceIdentifier
+from .face_identifier import FaceIdentifier
 
 
 def main():
