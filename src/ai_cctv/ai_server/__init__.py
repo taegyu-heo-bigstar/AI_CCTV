@@ -1,17 +1,12 @@
-# AI 서버 호환 패키지 파일입니다.
-# 실제 AI 서버 실행 묶음은 src/ai_server 패키지에 있습니다.
-# 기존 ai_cctv.ai_server import 경로를 유지하기 위해 공개 객체를 재노출합니다.
+# AI server 실행 패키지 파일입니다.
+# GUI 분석 실행, 이상 상황 판단, Discord 알림 연결 객체를 공개합니다.
+# Edge node 송출 코드와 분리된 서버 측 배포 단위입니다.
 
-from ai_server import (
-    AlertDispatcher,
-    AlertMessage,
-    AnomalyDetector,
-    DiscordChatBotChannel,
-    DwellTimeRule,
-    ObjectPresenceRule,
-    VideoWorker,
-    main,
-)
+"""AI 서버 실행 패키지입니다."""
+
+from .analysis import AnomalyDetector, DwellTimeRule, ObjectPresenceRule, VideoWorker
+from .alerts import AlertDispatcher, AlertMessage, DiscordChatBotChannel
+from .main import main
 
 __all__ = [
     "main",

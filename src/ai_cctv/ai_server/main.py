@@ -1,10 +1,16 @@
-# AI 서버 실행 진입점 호환 파일입니다.
-# 실제 AI 서버 실행 진입점은 src/ai_server/main.py에 있습니다.
-# 기존 ai_cctv.ai_server.main import 경로를 유지합니다.
+# AI server 실행 진입점 파일입니다.
+# 설치된 console script와 루트 main.py가 이 진입점을 호출합니다.
+# 실제 GUI 구성은 ai_cctv.client.gui에 위임합니다.
 
-from ai_server.main import main
+"""AI 서버 실행 진입점입니다."""
 
-__all__ = ["main"]
+from ai_cctv.client.gui import main as run_gui
+
+
+def main():
+    """AI 서버 GUI 분석 애플리케이션을 실행합니다."""
+
+    run_gui()
 
 
 if __name__ == "__main__":

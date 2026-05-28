@@ -132,7 +132,7 @@ src/
 
 ### 5.1 `edge_node` 패키지 추가
 
-라즈베리 파이 Edge node에서 실행할 코드는 `src/edge_node`로 분리되었다.
+라즈베리 파이 Edge node에서 실행할 코드는 `src/ai_cctv/edge_node`로 분리되었다.
 이 패키지는 CCTV 영상을 분석하지 않는다.
 주요 목표는 카메라 영상을 안정적으로 송출하는 것이다.
 
@@ -172,7 +172,7 @@ src/
 
 ### 6.1 `ai_server` 패키지 추가
 
-AI server에서 실행할 상위 진입점은 `src/ai_server`로 분리되었다.
+AI server에서 실행할 상위 진입점은 `src/ai_cctv/ai_server`로 분리되었다.
 이 패키지는 영상 수신, 분석, 알림, GUI 실행을 연결하는 역할을 한다.
 
 | 파일 | 주요 역할 |
@@ -324,8 +324,8 @@ KakaoTalk, SMS, 이메일 같은 방식은 차후 확장 영역으로 남겨두�
 | develop 쪽 위치/성격 | refactor 쪽 위치/성격 | 의미 |
 | --- | --- | --- |
 | `클라이언트 코드` | `src/ai_cctv/client` | GUI와 영상 처리 코드를 패키지 내부로 이동 |
-| `서버 코드` | `src/ai_cctv/server`, `src/ai_server` | 서버성 기능과 윈도우 실행 묶음 분리 |
-| `rtsp`, `rtspv1.0` | `src/ai_cctv/streaming`, `src/edge_node`, `scripts` | RTSP/GStreamer 관련 코드를 실행 코드와 보조 스크립트로 분리 |
+| `서버 코드` | `src/ai_cctv/server`, `src/ai_cctv/ai_server` | 서버성 기능과 윈도우 실행 묶음 분리 |
+| `rtsp`, `rtspv1.0` | `src/ai_cctv/streaming`, `src/ai_cctv/edge_node`, `scripts` | RTSP/GStreamer 관련 코드를 실행 코드와 보조 스크립트로 분리 |
 | 공부/정리 자료 폴더 | `docs` | 문서성 자료를 코드 실행 경로 밖으로 이동 |
 | 임시 이미지/샘플 데이터 | `tmp` | 실행 코드와 임시 자료를 분리 |
 
@@ -397,8 +397,8 @@ git diff --check
 
 | 추가하려는 기능 | 넣을 위치 |
 | --- | --- |
-| 라즈베리 파이 카메라 송출, GStreamer 명령, 송출 장애 대응 | `src/edge_node` |
-| 윈도우 서버 실행 흐름 연결 | `src/ai_server` |
+| 라즈베리 파이 카메라 송출, GStreamer 명령, 송출 장애 대응 | `src/ai_cctv/edge_node` |
+| 윈도우 서버 실행 흐름 연결 | `src/ai_cctv/ai_server` |
 | GUI 화면, 설정 창, 영상 표시 | `src/ai_cctv/client` |
 | 프레임 분석, 사람 탐지, 추적 | `src/ai_cctv/client/pipeline`, `src/ai_cctv/client/person_tracker.py` |
 | 이상 상황 판단 | `src/ai_cctv/anomaly` |
@@ -411,24 +411,22 @@ git diff --check
 예를 들어 Discord 메시지 문구를 바꾸는데 GUI 파일을 수정해야 한다면 구조가 잘못된 신호일 수 있다.
 반대로 각 기능이 자기 책임을 가진 폴더에 있다면 유지보수와 협업이 쉬워진다.
 
-
 ## 17. 추가 정리: Edge node와 AI server 디렉토리 분할
 
-프로젝트의 실행 책임을 더 분명히 하기 위해 Edge node 전용 디렉토리 `src/edge_node`와 AI server 전용 디렉토리 `src/ai_server`를 `src` 바로 아래에 분리했다.
+프로젝트의 실행 책임을 더 분명히 하되 Python 패키지 가독성을 유지하기 위해 Edge node 전용 디렉토리 `src/ai_cctv/edge_node`와 AI server 전용 디렉토리 `src/ai_cctv/ai_server`를 단일 루트 패키지 `src/ai_cctv` 아래에 분리했다.
 
 | 디렉토리 | 역할 |
 | --- | --- |
-| `src/edge_node` | 라즈베리 파이 Edge node 송출 및 장애 대응 |
-| `src/ai_server` | AI server 실행 진입점, 분석/알림 재노출 |
+| `src/ai_cctv/edge_node` | 라즈베리 파이 Edge node 송출 및 장애 대응 |
+| `src/ai_cctv/ai_server` | AI server 실행 진입점, 분석/알림 재노출 |
 | `src/ai_cctv/edge_pi` | 이전 Edge node import 경로 호환 레이어 |
-| `src/ai_cctv/ai_server` | 이전 AI server import 경로 호환 레이어 |
 | `src/ai_cctv/windows_server` | 이전 Windows server import 경로 호환 레이어 |
 
 함께 수정한 문제점은 다음과 같다.
 
-1. 실행 진입점이 `ai_cctv` 내부 호환 경로에 묶여 보이던 문제를 `src/edge_node/main.py`, `src/ai_server/main.py`로 분리해 해결했다.
-2. 콘솔 스크립트 `ai-cctv-edge`가 `edge_node.main`을 직접 사용하도록 수정했다.
-3. 콘솔 스크립트 `ai-cctv`, `ai-cctv-windows-server`가 `ai_server.main`을 직접 사용하도록 수정했다.
+1. 실행 진입점이 `ai_cctv` 내부 호환 경로에 묶여 보이던 문제를 `src/ai_cctv/edge_node/main.py`, `src/ai_cctv/ai_server/main.py`로 분리해 해결했다.
+2. 콘솔 스크립트 `ai-cctv-edge`가 `ai_cctv.edge_node.main`을 직접 사용하도록 수정했다.
+3. 콘솔 스크립트 `ai-cctv`, `ai-cctv-windows-server`가 `ai_cctv.ai_server.main`을 직접 사용하도록 수정했다.
 4. 기존 import 경로는 호환 래퍼로 남겨 기존 코드의 파손 가능성을 줄였다.
 
-이 변경으로 신규 코드는 `edge_node`와 `ai_server`를 기준으로 읽고, 기존 코드는 `ai_cctv.edge_pi`, `ai_cctv.ai_server`, `ai_cctv.windows_server` 경로를 유지해도 동작하도록 호환성을 보장한다.
+이 변경으로 신규 코드는 `ai_cctv.edge_node`와 `ai_cctv.ai_server`를 기준으로 읽고, 기존 코드는 `ai_cctv.edge_pi`, `ai_cctv.windows_server` 경로를 유지해도 동작하도록 호환성을 보장한다.

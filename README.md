@@ -49,9 +49,9 @@ python main.py
 inst/                 # 구조/흐름/변경 설명 문서와 보관 자료
 requirements/         # 실행 환경별 의존성 목록
 src/
-├─ edge_node/       # Edge node 전용 실행 코드
-├─ ai_server/       # AI server 전용 실행 코드
 └─ ai_cctv/
+   ├─ edge_node/    # Edge node 전용 실행 코드
+   ├─ ai_server/    # AI server 전용 실행 코드
    ├─ common/       # 공통 이벤트/메시지 값 객체
    ├─ client/       # AI server GUI/영상 분석 구현
    ├─ anomaly/      # 이상 상황 판단 규칙

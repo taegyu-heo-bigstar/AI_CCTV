@@ -6,7 +6,7 @@
 
 ```text
 AI_CCTV/
-├─ main.py                         # 로컬 개발용 Windows 서버 실행 진입점
+├─ main.py                         # 로컬 개발용 AI server 실행 진입점
 ├─ README.md                       # 프로젝트 개요와 설치 안내
 ├─ pyproject.toml                  # 패키지 메타데이터와 실행 명령
 ├─ requirements/                   # 실행 환경별 requirements 파일
@@ -16,22 +16,21 @@ AI_CCTV/
 │  ├─ change.md                    # develop 대비 변경 설명
 │  └─ archive/tmp/                 # 임시/샘플 자료 보관 위치
 ├─ src/
-│  ├─ edge_node/                   # Edge node 전용 실행 묶음
-│  │  ├─ main.py                   # Edge node 송출 명령 진입점
-│  │  ├─ streaming.py              # GStreamer + MediaMTX RTSP publish 명령
-│  │  └─ failover.py               # 네트워크 장애 대응 정책
-│  ├─ ai_server/                   # AI server 전용 실행 묶음
-│  │  ├─ main.py                   # AI server GUI/분석 진입점
-│  │  ├─ analysis.py               # 분석 계층 재노출
-│  │  └─ alerts.py                 # Discord 알림 계층 재노출
-│  └─ ai_cctv/
+│  └─ ai_cctv/                     # 프로젝트 단일 루트 패키지
+│     ├─ edge_node/                # Edge node 전용 실행 묶음
+│     │  ├─ main.py                # Edge node 송출 명령 진입점
+│     │  ├─ streaming.py           # GStreamer + MediaMTX RTSP publish 명령
+│     │  └─ failover.py            # 네트워크 장애 대응 정책
+│     ├─ ai_server/                # AI server 전용 실행 묶음
+│     │  ├─ main.py                # AI server GUI/분석 진입점
+│     │  ├─ analysis.py            # 분석 계층 재노출
+│     │  └─ alerts.py              # Discord 알림 계층 재노출
 │     ├─ common/                   # 플랫폼 공통 이벤트/메시지 값 객체
 │     ├─ client/                   # 기존 Windows GUI/분석 구현
 │     ├─ anomaly/                  # 이상 상황 판단 구현
 │     ├─ alerts/                   # 현재 Discord 중심 알림 구현과 확장 인터페이스
 │     ├─ edge/                     # 기존 edge import 호환 레이어
 │     ├─ edge_pi/                  # 기존 edge_pi import 호환 레이어
-│     ├─ ai_server/                # 기존 ai_cctv.ai_server import 호환 레이어
 │     ├─ windows_server/           # 기존 windows_server import 호환 레이어
 │     ├─ streaming/                # RTSP 데모/레거시 유틸리티
 │     └─ server/                   # 서버 보조 모듈 자리
@@ -52,11 +51,11 @@ AI_CCTV/
 ```mermaid
 flowchart LR
     Camera["Camera Module"] --> Pi["Raspberry Pi 4B"]
-    Pi --> EdgeMain["edge_node/main.py"]
-    EdgeMain --> GStreamer["edge_node/streaming.py<br/>GStreamer + MediaMTX"]
-    Pi --> Failover["edge_node/failover.py<br/>network policy"]
+    Pi --> EdgeMain["ai_cctv/edge_node/main.py"]
+    EdgeMain --> GStreamer["ai_cctv/edge_node/streaming.py<br/>GStreamer + MediaMTX"]
+    Pi --> Failover["ai_cctv/edge_node/failover.py<br/>network policy"]
     GStreamer --> RTSP["RTSP Stream"]
-    RTSP --> Windows["ai_server/main.py"]
+    RTSP --> Windows["ai_cctv/ai_server/main.py"]
     Windows --> VideoWorker["client/video_worker.py"]
     VideoWorker --> Tracker["client/person_tracker.py<br/>YOLO + ByteTrack"]
     Tracker --> Processor["client/pipeline/person_frame_processor.py"]

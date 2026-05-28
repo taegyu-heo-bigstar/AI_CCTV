@@ -1,6 +1,6 @@
 # Edge node 카메라 RTSP 송출 설정 파일입니다.
 # GStreamer 파이프라인이 카메라 영상을 MediaMTX RTSP 경로로 publish합니다.
-# 실제 프로세스 실행은 edge_node.main 또는 운영 서비스에서 수행합니다.
+# 실제 프로세스 실행은 ai_cctv.edge_node.main 또는 운영 서비스에서 수행합니다.
 
 from dataclasses import dataclass
 

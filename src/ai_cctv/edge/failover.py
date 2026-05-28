@@ -2,7 +2,7 @@
 # 실제 구현은 edge_node.failover 패키지에 있습니다.
 # 기존 edge.failover import 경로를 유지하기 위해 재노출합니다.
 
-from edge_node.failover import FailoverAction, NetworkFailoverPolicy
+from ai_cctv.edge_node.failover import FailoverAction, NetworkFailoverPolicy
 
 
 __all__ = ["FailoverAction", "NetworkFailoverPolicy"]
