@@ -5,7 +5,7 @@
 from datetime import datetime
 from PyQt5.QtCore import QThread, pyqtSignal
 
-from ..alerts.dispatcher import AlertDispatcher
+from ..alerts.dispatcher import AlertDispatcher, DiscordChatBotChannel
 from ..anomaly.detector import AnomalyDetector
 from .crop_manager import CropManager
 from .full_body_checker import FullBodyChecker
@@ -69,7 +69,7 @@ class VideoWorker(QThread):
         self.original_segment_seconds = original_segment_seconds
         self.recording_manager = None
         self.anomaly_detector = anomaly_detector or AnomalyDetector()
-        self.alert_dispatcher = alert_dispatcher or AlertDispatcher()
+        self.alert_dispatcher = alert_dispatcher or self._create_default_alert_dispatcher()
 
         self.vlm_worker = VLMWorker(self.state_manager) if self.use_vlm else None
         self.person_processor = PersonFrameProcessor(
@@ -170,3 +170,16 @@ class VideoWorker(QThread):
             self.recording_manager.stop_recording()
 
         self.stream.release()
+
+    def _create_default_alert_dispatcher(self):
+        """기본 Discord 이상 상황 알림 디스패처를 생성합니다.
+
+        인자:
+            없음.
+        반환값:
+            Discord 채널이 등록된 AlertDispatcher 객체를 반환합니다.
+        """
+
+        from .chat_bot import chat_bot as chatbot
+
+        return AlertDispatcher([DiscordChatBotChannel(chatbot)])

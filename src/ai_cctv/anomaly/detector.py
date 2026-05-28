@@ -103,8 +103,7 @@ class ObjectPresenceRule(AnomalyRule):
 
         return (
             detection.get("class_name"),
-            detection.get("person_id"),
-            detection.get("bbox"),
+            detection.get("track_id") or detection.get("person_id") or detection.get("bbox"),
         )
 
 
@@ -235,4 +234,3 @@ class AnomalyDetector:
         for rule in self.rules:
             events.extend(rule.evaluate(detections, evaluated_at))
         return events
-

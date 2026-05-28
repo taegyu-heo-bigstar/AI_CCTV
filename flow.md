@@ -10,7 +10,7 @@ AI_CCTV/
 ├─ structure.md                    # 파일별 클래스/함수 구조 표
 ├─ flow.md                         # 실행 흐름과 책임 경계 문서
 ├─ src/ai_cctv/
-│  ├─ edge/                        # Raspberry Pi 송출 및 장애 대응 정책
+│  ├─ edge/                        # Raspberry Pi GStreamer 송출 및 장애 대응 정책
 │  ├─ anomaly/                     # 객체 감지 결과 기반 이상 상황 판단
 │  ├─ alerts/                      # Discord, KakaoTalk, LoRa 확장용 알림 계층
 │  ├─ client/                      # 사용자 PC 기반 영상 수신/분석/GUI
@@ -31,7 +31,7 @@ AI_CCTV/
 ```mermaid
 flowchart LR
     Camera["Camera Module"] --> Pi["Raspberry Pi 4B"]
-    Pi --> EdgeStream["edge/streaming.py<br/>rpicam-vid + MediaMTX command"]
+    Pi --> EdgeStream["edge/streaming.py<br/>GStreamer + MediaMTX command"]
     Pi --> EdgeFailover["edge/failover.py<br/>network fail-over policy"]
     EdgeStream --> RTSP["RTSP / Network Streaming"]
     RTSP --> PC["User Desktop PC"]
@@ -120,7 +120,7 @@ classDiagram
 
 | 프로젝트 문서 기준 | 코드 구조 |
 |---|---|
-| Raspberry Pi 4B와 카메라 모듈 기반 송출 | `edge/streaming.py`에서 rpicam-vid + MediaMTX 명령 구조 제공 |
+| Raspberry Pi 4B와 카메라 모듈 기반 송출 | `edge/streaming.py`에서 GStreamer + MediaMTX RTSP publish 명령 구조 제공 |
 | RTSP 기반 실시간 전송 | `client/video_stream.py`, `streaming/` 패키지 |
 | PC 기반 OpenCV/YOLO 분석 | `client/video_worker.py`, `client/person_tracker.py` |
 | 이상 상황 판단 | `anomaly/detector.py`의 규칙 기반 판단 계층 |

@@ -289,6 +289,7 @@ AI CCTV 소스 코드의 파일별 클래스와 함수를 정리한 문서입니
 | `run` | 스레드 메인 루프에서 프레임 처리와 신호 발행을 수행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 | `stop` | 영상 처리 루프를 중지하고 스레드 종료를 기다립니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 | `_cleanup` | 사용 중인 분석 작업자, 녹화기, 영상 스트림을 정리합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
+| `_create_default_alert_dispatcher` | 기본 Discord 이상 상황 알림 디스패처를 생성합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
 
 ## `src/ai_cctv/client/vlm_person_analyzer.py`
 
@@ -341,11 +342,12 @@ AI CCTV 소스 코드의 파일별 클래스와 함수를 정리한 문서입니
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `PiStreamingConfig` | Raspberry Pi 영상 송출 설정을 표현합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
-| `RpicamMediaMtxCommandBuilder` | rpicam-vid 기반 MediaMTX 송출 명령을 생성합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `PiStreamingConfig` | Raspberry Pi GStreamer 영상 송출 설정을 표현합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
+| `GStreamerMediaMtxCommandBuilder` | GStreamer 기반 MediaMTX 송출 명령을 생성합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
 | `__init__` | 송출 명령 생성 설정을 초기화합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
-| `build_command` | rpicam-vid 송출 명령 인자 목록을 생성합니다. | 생성된 객체 또는 값 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `build_command` | GStreamer 송출 명령 인자 목록을 생성합니다. | 생성된 객체 또는 값 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 | `build_shell_text` | 문서와 운영 스크립트에 표시할 송출 명령 문자열을 생성합니다. | 생성된 객체 또는 값 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `RpicamMediaMtxCommandBuilder` | 기존 import 호환을 위한 GStreamer 명령 생성기 별칭입니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
 
 ## `src/ai_cctv/streaming/legacy_rtsp_receiver.py`
 
@@ -360,6 +362,13 @@ AI CCTV 소스 코드의 파일별 클래스와 함수를 정리한 문서입니
 | `get_frame` | GUI 대시보드나 AI 추론 모델이 메인 루프에서 호출하는 외부용 함수. | 조회된 값 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 | `stop` | 프로그램 종료 시 외부에서 안전하게 수집 전담 스레드와 감시 스레드를 정지시키는 해제 함수. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 | `main` | main 함수의 주요 기능을 수행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+
+## `src/ai_cctv/streaming/receiver.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `receive_rtsp` | RTSP 스트림을 수신하여 OpenCV 창에 표시합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `main` | RTSP 수신 데모를 실행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 
 ## `src/ai_cctv/streaming/sender.py`
 

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from ai_cctv.alerts.dispatcher import AlertChannel, AlertDispatcher
 from ai_cctv.anomaly.detector import AnomalyDetector, DwellTimeRule, ObjectPresenceRule
 from ai_cctv.edge.failover import NetworkFailoverPolicy
-from ai_cctv.edge.streaming import PiStreamingConfig, RpicamMediaMtxCommandBuilder
+from ai_cctv.edge.streaming import GStreamerMediaMtxCommandBuilder, PiStreamingConfig
 
 
 class MemoryAlertChannel(AlertChannel):
@@ -71,9 +71,12 @@ class ProjectStructureTest(unittest.TestCase):
 
         first_events = detector.evaluate([detection], now=datetime(2026, 5, 28))
         second_events = detector.evaluate([detection], now=datetime(2026, 5, 28))
+        moved_detection = dict(detection, bbox=(2, 3, 4, 5))
+        moved_events = detector.evaluate([moved_detection], now=datetime(2026, 5, 28))
 
         self.assertEqual(len(first_events), 1)
         self.assertEqual(len(second_events), 0)
+        self.assertEqual(len(moved_events), 0)
         self.assertEqual(first_events[0].object_name, "person")
 
     def test_dwell_time_rule_emits_after_threshold(self):
@@ -141,8 +144,8 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(action.should_record_local)
         self.assertTrue(action.should_send_minimal_alert)
 
-    def test_rpicam_mediamtx_command_uses_rtsp_destination(self):
-        """Raspberry Pi 송출 명령에 MediaMTX RTSP 목적지가 포함되는지 검증합니다.
+    def test_gstreamer_mediamtx_command_uses_rtsp_destination(self):
+        """GStreamer 송출 명령에 MediaMTX RTSP 목적지가 포함되는지 검증합니다.
 
         인자:
             없음.
@@ -151,10 +154,11 @@ class ProjectStructureTest(unittest.TestCase):
         """
 
         config = PiStreamingConfig(mediamtx_url="rtsp://127.0.0.1:8554/test")
-        command = RpicamMediaMtxCommandBuilder(config).build_command()
+        command = GStreamerMediaMtxCommandBuilder(config).build_command()
 
-        self.assertIn("rpicam-vid", command)
-        self.assertIn("rtsp://127.0.0.1:8554/test", command)
+        self.assertIn("gst-launch-1.0", command)
+        self.assertIn("libcamerasrc", command)
+        self.assertIn("location=rtsp://127.0.0.1:8554/test", command)
 
 
 if __name__ == "__main__":

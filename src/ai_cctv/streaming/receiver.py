@@ -1,54 +1,61 @@
-# receiver.py 파일입니다.
-# AI CCTV 프로젝트의 streaming 영역에서 사용하는 소스 코드입니다.
-# 이 파일의 클래스와 함수 책임은 각 국문 docstring에 정리되어 있습니다.
+# RTSP 수신 데모 실행 파일입니다.
+# import 시 자동으로 네트워크 접속이나 GUI 루프가 시작되지 않도록 main 진입점을 사용합니다.
+# 운영 클라이언트는 client.video_stream.VideoStream을 사용하고 이 파일은 수동 확인용입니다.
 
-# receiver.py ?????.
-# AI CCTV ????? streaming ???? ???? ?? ?????.
-# ? ??? ???? ?? ??? ? ?? docstring? ???? ????.
-
-# RTSP ?? ???? ?? ?????.
-# ?? ?? ??? legacy_rtsp_receiver? ???? ????.
-# ???? ??? ??? ???? ?? ?????.
-
-import cv2
 import os
 
-#지연 시간을 줄이는 기본 옵션
-os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "fflags;nobuffer|flags;low_delay"
+import cv2
 
-# 라즈베리파이의 IP 주소
-RTSP_URL = "rtsp://10.60.242.11:8554/stream"
 
-print(f"[{RTSP_URL}] 에 연결중")
+DEFAULT_RTSP_URL = "rtsp://10.60.242.11:8554/stream"
 
-cap = cv2.VideoCapture(RTSP_URL)
 
-if not cap.isOpened():
-    print("에러: RTSP 스트림에 연결할 수 없습니다.")
-    print("라즈베리파이에서 sender.py가 실행 중인지 확인하세요.")
-    print("IP 주소가 정확한지 확인하세요.")
-    exit()
+def receive_rtsp(rtsp_url=DEFAULT_RTSP_URL):
+    """RTSP 스트림을 수신하여 OpenCV 창에 표시합니다.
 
-print("연결 성공. 실시간 영상을 수신합니다.")
+    인자:
+        rtsp_url: 수신할 RTSP 스트림 URL입니다.
+    반환값:
+        정상 종료 또는 연결 실패 시 None을 반환합니다.
+    """
 
-while True:
-    ret, frame = cap.read()
+    os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "fflags;nobuffer|flags;low_delay"
+    print(f"[{rtsp_url}] 에 연결중")
 
-    if not ret:
-        print("프레임 수신 실패")
-        break
+    cap = cv2.VideoCapture(rtsp_url)
+    if not cap.isOpened():
+        print("에러: RTSP 스트림에 연결할 수 없습니다.")
+        print("Raspberry Pi에서 GStreamer + MediaMTX 송출이 실행 중인지 확인하세요.")
+        print("IP 주소가 정확한지 확인하세요.")
+        return
 
-    # ==========================================================
-    # 모델 들어갈 자리
-    # ==========================================================
+    print("연결 성공. 실시간 영상을 수신합니다.")
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            print("프레임 수신 실패")
+            break
 
-    # 화면 띄우기
-    cv2.imshow("AI CCTV Receiver", frame)
+        cv2.imshow("AI CCTV Receiver", frame)
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            print("수신을 종료합니다.")
+            break
 
-    #q 누르면 종료
-    if cv2.waitKey(1) & 0xFF == ord("q"):
-        print("수신을 종료합니다.")
-        break
+    cap.release()
+    cv2.destroyAllWindows()
 
-cap.release()
-cv2.destroyAllWindows()
+
+def main():
+    """RTSP 수신 데모를 실행합니다.
+
+    인자:
+        없음.
+    반환값:
+        없음.
+    """
+
+    receive_rtsp()
+
+
+if __name__ == "__main__":
+    main()
