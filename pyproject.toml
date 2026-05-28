@@ -42,9 +42,9 @@ vision-demo = [
 ]
 
 [project.scripts]
-ai-cctv = "ai_cctv.windows_server.main:main"
+ai-cctv = "ai_cctv.ai_server.main:main"
 ai-cctv-edge = "ai_cctv.edge_pi.main:main"
-ai-cctv-windows-server = "ai_cctv.windows_server.main:main"
+ai-cctv-windows-server = "ai_cctv.ai_server.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

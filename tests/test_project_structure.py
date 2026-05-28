@@ -178,7 +178,7 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertEqual(scripts["ai-cctv-edge"], "ai_cctv.edge_pi.main:main")
         self.assertEqual(
             scripts["ai-cctv-windows-server"],
-            "ai_cctv.windows_server.main:main",
+            "ai_cctv.ai_server.main:main",
         )
         self.assertIn("edge-pi", extras)
         self.assertIn("windows-server", extras)
