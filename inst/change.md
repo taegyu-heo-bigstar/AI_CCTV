@@ -16,7 +16,7 @@
 | 윈도우 서버 코드 | GUI, 탐지, 알림 코드가 클라이언트/서버 폴더에 혼재 | `windows_server`, `client`, `anomaly`, `alerts` 등으로 책임 분리 |
 | 공통 모델 | 이벤트/메시지 구조가 명확하지 않음 | `common`, `anomaly.events`, `alerts.message`로 공통 데이터 구조 정리 |
 | 알림 방식 | 여러 가능성이 코드와 설계에 섞여 있음 | 현시점 실행 경로는 Discord 중심, 다른 채널은 확장 영역으로 둠 |
-| 문서화 | 실험 자료와 구현 자료가 섞여 있음 | `README.md`, `flow.md`, `structure.md`, `change.md`, `docs/`로 정리 |
+| 문서화 | 실험 자료와 구현 자료가 섞여 있음 | `README.md`, `inst/flow.md`, `inst/structure.md`, `inst/change.md`, `docs/`로 정리 |
 | 검증 | 자동 검증 기준이 약함 | `tests/test_project_structure.py`로 구조와 엔트리포인트 검증 |
 
 핵심 변화는 "기능별 파일 이동"이 아니라 "실행 환경과 책임 기준으로 구조를 다시 잡은 것"이다.
@@ -244,10 +244,10 @@ KakaoTalk, SMS, 이메일 같은 방식은 차후 확장 영역으로 남겨두�
 | --- | --- |
 | `docs/` | 설계 메모, 공부 자료, 발표 자료 등 문서성 파일 정리 |
 | `scripts/` | 실행 보조 스크립트 정리 |
-| `tmp/` | 임시 또는 샘플 데이터 성격의 파일 정리 |
-| `structure.md` | 현재 소스 코드의 클래스/함수 목록 정리 |
-| `flow.md` | 현재 구조 기준 실행 흐름 문서화 |
-| `change.md` | develop 대비 refactor 변경 사항 설명 |
+| `inst/archive/tmp/` | 임시 또는 샘플 데이터 성격의 파일 정리 |
+| `inst/structure.md` | 현재 소스 코드의 클래스/함수 목록 정리 |
+| `inst/flow.md` | 현재 구조 기준 실행 흐름 문서화 |
+| `inst/change.md` | develop 대비 refactor 변경 사항 설명 |
 
 문서와 코드를 분리하는 이유는 유지보수성 때문이다.
 소스 코드 폴더 안에는 실행에 필요한 코드가 있어야 하고, 설계 설명이나 학습 자료는 문서 폴더에 있어야 한다.
@@ -335,7 +335,7 @@ KakaoTalk, SMS, 이메일 같은 방식은 차후 확장 영역으로 남겨두�
 | 실행 환경 분리 | 라즈베리 파이와 윈도우 서버의 책임이 분리되었다. |
 | 패키지 구조 도입 | `src/ai_cctv` 아래에서 import 경로를 일관되게 관리할 수 있다. |
 | 의존성 분리 | 라즈베리 파이에 불필요한 윈도우 서버 의존성을 설치하지 않아도 된다. |
-| 문서 보강 | `README.md`, `flow.md`, `structure.md`로 구조를 설명할 수 있다. |
+| 문서 보강 | `README.md`, `inst/flow.md`, `inst/structure.md`로 구조를 설명할 수 있다. |
 | 호환성 고려 | 기존 경로를 완전히 끊지 않고 일부 호환 래퍼를 유지했다. |
 | Discord 중심 정리 | 현시점에 실제 사용할 알림 방식을 기준으로 구현 범위를 줄였다. |
 

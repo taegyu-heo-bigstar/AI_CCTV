@@ -18,11 +18,23 @@ pip install -e ".[edge-pi]"
 ai-cctv-edge
 ```
 
+전통적인 requirements 파일이 필요한 환경에서는 다음 파일을 사용할 수 있습니다.
+
+```bash
+pip install -r requirements/edge-pi.txt
+```
+
 Windows 서버 실행 환경:
 
 ```bash
 pip install -e ".[windows-server]"
 ai-cctv-windows-server
+```
+
+전통적인 requirements 파일이 필요한 환경에서는 다음 파일을 사용할 수 있습니다.
+
+```bash
+pip install -r requirements/windows-server.txt
 ```
 
 로컬 개발 환경에서 기존 방식으로 Windows 서버를 실행할 수도 있습니다.
@@ -34,6 +46,8 @@ python main.py
 ## 구조
 
 ```text
+inst/                 # 구조/흐름/변경 설명 문서와 보관 자료
+requirements/         # 실행 환경별 의존성 목록
 src/ai_cctv/
 ├─ common/          # 공통 이벤트/메시지 값 객체
 ├─ edge_pi/         # Raspberry Pi 전용 실행 코드

@@ -7,8 +7,14 @@
 ```text
 AI_CCTV/
 ├─ main.py                         # 로컬 개발용 Windows 서버 실행 진입점
-├─ structure.md                    # 파일별 클래스/함수 구조 표
-├─ flow.md                         # 실행 흐름과 책임 경계 문서
+├─ README.md                       # 프로젝트 개요와 설치 안내
+├─ pyproject.toml                  # 패키지 메타데이터와 실행 명령
+├─ requirements/                   # 실행 환경별 requirements 파일
+├─ inst/                           # 구조/흐름/변경 설명 문서와 보관 자료
+│  ├─ structure.md                 # 파일별 클래스/함수 구조 표
+│  ├─ flow.md                      # 실행 흐름과 책임 경계 문서
+│  ├─ change.md                    # develop 대비 변경 설명
+│  └─ archive/tmp/                 # 임시/샘플 자료 보관 위치
 ├─ src/ai_cctv/
 │  ├─ common/                      # 플랫폼 공통 이벤트/메시지 값 객체
 │  ├─ edge_pi/                     # Raspberry Pi 전용 실행 묶음
