@@ -1,4 +1,12 @@
 
+# vlm_person_analyzer_qwen.py 파일입니다.
+# AI CCTV 프로젝트의 client 영역에서 사용하는 소스 코드입니다.
+# 이 파일의 클래스와 함수 책임은 각 국문 docstring에 정리되어 있습니다.
+
+# vlm_person_analyzer_qwen.py ?????.
+# AI CCTV ????? client ???? ???? ?? ?????.
+# ? ??? ???? ?? ??? ? ?? docstring? ???? ????.
+
 """
 VLM 모듈 파일입니다.
 외부 파일에서 실행시 아래와같이 진행.
@@ -21,6 +29,13 @@ from transformers import (
 
 
 class PersonAnalyzer:
+    """PersonAnalyzer 클래스의 주요 책임을 수행합니다.
+    
+    인자:
+        생성자 인자는 __init__ 문서를 따릅니다.
+    반환값:
+        PersonAnalyzer 인스턴스를 반환합니다.
+    """
     def __init__(
         self,
         model_id="Qwen/Qwen2.5-VL-3B-Instruct",
@@ -28,6 +43,13 @@ class PersonAnalyzer:
         max_pixels=384 * 384,
         use_4bit=True,
     ):
+        """__init__ 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         self.model_id = model_id
 
         print("모델 로딩 중...")
@@ -64,6 +86,13 @@ class PersonAnalyzer:
         print(f"모델 로딩 시간: {end - start:.2f}초")
         print(self.model.hf_device_map)
     def _build_messages(self, image):
+        """_build_messages 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         return [
             {
                 "role": "user",
@@ -96,6 +125,13 @@ class PersonAnalyzer:
         ]
 
     def analyze(self, image_or_path, max_new_tokens=50, show_time=True):
+        """analyze 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         if isinstance(image_or_path, str):
             image = Image.open(image_or_path).convert("RGB")
         else:
@@ -144,6 +180,13 @@ class PersonAnalyzer:
         return result
 
     def _clean_result(self, text):
+        """_clean_result 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         text = text.strip()
         text = text.replace("입니다", "")
         text = text.replace("를", "")

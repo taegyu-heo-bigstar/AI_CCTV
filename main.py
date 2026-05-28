@@ -1,3 +1,7 @@
+# AI CCTV 로컬 개발 실행 파일입니다.
+# 설치 없이 루트에서 python main.py로 GUI를 실행합니다.
+# src 경로를 임시로 sys.path에 추가한 뒤 패키지 진입점을 호출합니다.
+
 import sys
 from pathlib import Path
 

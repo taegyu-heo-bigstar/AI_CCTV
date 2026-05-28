@@ -1,3 +1,15 @@
+# legacy_rtsp_receiver.py 파일입니다.
+# AI CCTV 프로젝트의 streaming 영역에서 사용하는 소스 코드입니다.
+# 이 파일의 클래스와 함수 책임은 각 국문 docstring에 정리되어 있습니다.
+
+# legacy_rtsp_receiver.py ?????.
+# AI CCTV ????? streaming ???? ???? ?? ?????.
+# ? ??? ???? ?? ??? ? ?? docstring? ???? ????.
+
+# legacy_rtsp_receiver.py ?? ?????.
+# AI CCTV ????? streaming ?? ??? ?????.
+# ???? ??? ?? ??? ? ?? docstring? ?????.
+
 import cv2
 import threading  # 멀티스레딩 씀. 영상 수신 스레드와 감시(Watchdog) 스레드를 병렬로 실행할려고
 import time  # 시간 계측 및 지연(sleep) 관리
@@ -52,6 +64,13 @@ class RTSPReceiver:
     단선 감지 시 자동으로 재연결을 시도하며, 영상이 굳었을 때 리소스를 강제 회수하는 감시견(Watchdog)을 탑재한 클래스.
     """
     def __init__(self, rtsp_url, reconnect_interval=3):
+        """__init__ 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         self.rtsp_url = rtsp_url  # 접속할 RTSP 주소
         self.reconnect_interval = reconnect_interval  # 접속 실패 시 다시 시도할 대기 간격 (초 단위)
         
@@ -199,6 +218,13 @@ class RTSPReceiver:
 
 def main():
     # 라즈베리파이의 실제 이더넷 IP 주소 및 RTSP 송출 경로 입력
+    """main 함수의 주요 기능을 수행합니다.
+    
+    인자:
+        함수 시그니처에 정의된 값을 사용합니다.
+    반환값:
+        처리 결과 또는 None을 반환합니다.
+    """
     RTSP_URL = "rtsp://192.168.99.200:8554/live"
     
     # RTSP 수신기 객체 생성 및 백그라운드 구동 개시

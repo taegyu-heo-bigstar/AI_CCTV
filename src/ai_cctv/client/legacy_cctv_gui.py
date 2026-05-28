@@ -1,3 +1,15 @@
+# legacy_cctv_gui.py 파일입니다.
+# AI CCTV 프로젝트의 client 영역에서 사용하는 소스 코드입니다.
+# 이 파일의 클래스와 함수 책임은 각 국문 docstring에 정리되어 있습니다.
+
+# legacy_cctv_gui.py ?????.
+# AI CCTV ????? client ???? ???? ?? ?????.
+# ? ??? ???? ?? ??? ? ?? docstring? ???? ????.
+
+# legacy_cctv_gui.py ?? ?????.
+# AI CCTV ????? client ?? ??? ?????.
+# ???? ??? ?? ??? ? ?? docstring? ?????.
+
 import sys
 import cv2
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
@@ -6,7 +18,21 @@ from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QImage, QPixmap
 
 class CCTVMainWindow(QMainWindow):
+    """CCTVMainWindow 클래스의 주요 책임을 수행합니다.
+    
+    인자:
+        생성자 인자는 __init__ 문서를 따릅니다.
+    반환값:
+        CCTVMainWindow 인스턴스를 반환합니다.
+    """
     def __init__(self):
+        """__init__ 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         super().__init__()
         self.setWindowTitle("Intelligent CCTV Control Center")
         self.setGeometry(100, 100, 1600, 900)
@@ -126,6 +152,13 @@ class CCTVMainWindow(QMainWindow):
         self.timer.start(30) # 30ms (~33 fps)
 
     def update_frame(self):
+        """update_frame 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         ret, frame = self.cap.read()
         if ret:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -140,6 +173,13 @@ class CCTVMainWindow(QMainWindow):
             self.video_label.setPixmap(scaled_pixmap)
 
     def closeEvent(self, event):
+        """closeEvent 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         if self.cap.isOpened():
             self.cap.release()
         event.accept()

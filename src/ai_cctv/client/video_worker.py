@@ -1,10 +1,13 @@
-from datetime import datetime
+# AI CCTV 영상 처리 스레드를 정의하는 파일입니다.
+# 스트림 읽기, 추적, 녹화, VLM 작업 시작과 종료 흐름을 조정합니다.
+# 인물별 세부 처리는 PersonFrameProcessor에 위임합니다.
 
-import cv2
+from datetime import datetime
 from PyQt5.QtCore import QThread, pyqtSignal
 
 from .crop_manager import CropManager
 from .full_body_checker import FullBodyChecker
+from .pipeline.person_frame_processor import PersonFrameProcessor
 from .person_state_manager import PersonStateManager
 from .person_tracker import PersonTracker
 from .recording_manager import RecordingManager
@@ -13,7 +16,16 @@ from .vlm_worker import VLMWorker
 
 
 class VideoWorker(QThread):
-    """Coordinates capture, detection, recording, and optional VLM analysis."""
+    """영상 캡처, 추적, 녹화, 선택적 VLM 분석을 조정합니다.
+
+    인자:
+        source: OpenCV VideoCapture에 전달할 입력 소스입니다.
+        use_vlm: VLM 분석 사용 여부입니다.
+        ai_cctv_path: 녹화 파일 저장 루트 경로입니다.
+        original_segment_seconds: 원본 녹화 파일 분할 초 단위입니다.
+    반환값:
+        VideoWorker 인스턴스를 반환합니다.
+    """
 
     frame_ready = pyqtSignal(object)
     metrics_ready = pyqtSignal(dict)
@@ -26,6 +38,17 @@ class VideoWorker(QThread):
         ai_cctv_path="",
         original_segment_seconds=10,
     ):
+        """영상 처리 스레드와 협력 객체를 초기화합니다.
+
+        인자:
+            source: OpenCV VideoCapture 입력 소스입니다.
+            use_vlm: VLM 분석 사용 여부입니다.
+            ai_cctv_path: 녹화 파일 저장 루트 경로입니다.
+            original_segment_seconds: 원본 녹화 파일 분할 초 단위입니다.
+        반환값:
+            없음.
+        """
+
         super().__init__()
         self.source = source
         self.running = True
@@ -41,8 +64,22 @@ class VideoWorker(QThread):
         self.recording_manager = None
 
         self.vlm_worker = VLMWorker(self.state_manager) if self.use_vlm else None
+        self.person_processor = PersonFrameProcessor(
+            full_body_checker=self.full_body_checker,
+            crop_manager=self.crop_manager,
+            state_manager=self.state_manager,
+            vlm_worker=self.vlm_worker,
+        )
 
     def run(self):
+        """스레드 메인 루프에서 프레임 처리와 신호 발행을 수행합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
         if not self.stream.open():
             self.event_ready.emit({
                 "type": "error",
@@ -75,7 +112,8 @@ class VideoWorker(QThread):
 
             persons = self.tracker.track(frame)
             for person in persons:
-                self._handle_person(frame, person)
+                for event in self.person_processor.process(frame, person):
+                    self.event_ready.emit(event)
 
             for removed_id in self.state_manager.remove_disappeared_persons():
                 self.event_ready.emit({
@@ -93,65 +131,26 @@ class VideoWorker(QThread):
         self._cleanup()
 
     def stop(self):
+        """영상 처리 루프를 중지하고 스레드 종료를 기다립니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
         self.running = False
         self.wait()
 
-    def _handle_person(self, frame, person):
-        person_id = person["person_id"]
-        bbox = person["bbox"]
-        conf = person["conf"]
-        x1, y1, x2, y2 = map(int, bbox)
-
-        is_full_body = self.full_body_checker.is_full_body_visible(
-            bbox,
-            frame.shape,
-        )
-        self.state_manager.update_person(
-            person_id=person_id,
-            bbox=bbox,
-            is_full_body=is_full_body,
-        )
-
-        if self._should_queue_vlm(person_id, is_full_body):
-            crop_path = self.crop_manager.save_crop(
-                frame=frame,
-                bbox=bbox,
-                person_id=person_id,
-            )
-            if crop_path is not None:
-                self.state_manager.mark_crop_saved(person_id, crop_path)
-                self.vlm_worker.add_task(person_id, crop_path)
-                self.event_ready.emit({
-                    "type": "vlm_queue",
-                    "person_id": person_id,
-                    "time": datetime.now().strftime("%H:%M:%S"),
-                })
-
-        status = self.full_body_checker.get_status_text(bbox, frame.shape)
-        color = (0, 255, 0) if is_full_body else (0, 0, 255)
-        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-
-        state = self.state_manager.get_state(person_id)
-        vlm_text = " VLM_DONE" if state and state.get("vlm_done", False) else ""
-        label = f"ID:{person_id} {status} {conf:.2f}{vlm_text}"
-        cv2.putText(
-            frame,
-            label,
-            (x1, y1 - 10),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
-            color,
-            2,
-        )
-
-    def _should_queue_vlm(self, person_id, is_full_body):
-        return (
-            self.vlm_worker is not None
-            and is_full_body
-            and not self.state_manager.has_crop_saved(person_id)
-        )
-
     def _cleanup(self):
+        """사용 중인 분석 작업자, 녹화기, 영상 스트림을 정리합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
         if self.vlm_worker is not None:
             self.vlm_worker.stop()
 

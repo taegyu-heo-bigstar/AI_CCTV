@@ -1,7 +1,22 @@
+# full_body_checker.py 파일입니다.
+# AI CCTV 프로젝트의 client 영역에서 사용하는 소스 코드입니다.
+# 이 파일의 클래스와 함수 책임은 각 국문 docstring에 정리되어 있습니다.
+
+# full_body_checker.py ?????.
+# AI CCTV ????? client ???? ???? ?? ?????.
+# ? ??? ???? ?? ??? ? ?? docstring? ???? ????.
+
 # full_body_checker.py
 
 
 class FullBodyChecker:
+    """FullBodyChecker 클래스의 주요 책임을 수행합니다.
+    
+    인자:
+        생성자 인자는 __init__ 문서를 따릅니다.
+    반환값:
+        FullBodyChecker 인스턴스를 반환합니다.
+    """
     def __init__(
         self,
         min_body_height_ratio=0.45,

@@ -1,3 +1,15 @@
+# face_recognition.py 파일입니다.
+# AI CCTV 프로젝트의 client 영역에서 사용하는 소스 코드입니다.
+# 이 파일의 클래스와 함수 책임은 각 국문 docstring에 정리되어 있습니다.
+
+# face_recognition.py ?????.
+# AI CCTV ????? client ???? ???? ?? ?????.
+# ? ??? ???? ?? ??? ? ?? docstring? ???? ????.
+
+# face_recognition.py ?? ?????.
+# AI CCTV ????? client ?? ??? ?????.
+# ???? ??? ?? ??? ? ?? docstring? ?????.
+
 import cv2
 import numpy as np
 import mediapipe as mp
@@ -25,16 +37,37 @@ face_app.prepare(ctx_id=-1, det_size=(640, 640))
 
 
 def normalize_embedding(embedding: np.ndarray) -> np.ndarray:
+    """normalize_embedding 함수의 주요 기능을 수행합니다.
+    
+    인자:
+        함수 시그니처에 정의된 값을 사용합니다.
+    반환값:
+        처리 결과 또는 None을 반환합니다.
+    """
     emb = embedding.astype(np.float32)
     norm = np.linalg.norm(emb) + 1e-8
     return emb / norm
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    """cosine_similarity 함수의 주요 기능을 수행합니다.
+    
+    인자:
+        함수 시그니처에 정의된 값을 사용합니다.
+    반환값:
+        처리 결과 또는 None을 반환합니다.
+    """
     return float(np.dot(a, b))
 
 
 def get_largest_face(faces):
+    """get_largest_face 함수의 주요 기능을 수행합니다.
+    
+    인자:
+        함수 시그니처에 정의된 값을 사용합니다.
+    반환값:
+        처리 결과 또는 None을 반환합니다.
+    """
     if not faces:
         return None
     return max(
@@ -44,6 +77,13 @@ def get_largest_face(faces):
 
 
 def expand_box(x1, y1, x2, y2, img_w, img_h, scale=0.4):
+    """expand_box 함수의 주요 기능을 수행합니다.
+    
+    인자:
+        함수 시그니처에 정의된 값을 사용합니다.
+    반환값:
+        처리 결과 또는 None을 반환합니다.
+    """
     w = x2 - x1
     h = y2 - y1
     dx = int(w * scale)
@@ -57,6 +97,13 @@ def expand_box(x1, y1, x2, y2, img_w, img_h, scale=0.4):
 
 
 def load_known_faces(face_dir: str):
+    """load_known_faces 함수의 주요 기능을 수행합니다.
+    
+    인자:
+        함수 시그니처에 정의된 값을 사용합니다.
+    반환값:
+        처리 결과 또는 None을 반환합니다.
+    """
     face_db = {}
     base = Path(face_dir)
 
@@ -98,6 +145,13 @@ def load_known_faces(face_dir: str):
 
 
 def recognize_face(face_crop: np.ndarray, face_db: dict, threshold=0.20):
+    """recognize_face 함수의 주요 기능을 수행합니다.
+    
+    인자:
+        함수 시그니처에 정의된 값을 사용합니다.
+    반환값:
+        처리 결과 또는 None을 반환합니다.
+    """
     faces = face_app.get(face_crop)
     if not faces:
         return "Unknown", -1.0
@@ -123,6 +177,13 @@ def recognize_face(face_crop: np.ndarray, face_db: dict, threshold=0.20):
 
 
 def detect_face_with_tasks(face_detector, bgr_roi: np.ndarray):
+    """detect_face_with_tasks 함수의 주요 기능을 수행합니다.
+    
+    인자:
+        함수 시그니처에 정의된 값을 사용합니다.
+    반환값:
+        처리 결과 또는 None을 반환합니다.
+    """
     if bgr_roi is None or bgr_roi.size == 0:
         return None
 

@@ -1,3 +1,15 @@
+# face_identifier.py 파일입니다.
+# AI CCTV 프로젝트의 client 영역에서 사용하는 소스 코드입니다.
+# 이 파일의 클래스와 함수 책임은 각 국문 docstring에 정리되어 있습니다.
+
+# face_identifier.py ?????.
+# AI CCTV ????? client ???? ???? ?? ?????.
+# ? ??? ???? ?? ??? ? ?? docstring? ???? ????.
+
+# face_identifier.py ?? ?????.
+# AI CCTV ????? client ?? ??? ?????.
+# ???? ??? ?? ??? ? ?? docstring? ?????.
+
 import os
 from pathlib import Path
 
@@ -7,6 +19,13 @@ from insightface.app import FaceAnalysis
 
 
 class FaceIdentifier:
+    """FaceIdentifier 클래스의 주요 책임을 수행합니다.
+    
+    인자:
+        생성자 인자는 __init__ 문서를 따릅니다.
+    반환값:
+        FaceIdentifier 인스턴스를 반환합니다.
+    """
     def __init__(
         self,
         known_face_dir="known_faces",
@@ -17,6 +36,13 @@ class FaceIdentifier:
         face_region_top_ratio=0.40,
         face_region_side_margin_ratio=0.15,
     ):
+        """__init__ 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         self.known_face_dir = known_face_dir
         self.face_sim_threshold = face_sim_threshold
         self.save_debug_crops = save_debug_crops
@@ -40,6 +66,13 @@ class FaceIdentifier:
         self.face_db = self._load_known_faces()
 
     def identify_from_path(self, person_id, image_path):
+        """identify_from_path 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         try:
             full_body_crop = cv2.imread(str(image_path))
 
@@ -52,6 +85,13 @@ class FaceIdentifier:
             return self._error_result(person_id, str(e))
 
     def identify_from_crop(self, person_id, full_body_crop):
+        """identify_from_crop 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         try:
             if self.use_cache and person_id in self.face_cache:
                 return dict(self.face_cache[person_id])
@@ -76,6 +116,13 @@ class FaceIdentifier:
             return self._error_result(person_id, str(e))
 
     def _load_known_faces(self):
+        """_load_known_faces 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         face_db = {}
         base_dir = Path(self.known_face_dir)
 
@@ -114,6 +161,13 @@ class FaceIdentifier:
         return face_db
 
     def _recognize_face(self, person_id, face_crop, face_crop_path):
+        """_recognize_face 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         if not self.face_db:
             return self._no_registered_faces_result(person_id, face_crop_path)
 
@@ -155,6 +209,13 @@ class FaceIdentifier:
         }
 
     def _crop_face_region(self, full_body_crop):
+        """_crop_face_region 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         height, width = full_body_crop.shape[:2]
 
         top_height = int(height * self.face_region_top_ratio)
@@ -179,6 +240,13 @@ class FaceIdentifier:
         return face_crop
 
     def _save_face_crop(self, person_id, face_crop):
+        """_save_face_crop 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         if not self.save_debug_crops:
             return None
 
@@ -195,6 +263,13 @@ class FaceIdentifier:
         return save_path
 
     def _get_largest_face(self, image):
+        """_get_largest_face 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         faces = self.face_app.get(image)
 
         if not faces:
@@ -209,6 +284,13 @@ class FaceIdentifier:
         )
 
     def _ensure_bgr_image(self, image):
+        """_ensure_bgr_image 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         if image is None or not isinstance(image, np.ndarray) or image.size == 0:
             return None
 
@@ -228,16 +310,37 @@ class FaceIdentifier:
 
     @staticmethod
     def _normalize_embedding(embedding):
+        """_normalize_embedding 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         embedding = embedding.astype(np.float32)
         norm = np.linalg.norm(embedding) + 1e-8
         return embedding / norm
 
     @staticmethod
     def _cosine_similarity(a, b):
+        """_cosine_similarity 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         return float(np.dot(a, b))
 
     @staticmethod
     def _no_face_result(person_id, face_crop_path=None):
+        """_no_face_result 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         return {
             "person_id": person_id,
             "name": "Unknown",
@@ -248,6 +351,13 @@ class FaceIdentifier:
 
     @staticmethod
     def _no_registered_faces_result(person_id, face_crop_path=None):
+        """_no_registered_faces_result 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         return {
             "person_id": person_id,
             "name": "Unknown",
@@ -258,6 +368,13 @@ class FaceIdentifier:
 
     @staticmethod
     def _error_result(person_id, error):
+        """_error_result 함수의 주요 기능을 수행합니다.
+        
+        인자:
+            함수 시그니처에 정의된 값을 사용합니다.
+        반환값:
+            처리 결과 또는 None을 반환합니다.
+        """
         return {
             "person_id": person_id,
             "name": "Unknown",
