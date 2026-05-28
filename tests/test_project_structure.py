@@ -9,8 +9,8 @@ from pathlib import Path
 
 from ai_cctv.alerts.dispatcher import AlertChannel, AlertDispatcher
 from ai_cctv.anomaly.detector import AnomalyDetector, DwellTimeRule, ObjectPresenceRule
-from ai_cctv.edge_pi.failover import NetworkFailoverPolicy
-from ai_cctv.edge_pi.streaming import GStreamerMediaMtxCommandBuilder, PiStreamingConfig
+from edge_node.failover import NetworkFailoverPolicy
+from edge_node.streaming import GStreamerMediaMtxCommandBuilder, PiStreamingConfig
 
 
 class MemoryAlertChannel(AlertChannel):
@@ -163,7 +163,7 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertIn("location=rtsp://127.0.0.1:8554/test", command)
 
     def test_console_scripts_are_split_by_deployment_bundle(self):
-        """Raspberry Pi와 Windows 서버 실행 진입점이 분리되어 있는지 검증합니다.
+        """Edge node와 AI server 실행 진입점이 분리되어 있는지 검증합니다.
 
         인자:
             없음.
@@ -175,13 +175,20 @@ class ProjectStructureTest(unittest.TestCase):
         scripts = pyproject["project"]["scripts"]
         extras = pyproject["project"]["optional-dependencies"]
 
-        self.assertEqual(scripts["ai-cctv-edge"], "ai_cctv.edge_pi.main:main")
+        self.assertEqual(scripts["ai-cctv-edge"], "edge_node.main:main")
         self.assertEqual(
             scripts["ai-cctv-windows-server"],
-            "ai_cctv.ai_server.main:main",
+            "ai_server.main:main",
         )
+        self.assertEqual(scripts["ai-cctv"], "ai_server.main:main")
+        self.assertIn("edge-node", extras)
+        self.assertIn("ai-server", extras)
         self.assertIn("edge-pi", extras)
         self.assertIn("windows-server", extras)
+        self.assertTrue(Path("src/edge_node").is_dir())
+        self.assertTrue(Path("src/ai_server").is_dir())
+        self.assertTrue(Path("requirements/edge-node.txt").is_file())
+        self.assertTrue(Path("requirements/ai-server.txt").is_file())
 
 
 if __name__ == "__main__":

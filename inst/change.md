@@ -1,4 +1,4 @@
-# develop 브랜치 대비 refactor 브랜치 변경 설명
+﻿# develop 브랜치 대비 refactor 브랜치 변경 설명
 
 이 문서는 `origin/develop...refactor` 기준으로 현재 `refactor` 브랜치가 `develop` 브랜치와 어떻게 달라졌는지 설명한다.
 대상 독자는 프로젝트 구조를 처음 보는 주니어 개발자이며, 단순히 "무엇이 바뀌었는가"뿐 아니라 "왜 그렇게 나누었는가"를 이해하는 데 초점을 둔다.
@@ -12,8 +12,8 @@
 | --- | --- | --- |
 | 프로젝트 형태 | 여러 스크립트와 자료 폴더가 루트에 흩어져 있음 | `src/ai_cctv` 중심의 Python 패키지 구조 |
 | 실행 단위 | 파일을 직접 실행하는 방식이 많음 | 콘솔 명령과 패키지 엔트리포인트 제공 |
-| 라즈베리 파이 코드 | RTSP 송출 실험 코드가 별도 폴더에 존재 | `edge_pi` 패키지로 GStreamer + MediaMTX 송출 책임 분리 |
-| 윈도우 서버 코드 | GUI, 탐지, 알림 코드가 클라이언트/서버 폴더에 혼재 | `windows_server`, `client`, `anomaly`, `alerts` 등으로 책임 분리 |
+| 라즈베리 파이 코드 | RTSP 송출 실험 코드가 별도 폴더에 존재 | `edge_node` 패키지로 GStreamer + MediaMTX 송출 책임 분리 |
+| 윈도우 서버 코드 | GUI, 탐지, 알림 코드가 클라이언트/서버 폴더에 혼재 | `ai_server`, `client`, `anomaly`, `alerts` 등으로 책임 분리 |
 | 공통 모델 | 이벤트/메시지 구조가 명확하지 않음 | `common`, `anomaly.events`, `alerts.message`로 공통 데이터 구조 정리 |
 | 알림 방식 | 여러 가능성이 코드와 설계에 섞여 있음 | 현시점 실행 경로는 Discord 중심, 다른 채널은 확장 영역으로 둠 |
 | 문서화 | 실험 자료와 구현 자료가 섞여 있음 | `README.md`, `inst/flow.md`, `inst/structure.md`, `inst/change.md`, `docs/`로 정리 |
@@ -49,8 +49,10 @@
 
 | 의존성 그룹 | 목적 |
 | --- | --- |
-| `edge-pi` | 라즈베리 파이 송출 코드 실행에 필요한 의존성 |
-| `windows-server` | 윈도우 서버 분석, GUI, Discord 알림 실행에 필요한 의존성 |
+| `edge-node` | 라즈베리 파이 Edge node 송출 코드 실행에 필요한 의존성 |
+| `ai-server` | AI server 분석, GUI, Discord 알림 실행에 필요한 의존성 |
+| `edge-pi` | 기존 설치 명령 호환을 위한 Edge node 의존성 별칭 |
+| `windows-server` | 기존 설치 명령 호환을 위한 AI server 의존성 별칭 |
 | `edge` | 기존 이름과의 호환을 위한 라즈베리 파이 의존성 별칭 |
 | `vision-demo` | 실험 또는 데모성 비전 코드 실행용 의존성 |
 
@@ -93,16 +95,20 @@ ai-cctv-edge
 현재 핵심 구조는 다음과 같다.
 
 ```text
-src/ai_cctv/
-  alerts/
-  anomaly/
-  client/
-  common/
-  edge/
-  edge_pi/
-  server/
-  streaming/
-  windows_server/
+src/
+  edge_node/
+  ai_server/
+  ai_cctv/
+    alerts/
+    anomaly/
+    client/
+    common/
+    edge/
+    edge_pi/
+    ai_server/
+    windows_server/
+    server/
+    streaming/
 ```
 
 각 폴더의 책임은 다음과 같다.
@@ -114,28 +120,28 @@ src/ai_cctv/
 | `client` | 윈도우 서버 GUI, 영상 표시, 프레임 처리 |
 | `common` | 여러 실행 묶음이 함께 쓰는 공통 이벤트/메시지 재노출 |
 | `edge` | 기존 import 경로를 유지하기 위한 호환 계층 |
-| `edge_pi` | 라즈베리 파이용 송출과 장애 대응 실행 계층 |
+| `edge_node` | 라즈베리 파이 Edge node 송출과 장애 대응 실행 계층 |
 | `server` | 서버 관점의 보조 기능과 호환 코드 |
 | `streaming` | RTSP/GStreamer 관련 송수신 코드와 레거시 코드 |
-| `windows_server` | 윈도우 서버 실행 묶음의 상위 진입점 |
+| `ai_server` | AI server 실행 묶음의 상위 진입점 |
 
 이 구조의 장점은 "파일 이름"이 아니라 "책임"을 기준으로 코드를 찾을 수 있다는 것이다.
-예를 들어 Discord 알림을 수정하고 싶으면 `alerts`를 먼저 보면 되고, 라즈베리 파이 송출 명령을 수정하고 싶으면 `edge_pi`를 먼저 보면 된다.
+예를 들어 Discord 알림을 수정하고 싶으면 `alerts`를 먼저 보면 되고, 라즈베리 파이 송출 명령을 수정하고 싶으면 `edge_node`를 먼저 보면 된다.
 
-## 5. 라즈베리 파이 실행 묶음 변경
+## 5. Edge node 실행 묶음 변경
 
-### 5.1 `edge_pi` 패키지 추가
+### 5.1 `edge_node` 패키지 추가
 
-라즈베리 파이에서 실행할 코드는 `src/ai_cctv/edge_pi`로 분리되었다.
+라즈베리 파이 Edge node에서 실행할 코드는 `src/edge_node`로 분리되었다.
 이 패키지는 CCTV 영상을 분석하지 않는다.
 주요 목표는 카메라 영상을 안정적으로 송출하는 것이다.
 
 | 파일 | 주요 역할 |
 | --- | --- |
-| `edge_pi/main.py` | 라즈베리 파이 실행 진입점 |
-| `edge_pi/streaming.py` | GStreamer + MediaMTX 기반 송출 명령 생성 |
-| `edge_pi/failover.py` | 네트워크 장애 상황에서 재시도 여부 판단 |
-| `edge_pi/__init__.py` | 라즈베리 파이 패키지 공개 API 정리 |
+| `edge_node/main.py` | Edge node 실행 진입점 |
+| `edge_node/streaming.py` | GStreamer + MediaMTX 기반 송출 명령 생성 |
+| `edge_node/failover.py` | 네트워크 장애 상황에서 재시도 여부 판단 |
+| `edge_node/__init__.py` | 라즈베리 파이 패키지 공개 API 정리 |
 
 ### 5.2 GStreamer + MediaMTX 기준 반영
 
@@ -156,25 +162,25 @@ src/ai_cctv/
 ### 5.3 `edge` 패키지는 호환 계층
 
 `src/ai_cctv/edge`는 새 구현의 중심이 아니다.
-이 폴더는 기존에 `ai_cctv.edge` 경로를 사용하던 코드가 갑자기 깨지지 않도록 `edge_pi`의 기능을 다시 노출하는 역할을 한다.
+이 폴더는 기존에 `ai_cctv.edge` 경로를 사용하던 코드가 갑자기 깨지지 않도록 `edge_node`의 기능을 다시 노출하는 역할을 한다.
 
 이런 코드를 호환 래퍼라고 부른다.
 호환 래퍼는 새 구조로 옮겨가는 동안 기존 import 경로를 유지하는 데 도움이 된다.
-하지만 새 코드를 작성할 때는 가능하면 `edge_pi`를 직접 사용하는 것이 더 명확하다.
+하지만 새 코드를 작성할 때는 가능하면 `edge_node`를 직접 사용하는 것이 더 명확하다.
 
-## 6. 윈도우 서버 실행 묶음 변경
+## 6. AI server 실행 묶음 변경
 
-### 6.1 `windows_server` 패키지 추가
+### 6.1 `ai_server` 패키지 추가
 
-윈도우 서버에서 실행할 상위 진입점은 `src/ai_cctv/windows_server`로 분리되었다.
+AI server에서 실행할 상위 진입점은 `src/ai_server`로 분리되었다.
 이 패키지는 영상 수신, 분석, 알림, GUI 실행을 연결하는 역할을 한다.
 
 | 파일 | 주요 역할 |
 | --- | --- |
-| `windows_server/main.py` | 윈도우 서버 실행 진입점 |
-| `windows_server/analysis.py` | 분석 관련 기능을 윈도우 서버 계층에서 사용할 수 있게 정리 |
-| `windows_server/alerts.py` | 알림 관련 기능을 윈도우 서버 계층에서 사용할 수 있게 정리 |
-| `windows_server/__init__.py` | 윈도우 서버 패키지 공개 API 정리 |
+| `ai_server/main.py` | AI server 실행 진입점 |
+| `ai_server/analysis.py` | 분석 관련 기능을 AI server 계층에서 사용할 수 있게 정리 |
+| `ai_server/alerts.py` | 알림 관련 기능을 AI server 계층에서 사용할 수 있게 정리 |
+| `ai_server/__init__.py` | AI server 패키지 공개 API 정리 |
 
 ### 6.2 GUI와 영상 처리 책임 분리
 
@@ -230,7 +236,7 @@ KakaoTalk, SMS, 이메일 같은 방식은 차후 확장 영역으로 남겨두�
 | --- | --- |
 | `alerts/message.py` | 이상 상황 이벤트를 사람이 읽을 수 있는 알림 메시지로 변환 |
 | `alerts/dispatcher.py` | 알림 메시지를 실제 외부 채널로 보내는 디스패처 |
-| `windows_server/alerts.py` | 윈도우 서버 실행 묶음에서 알림 기능을 사용하기 위한 연결 계층 |
+| `ai_server/alerts.py` | 윈도우 서버 실행 묶음에서 알림 기능을 사용하기 위한 연결 계층 |
 
 주니어 개발자가 주의해야 할 점은 "확장 가능성"과 "지금 구현할 기능"을 구분해야 한다는 것이다.
 코드 구조상 다른 알림 채널을 나중에 추가할 수는 있지만, 현재 실행 경로는 Discord를 기준으로 평가해야 한다.
@@ -299,7 +305,7 @@ KakaoTalk, SMS, 이메일 같은 방식은 차후 확장 영역으로 남겨두�
 ### 10.4 호환 래퍼
 
 호환 래퍼는 기존 코드가 사용하던 import 경로를 유지하기 위해 새 구현을 다시 노출하는 얇은 파일이다.
-예를 들어 `edge`는 새 중심 구조인 `edge_pi`로 기능을 넘겨주는 역할을 한다.
+예를 들어 `edge`는 새 중심 구조인 `edge_node`로 기능을 넘겨주는 역할을 한다.
 
 호환 래퍼는 기존 코드가 갑자기 깨지는 것을 막는 데 유용하지만, 새 코드를 작성할 때는 실제 책임이 있는 새 패키지를 직접 사용하는 편이 좋다.
 
@@ -318,8 +324,8 @@ KakaoTalk, SMS, 이메일 같은 방식은 차후 확장 영역으로 남겨두�
 | develop 쪽 위치/성격 | refactor 쪽 위치/성격 | 의미 |
 | --- | --- | --- |
 | `클라이언트 코드` | `src/ai_cctv/client` | GUI와 영상 처리 코드를 패키지 내부로 이동 |
-| `서버 코드` | `src/ai_cctv/server`, `src/ai_cctv/windows_server` | 서버성 기능과 윈도우 실행 묶음 분리 |
-| `rtsp`, `rtspv1.0` | `src/ai_cctv/streaming`, `src/ai_cctv/edge_pi`, `scripts` | RTSP/GStreamer 관련 코드를 실행 코드와 보조 스크립트로 분리 |
+| `서버 코드` | `src/ai_cctv/server`, `src/ai_server` | 서버성 기능과 윈도우 실행 묶음 분리 |
+| `rtsp`, `rtspv1.0` | `src/ai_cctv/streaming`, `src/edge_node`, `scripts` | RTSP/GStreamer 관련 코드를 실행 코드와 보조 스크립트로 분리 |
 | 공부/정리 자료 폴더 | `docs` | 문서성 자료를 코드 실행 경로 밖으로 이동 |
 | 임시 이미지/샘플 데이터 | `tmp` | 실행 코드와 임시 자료를 분리 |
 
@@ -391,8 +397,8 @@ git diff --check
 
 | 추가하려는 기능 | 넣을 위치 |
 | --- | --- |
-| 라즈베리 파이 카메라 송출, GStreamer 명령, 송출 장애 대응 | `src/ai_cctv/edge_pi` |
-| 윈도우 서버 실행 흐름 연결 | `src/ai_cctv/windows_server` |
+| 라즈베리 파이 카메라 송출, GStreamer 명령, 송출 장애 대응 | `src/edge_node` |
+| 윈도우 서버 실행 흐름 연결 | `src/ai_server` |
 | GUI 화면, 설정 창, 영상 표시 | `src/ai_cctv/client` |
 | 프레임 분석, 사람 탐지, 추적 | `src/ai_cctv/client/pipeline`, `src/ai_cctv/client/person_tracker.py` |
 | 이상 상황 판단 | `src/ai_cctv/anomaly` |
@@ -406,20 +412,23 @@ git diff --check
 반대로 각 기능이 자기 책임을 가진 폴더에 있다면 유지보수와 협업이 쉬워진다.
 
 
-## 10. 추가 정리: 엣지 노드와 AI 서버 디렉토리 분할
+## 17. 추가 정리: Edge node와 AI server 디렉토리 분할
 
-프로젝트의 실행 책임을 더 분명히 하기 위해 AI 서버 전용 디렉토리 `src/ai_cctv/ai_server`를 추가했다.
+프로젝트의 실행 책임을 더 분명히 하기 위해 Edge node 전용 디렉토리 `src/edge_node`와 AI server 전용 디렉토리 `src/ai_server`를 `src` 바로 아래에 분리했다.
 
 | 디렉토리 | 역할 |
 | --- | --- |
-| `edge_pi` | 라즈베리 파이 엣지 노드 송출 및 장애 대응 |
-| `ai_server` | Windows AI 서버 실행 진입점, 분석/알림 재노출 |
-| `windows_server` | 이전 import 경로 호환 레이어 |
+| `src/edge_node` | 라즈베리 파이 Edge node 송출 및 장애 대응 |
+| `src/ai_server` | AI server 실행 진입점, 분석/알림 재노출 |
+| `src/ai_cctv/edge_pi` | 이전 Edge node import 경로 호환 레이어 |
+| `src/ai_cctv/ai_server` | 이전 AI server import 경로 호환 레이어 |
+| `src/ai_cctv/windows_server` | 이전 Windows server import 경로 호환 레이어 |
 
 함께 수정한 문제점은 다음과 같다.
 
-1. 실행 진입점이 `windows_server`에만 있어 디렉토리 이름과 실제 실행 책임이 덜 명확했던 문제를 `ai_server/main.py`로 분리해 해결했다.
-2. `src/ai_cctv/__main__.py`에 인코딩 깨짐 주석이 남아 있던 문제를 정리해 패키지 실행 의도를 명확히 했다.
-3. 콘솔 스크립트 `ai-cctv`, `ai-cctv-windows-server`가 새 AI 서버 진입점을 사용하도록 수정했다.
+1. 실행 진입점이 `ai_cctv` 내부 호환 경로에 묶여 보이던 문제를 `src/edge_node/main.py`, `src/ai_server/main.py`로 분리해 해결했다.
+2. 콘솔 스크립트 `ai-cctv-edge`가 `edge_node.main`을 직접 사용하도록 수정했다.
+3. 콘솔 스크립트 `ai-cctv`, `ai-cctv-windows-server`가 `ai_server.main`을 직접 사용하도록 수정했다.
+4. 기존 import 경로는 호환 래퍼로 남겨 기존 코드의 파손 가능성을 줄였다.
 
-이 변경으로 신규 코드는 `ai_server`를 기준으로 읽고, 기존 코드는 `windows_server` 경로를 유지해도 동작하도록 호환성을 보장한다.
+이 변경으로 신규 코드는 `edge_node`와 `ai_server`를 기준으로 읽고, 기존 코드는 `ai_cctv.edge_pi`, `ai_cctv.ai_server`, `ai_cctv.windows_server` 경로를 유지해도 동작하도록 호환성을 보장한다.

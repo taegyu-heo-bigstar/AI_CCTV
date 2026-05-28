@@ -1,4 +1,21 @@
-# AI CCTV Raspberry Pi 실행 패키지입니다.
-# 카메라 송출, MediaMTX publish, 네트워크 장애 대응 책임을 담당합니다.
-# Windows 서버 분석 코드와 의존성을 분리하기 위한 배포 단위입니다.
+# Edge node 호환 패키지 파일입니다.
+# 실제 Edge node 실행 묶음은 src/edge_node 패키지에 있습니다.
+# 기존 ai_cctv.edge_pi import 경로를 유지하기 위해 공개 객체를 재노출합니다.
 
+from edge_node.failover import FailoverAction, NetworkFailoverPolicy
+from edge_node.main import build_default_streaming_command, main
+from edge_node.streaming import (
+    GStreamerMediaMtxCommandBuilder,
+    PiStreamingConfig,
+    RpicamMediaMtxCommandBuilder,
+)
+
+__all__ = [
+    "main",
+    "build_default_streaming_command",
+    "FailoverAction",
+    "NetworkFailoverPolicy",
+    "GStreamerMediaMtxCommandBuilder",
+    "PiStreamingConfig",
+    "RpicamMediaMtxCommandBuilder",
+]

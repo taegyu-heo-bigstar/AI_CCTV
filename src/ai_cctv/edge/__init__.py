@@ -1,4 +1,3 @@
-# AI CCTV 라즈베리파이 엣지 장치 패키지입니다.
-# 카메라 송출, 로컬 저장, 네트워크 장애 대응 구조를 표현합니다.
-# PC 클라이언트와 분리된 Raspberry Pi 책임 영역입니다.
-
+# AI CCTV Edge 호환 패키지입니다.
+# 실제 Edge node 실행 책임은 src/edge_node 패키지로 분리되어 있습니다.
+# 기존 ai_cctv.edge import 경로를 유지하기 위한 영역입니다.
