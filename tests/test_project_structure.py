@@ -11,7 +11,7 @@ from ai_cctv.ai_server.alerts.dispatcher import (
     NotificationChannel,
     NotificationDispatcher,
 )
-from ai_cctv.ai_server.anomaly.detector import (
+from ai_cctv.ai_server.analysis.anomaly.detector import (
     AnomalyRuleEngine,
     DwellTimeAnomalyRule,
     ObjectAppearanceRule,
@@ -191,9 +191,9 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertEqual(scripts["ai-cctv-edge"], "ai_cctv.edge_node.main:main")
         self.assertEqual(
             scripts["ai-cctv-ai-server"],
-            "ai_cctv.ai_server.main:main",
+            "ai_cctv.ai_server.server_run:main",
         )
-        self.assertEqual(scripts["ai-cctv"], "ai_cctv.ai_server.main:main")
+        self.assertEqual(scripts["ai-cctv"], "ai_cctv.ai_server.server_run:main")
         self.assertIn("edge-node", extras)
         self.assertIn("ai-server", extras)
         self.assertNotIn("edge-pi", extras)
@@ -202,8 +202,11 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertNotIn("ai-cctv-windows-server", scripts)
         self.assertTrue(Path("src/ai_cctv/edge_node").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server").is_dir())
-        self.assertTrue(Path("src/ai_cctv/ai_server/control_center").is_dir())
-        self.assertTrue(Path("src/ai_cctv/ai_server/anomaly").is_dir())
+        self.assertTrue(Path("src/ai_cctv/ai_server/server_run.py").is_file())
+        self.assertTrue(Path("src/ai_cctv/ai_server/ui").is_dir())
+        self.assertTrue(Path("src/ai_cctv/ai_server/analysis").is_dir())
+        self.assertTrue(Path("src/ai_cctv/ai_server/analysis/anomaly").is_dir())
+        self.assertTrue(Path("src/ai_cctv/ai_server/storage").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/alerts").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/alerts/chat_bot").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/common").is_dir())
@@ -217,10 +220,11 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertFalse(Path("src/ai_cctv/alerts").exists())
         self.assertFalse(Path("src/ai_cctv/common").exists())
         self.assertFalse(Path("src/ai_cctv/ai_server/client").exists())
-        self.assertFalse(Path("src/ai_cctv/ai_server/control_center/chat_bot").exists())
-        self.assertFalse(
-            Path("src/ai_cctv/ai_server/control_center/legacy_cctv_gui.py").exists()
-        )
+        self.assertFalse(Path("src/ai_cctv/ai_server/control_center").exists())
+        self.assertFalse(Path("src/ai_cctv/ai_server/main.py").exists())
+        self.assertFalse(Path("src/ai_cctv/ai_server/analysis.py").exists())
+        self.assertFalse(Path("src/ai_cctv/ai_server/anomaly").exists())
+        self.assertFalse(Path("src/ai_cctv/ai_server/ui/legacy_cctv_gui.py").exists())
         self.assertFalse(Path("src/ai_cctv/streaming/legacy_rtsp_receiver.py").exists())
         self.assertFalse(Path("src/ai_cctv/server/fail_over.py").exists())
         self.assertTrue(Path("requirements/edge-node.txt").is_file())

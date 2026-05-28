@@ -1,19 +1,15 @@
 # AI CCTV Flow
 
-이 문서는 최종 배포 목표인 Edge node 실행 묶음과 AI server 실행 묶음을 기준으로 프로젝트 구조와 실행 흐름을 설명합니다.
+이 문서는 Edge node와 AI server 두 실행 묶음을 기준으로 프로젝트 구조와 실행 흐름을 설명합니다.
 
 ## Project Layout
 
 ```text
 AI_CCTV/
 |-- main.py                         # 로컬 개발용 AI server 실행 진입점
-|-- README.md                       # 프로젝트 개요와 설치 안내
 |-- pyproject.toml                  # 패키지 메타데이터와 실행 명령
 |-- requirements/                   # 배포 환경별 requirements 파일
 |-- inst/                           # 구조, 흐름, 변경 설명 문서
-|   |-- structure.md                # 파일별 클래스/함수 구조 표
-|   |-- flow.md                     # 실행 흐름과 책임 경계 문서
-|   `-- change.md                   # develop 대비 변경 설명
 |-- src/
 |   `-- ai_cctv/
 |       |-- edge_node/              # Raspberry Pi Edge node 배포 단위
@@ -21,16 +17,14 @@ AI_CCTV/
 |       |   |-- streaming.py        # GStreamer + MediaMTX RTSP publish 명령 생성
 |       |   `-- failover.py         # 네트워크 장애 대응 정책
 |       `-- ai_server/              # Windows AI server 배포 단위
-|           |-- main.py             # AI server GUI/분석 진입점
-|           |-- analysis.py         # 서버 분석 계층 재노출
+|           |-- server_run.py       # AI server 실행 진입점
 |           |-- stream_receiver.py  # MediaMTX RTSP 수신 수동 점검 도구
-|           |-- control_center/     # GUI, 영상 루프, 추적, 녹화, VLM 구현
-|           |-- anomaly/            # 이상 상황 판정 규칙과 이벤트
-|           |-- alerts/             # Discord 알림 메시지, 디스패처, 챗봇 전송 구현
+|           |-- ui/                 # PyQt 화면, 설정창, 이벤트 표시
+|           |-- analysis/           # 영상 입력, 추적, VLM, 이상 상황 판정
+|           |-- storage/            # 저장 경로와 녹화 관리
+|           |-- alerts/             # Discord 알림 메시지, 디스패처, 챗봇 전송
 |           `-- common/             # 서버 노드 내부 공통 값 객체 재노출
-|-- tests/                          # 구조와 도메인 경계 단위 테스트
-|-- docs/                           # 설계/학습 문서
-`-- scripts/                        # 운영 보조 스크립트
+`-- tests/                          # 구조와 도메인 경계 단위 테스트
 ```
 
 ## Deployment Bundles
@@ -50,14 +44,16 @@ flowchart LR
     Pi --> Failover["EdgeNetworkFailoverPolicy"]
     StreamBuilder --> MediaMTX["MediaMTX RTSP publish"]
     MediaMTX --> RTSP["RTSP Stream"]
-    RTSP --> Windows["ai_cctv/ai_server/main.py"]
-    Windows --> VideoWorker["ai_server/control_center/video_worker.py"]
+    RTSP --> ServerRun["ai_cctv/ai_server/server_run.py"]
+    ServerRun --> MainWindow["ai_server/ui/main_window.py"]
+    MainWindow --> VideoWorker["ai_server/analysis/video_worker.py"]
     VideoWorker --> Tracker["PersonTracker"]
     Tracker --> Processor["PersonFrameProcessor"]
     Tracker --> RuleEngine["AnomalyRuleEngine"]
+    VideoWorker --> Storage["storage/recording_manager.py"]
     RuleEngine --> Event["AnomalyEvent"]
     Event --> Dispatcher["NotificationDispatcher"]
-    Dispatcher --> Discord["Discord"]
+    Dispatcher --> Discord["alerts/chat_bot"]
     Processor --> GUI["CCTVMainWindow"]
 ```
 
@@ -74,15 +70,17 @@ classDiagram
         +decide_for_network(network_available)
     }
 
+    class CCTVMainWindow {
+        +start_video()
+        +stop_video()
+        +add_event(event)
+    }
+
     class VideoWorker {
         +run()
         +stop()
         -_create_default_notification_dispatcher()
         -_cleanup()
-    }
-
-    class PersonTracker {
-        +track(frame)
     }
 
     class AnomalyRuleEngine {
@@ -94,28 +92,13 @@ classDiagram
         +dispatch(message)
     }
 
-    class CCTVMainWindow {
-        +start_video()
-        +stop_video()
-        +add_event(event)
-    }
-
     MediaMtxGStreamerCommandBuilder --> EdgeNetworkFailoverPolicy
-    VideoWorker --> PersonTracker
+    CCTVMainWindow --> VideoWorker
     VideoWorker --> AnomalyRuleEngine
     VideoWorker --> NotificationDispatcher
-    CCTVMainWindow --> VideoWorker
 ```
 
 ## Execution
-
-로컬 개발 환경에서 AI server는 다음 명령으로 실행합니다.
-
-```bash
-python main.py
-```
-
-배포 환경에서는 실행 묶음별 extras와 console script를 사용합니다.
 
 ```bash
 pip install -e ".[edge-node]"

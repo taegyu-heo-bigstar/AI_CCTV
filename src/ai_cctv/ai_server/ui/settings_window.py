@@ -19,7 +19,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from .storage.path_manager import StoragePathManager
+from ..storage.path_manager import StoragePathManager
 
 
 class SettingsWindow(QDialog):

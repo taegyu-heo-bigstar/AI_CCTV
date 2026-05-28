@@ -6,13 +6,13 @@ from datetime import datetime
 from PyQt5.QtCore import QThread, pyqtSignal
 
 from ..alerts.dispatcher import DiscordNotificationChannel, NotificationDispatcher
-from ..anomaly.detector import AnomalyRuleEngine
+from .anomaly.detector import AnomalyRuleEngine
 from .crop_manager import CropManager
 from .full_body_checker import FullBodyChecker
 from .pipeline.person_frame_processor import PersonFrameProcessor
 from .person_state_manager import PersonStateManager
 from .person_tracker import PersonTracker
-from .recording_manager import RecordingManager
+from ..storage.recording_manager import RecordingManager
 from .video_stream import VideoStream
 from .vlm_worker import VLMWorker
 

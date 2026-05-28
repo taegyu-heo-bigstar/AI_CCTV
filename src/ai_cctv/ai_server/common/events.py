@@ -2,7 +2,7 @@
 # 여러 계층이 같은 이상 상황 이벤트 값 객체를 참조할 수 있게 공개합니다.
 # 실제 이벤트 정의는 ai_cctv.ai_server.anomaly.events에 둡니다.
 
-from ..anomaly.events import AnomalyEvent
+from ..analysis.anomaly.events import AnomalyEvent
 
 
 __all__ = ["AnomalyEvent"]

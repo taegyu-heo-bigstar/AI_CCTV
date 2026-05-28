@@ -20,8 +20,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ..settings_window import SettingsWindow
-from ..video_worker import VideoWorker
+from .settings_window import SettingsWindow
+from ..analysis.video_worker import VideoWorker
 from .event_presenter import EventPresenter
 
 

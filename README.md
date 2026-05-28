@@ -18,12 +18,6 @@ pip install -e ".[edge-node]"
 ai-cctv-edge
 ```
 
-전통적인 requirements 파일이 필요한 환경에서는 다음 파일을 사용할 수 있습니다.
-
-```bash
-pip install -r requirements/edge-node.txt
-```
-
 AI server 실행 환경:
 
 ```bash
@@ -31,9 +25,10 @@ pip install -e ".[ai-server]"
 ai-cctv-ai-server
 ```
 
-전통적인 requirements 파일이 필요한 환경에서는 다음 파일을 사용할 수 있습니다.
+requirements 파일이 필요한 환경에서는 다음 파일을 사용할 수 있습니다.
 
 ```bash
+pip install -r requirements/edge-node.txt
 pip install -r requirements/ai-server.txt
 ```
 
@@ -46,16 +41,16 @@ python main.py
 ## 구조
 
 ```text
-inst/                 # 구조, 흐름, 변경 설명 문서
-requirements/         # 실행 환경별 의존성 목록
 src/
 `-- ai_cctv/
-    |-- edge_node/    # Edge node 전용 실행 코드
-    `-- ai_server/    # AI server 전용 실행 코드와 서버 소유 하위 도메인
-        |-- control_center/  # GUI, 영상 루프, 추적, 녹화, VLM 분석 구현
-        |-- anomaly/  # 이상 상황 판정 규칙과 이벤트
-        |-- alerts/   # Discord 중심 알림 계층과 챗봇 전송 구현
-        `-- common/   # 서버 노드 내부 공통 값 객체 재노출
+    |-- edge_node/      # Raspberry Pi Edge node 실행 코드
+    `-- ai_server/      # Windows AI server 실행 코드
+        |-- server_run.py
+        |-- ui/         # PyQt 화면, 설정창, 이벤트 표시
+        |-- analysis/   # 영상 입력, 추적, VLM, 이상 상황 판정
+        |-- storage/    # 저장 경로와 녹화 관리
+        |-- alerts/     # Discord 알림과 챗봇 전송
+        `-- common/     # 서버 내부 공통 값 객체 재노출
 ```
 
 ## 검증
