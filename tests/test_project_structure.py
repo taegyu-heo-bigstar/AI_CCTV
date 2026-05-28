@@ -7,8 +7,11 @@ import tomllib
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from ai_cctv.alerts.dispatcher import NotificationChannel, NotificationDispatcher
-from ai_cctv.anomaly.detector import (
+from ai_cctv.ai_server.alerts.dispatcher import (
+    NotificationChannel,
+    NotificationDispatcher,
+)
+from ai_cctv.ai_server.anomaly.detector import (
     AnomalyRuleEngine,
     DwellTimeAnomalyRule,
     ObjectAppearanceRule,
@@ -199,12 +202,20 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertNotIn("ai-cctv-windows-server", scripts)
         self.assertTrue(Path("src/ai_cctv/edge_node").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server").is_dir())
+        self.assertTrue(Path("src/ai_cctv/ai_server/client").is_dir())
+        self.assertTrue(Path("src/ai_cctv/ai_server/anomaly").is_dir())
+        self.assertTrue(Path("src/ai_cctv/ai_server/alerts").is_dir())
+        self.assertTrue(Path("src/ai_cctv/ai_server/common").is_dir())
         self.assertFalse(Path("src/ai_cctv/edge").exists())
         self.assertFalse(Path("src/ai_cctv/edge_pi").exists())
         self.assertFalse(Path("src/ai_cctv/windows_server").exists())
         self.assertFalse(Path("src/ai_cctv/server").exists())
         self.assertFalse(Path("src/ai_cctv/streaming").exists())
-        self.assertFalse(Path("src/ai_cctv/client/legacy_cctv_gui.py").exists())
+        self.assertFalse(Path("src/ai_cctv/client").exists())
+        self.assertFalse(Path("src/ai_cctv/anomaly").exists())
+        self.assertFalse(Path("src/ai_cctv/alerts").exists())
+        self.assertFalse(Path("src/ai_cctv/common").exists())
+        self.assertFalse(Path("src/ai_cctv/ai_server/client/legacy_cctv_gui.py").exists())
         self.assertFalse(Path("src/ai_cctv/streaming/legacy_rtsp_receiver.py").exists())
         self.assertFalse(Path("src/ai_cctv/server/fail_over.py").exists())
         self.assertTrue(Path("requirements/edge-node.txt").is_file())

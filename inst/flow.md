@@ -20,15 +20,14 @@ AI_CCTV/
 |       |   |-- main.py             # Edge node 송출 명령 진입점
 |       |   |-- streaming.py        # GStreamer + MediaMTX RTSP publish 명령 생성
 |       |   `-- failover.py         # 네트워크 장애 대응 정책
-|       |-- ai_server/              # Windows AI server 배포 단위
-|       |   |-- main.py             # AI server GUI/분석 진입점
-|       |   |-- analysis.py         # 분석 계층 공개 API
-|       |   |-- alerts.py           # Discord 알림 계층 공개 API
-|       |   `-- stream_receiver.py  # MediaMTX RTSP 수신 수동 점검 도구
-|       |-- client/                 # Windows GUI와 영상 분석 구현
-|       |-- anomaly/                # 이상 상황 판정 규칙과 이벤트
-|       |-- alerts/                 # Discord 알림 메시지와 디스패처
-|       `-- common/                 # 공통 값 객체 재노출
+|       `-- ai_server/              # Windows AI server 배포 단위
+|           |-- main.py             # AI server GUI/분석 진입점
+|           |-- analysis.py         # 서버 분석 계층 재노출
+|           |-- stream_receiver.py  # MediaMTX RTSP 수신 수동 점검 도구
+|           |-- client/             # GUI, 영상 루프, 추적, 녹화, VLM 구현
+|           |-- anomaly/            # 이상 상황 판정 규칙과 이벤트
+|           |-- alerts/             # Discord 알림 메시지와 디스패처
+|           `-- common/             # 서버 노드 내부 공통 값 객체 재노출
 |-- tests/                          # 구조와 도메인 경계 단위 테스트
 |-- docs/                           # 설계/학습 문서
 `-- scripts/                        # 운영 보조 스크립트
@@ -52,7 +51,7 @@ flowchart LR
     StreamBuilder --> MediaMTX["MediaMTX RTSP publish"]
     MediaMTX --> RTSP["RTSP Stream"]
     RTSP --> Windows["ai_cctv/ai_server/main.py"]
-    Windows --> VideoWorker["client/video_worker.py"]
+    Windows --> VideoWorker["ai_server/client/video_worker.py"]
     VideoWorker --> Tracker["PersonTracker"]
     Tracker --> Processor["PersonFrameProcessor"]
     Tracker --> RuleEngine["AnomalyRuleEngine"]
