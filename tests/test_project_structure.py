@@ -3,12 +3,14 @@
 # 종합설계 문서의 핵심 계층이 코드로 동작하는지 확인합니다.
 
 import unittest
+import tomllib
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from ai_cctv.alerts.dispatcher import AlertChannel, AlertDispatcher
 from ai_cctv.anomaly.detector import AnomalyDetector, DwellTimeRule, ObjectPresenceRule
-from ai_cctv.edge.failover import NetworkFailoverPolicy
-from ai_cctv.edge.streaming import GStreamerMediaMtxCommandBuilder, PiStreamingConfig
+from ai_cctv.edge_pi.failover import NetworkFailoverPolicy
+from ai_cctv.edge_pi.streaming import GStreamerMediaMtxCommandBuilder, PiStreamingConfig
 
 
 class MemoryAlertChannel(AlertChannel):
@@ -159,6 +161,27 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertIn("gst-launch-1.0", command)
         self.assertIn("libcamerasrc", command)
         self.assertIn("location=rtsp://127.0.0.1:8554/test", command)
+
+    def test_console_scripts_are_split_by_deployment_bundle(self):
+        """Raspberry Pi와 Windows 서버 실행 진입점이 분리되어 있는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+        scripts = pyproject["project"]["scripts"]
+        extras = pyproject["project"]["optional-dependencies"]
+
+        self.assertEqual(scripts["ai-cctv-edge"], "ai_cctv.edge_pi.main:main")
+        self.assertEqual(
+            scripts["ai-cctv-windows-server"],
+            "ai_cctv.windows_server.main:main",
+        )
+        self.assertIn("edge-pi", extras)
+        self.assertIn("windows-server", extras)
 
 
 if __name__ == "__main__":

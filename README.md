@@ -1,35 +1,52 @@
-## 5/14일 추가)
-### 브랜치 보호
-브랜치 규칙 추가했습니다.
-main브랜치 규칙
-- 강제 push불가
-- 무조건 PR로 본인 제외 1명이 merge눌러줘야합니다.
+# AI CCTV
 
-develop브랜치 규칙
-- 강제 push불가
-- 무조건 PR로 본인 포함 1명이 merge눌러야합니다.
+Raspberry Pi 기반 CCTV 송출 장치와 Windows 서버 기반 AI 영상 분석기를 분리해 구성하는 프로젝트입니다.
 
----
+## 실행 묶음
 
-### gitignore처리 해주세요.
-코드 올리실때 따로 가상환경 만들어서 실행하신분들은 가상환경 .gitignore에 추가해서 추적 안되게 해주세요.
+| 묶음 | 역할 | 실행 명령 |
+|---|---|---|
+| Raspberry Pi | 카메라 영상 송출, GStreamer + MediaMTX RTSP publish, 네트워크 장애 정책 | `ai-cctv-edge` |
+| Windows 서버 | RTSP 수신, OpenCV/YOLO 분석, 이상 상황 판단, Discord 알림, GUI | `ai-cctv-windows-server` |
 
-### 가상환경 셋팅
-venv가상환경 설정 방법(윈도우 기준)
+## 설치
+
+Raspberry Pi 실행 환경:
+
 ```bash
-py -3.11 -m venv venv311 # 가상환경 생성(버전은 가급적 파이썬 3.11버전)
-venv311\Scripts\activate # 가상환경 활성화
+pip install -e ".[edge-pi]"
+ai-cctv-edge
 ```
 
-라이브러리 파일 다운로드
+Windows 서버 실행 환경:
+
 ```bash
-pip install -r requirements.txt
+pip install -e ".[windows-server]"
+ai-cctv-windows-server
 ```
 
-torch는 각자 pc마다 맞는 버전으로 각자 설치해주셔야합니다. 
-GPU 사용, CUDA 12.1 예시)
-`pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121`
+로컬 개발 환경에서 기존 방식으로 Windows 서버를 실행할 수도 있습니다.
 
-GPU 없거나 CPU만 사용할 경우) - 이건 비추합니다. 차라리 테스트를 위해서는 gpu부족하면 코랩 쓰는거 권장합니다.
-`pip install torch torchvision torchaudio`
+```bash
+python main.py
+```
 
+## 구조
+
+```text
+src/ai_cctv/
+├─ common/          # 공통 이벤트/메시지 값 객체
+├─ edge_pi/         # Raspberry Pi 전용 실행 코드
+├─ windows_server/  # Windows 서버 전용 실행 코드
+├─ client/          # Windows GUI/영상 분석 구현
+├─ anomaly/         # 이상 상황 판단 규칙
+├─ alerts/          # Discord 중심 알림 계층
+└─ edge/            # 기존 import 호환 레이어
+```
+
+## 검증
+
+```bash
+python -m compileall src main.py tests
+$env:PYTHONPATH="src"; python -m unittest discover -s tests
+```

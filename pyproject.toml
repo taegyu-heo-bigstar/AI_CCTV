@@ -8,6 +8,13 @@ version = "0.1.0"
 description = "AI CCTV client and streaming utilities"
 requires-python = ">=3.11"
 dependencies = [
+]
+
+[project.optional-dependencies]
+edge-pi = [
+    "pygobject",
+]
+windows-server = [
     "transformers>=4.51.0",
     "accelerate",
     "pillow",
@@ -26,8 +33,6 @@ dependencies = [
     "discord.py>=2.0.0",
     "PyQt5",
 ]
-
-[project.optional-dependencies]
 edge = [
     "pygobject",
 ]
@@ -37,7 +42,9 @@ vision-demo = [
 ]
 
 [project.scripts]
-ai-cctv = "ai_cctv.client.gui:main"
+ai-cctv = "ai_cctv.windows_server.main:main"
+ai-cctv-edge = "ai_cctv.edge_pi.main:main"
+ai-cctv-windows-server = "ai_cctv.windows_server.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

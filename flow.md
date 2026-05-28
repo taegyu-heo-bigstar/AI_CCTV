@@ -1,66 +1,67 @@
 # AI CCTV Flow
 
-이 문서는 종합설계 프로젝트 요약 문서 기준에 맞춘 AI CCTV 코드 구조와 실행 흐름을 설명합니다.
+이 문서는 최종 배포 목표인 Raspberry Pi 실행 묶음과 Windows 서버 실행 묶음을 기준으로 프로젝트 구조를 설명합니다.
 
 ## Project Layout
 
 ```text
 AI_CCTV/
-├─ main.py                         # 로컬 개발 실행 진입점
+├─ main.py                         # 로컬 개발용 Windows 서버 실행 진입점
 ├─ structure.md                    # 파일별 클래스/함수 구조 표
 ├─ flow.md                         # 실행 흐름과 책임 경계 문서
 ├─ src/ai_cctv/
-│  ├─ edge/                        # Raspberry Pi GStreamer 송출 및 장애 대응 정책
-│  ├─ anomaly/                     # 객체 감지 결과 기반 이상 상황 판단
-│  ├─ alerts/                      # Discord, KakaoTalk, LoRa 확장용 알림 계층
-│  ├─ client/                      # 사용자 PC 기반 영상 수신/분석/GUI
-│  │  ├─ pipeline/                 # 프레임 단위 인물 처리
-│  │  ├─ storage/                  # PC 저장 경로 규칙
-│  │  ├─ ui/                       # PyQt 메인 화면과 이벤트 표시
-│  │  └─ chat_bot/                 # 기존 Discord 전송 구현
-│  ├─ streaming/                   # RTSP 송수신 실험 및 레거시 유틸리티
+│  ├─ common/                      # 플랫폼 공통 이벤트/메시지 값 객체
+│  ├─ edge_pi/                     # Raspberry Pi 전용 실행 묶음
+│  │  ├─ main.py                   # Pi 송출 명령 진입점
+│  │  ├─ streaming.py              # GStreamer + MediaMTX RTSP publish 명령
+│  │  └─ failover.py               # 네트워크 장애 대응 정책
+│  ├─ windows_server/              # Windows 서버 전용 실행 묶음
+│  │  ├─ main.py                   # Windows 서버 GUI/분석 진입점
+│  │  ├─ analysis.py               # 분석 계층 재노출
+│  │  └─ alerts.py                 # Discord 알림 계층 재노출
+│  ├─ client/                      # 기존 Windows GUI/분석 구현
+│  ├─ anomaly/                     # 이상 상황 판단 구현
+│  ├─ alerts/                      # 현재 Discord 중심 알림 구현과 확장 인터페이스
+│  ├─ edge/                        # 기존 edge import 호환 레이어
+│  ├─ streaming/                   # RTSP 데모/레거시 유틸리티
 │  └─ server/                      # 서버 보조 모듈 자리
+├─ tests/                          # 장비 비의존 구조 테스트
 ├─ docs/                           # 설계/학습 문서
-├─ scripts/                        # 운영 스크립트
-├─ tests/                          # 장비 비의존 단위 테스트
-└─ tmp/                            # 임시/레거시 자료
+└─ scripts/                        # 운영 스크립트
 ```
+
+## Deployment Bundles
+
+| 실행 묶음 | 설치 extras | console script | 주요 책임 |
+|---|---|---|---|
+| Raspberry Pi | `ai-cctv[edge-pi]` | `ai-cctv-edge` | 카메라 송출, MediaMTX publish, 네트워크 장애 정책 |
+| Windows 서버 | `ai-cctv[windows-server]` | `ai-cctv-windows-server` 또는 `ai-cctv` | RTSP 수신, OpenCV/YOLO 분석, 이상 상황 판단, Discord 알림, GUI |
 
 ## System Flow
 
 ```mermaid
 flowchart LR
     Camera["Camera Module"] --> Pi["Raspberry Pi 4B"]
-    Pi --> EdgeStream["edge/streaming.py<br/>GStreamer + MediaMTX command"]
-    Pi --> EdgeFailover["edge/failover.py<br/>network fail-over policy"]
-    EdgeStream --> RTSP["RTSP / Network Streaming"]
-    RTSP --> PC["User Desktop PC"]
-    PC --> VideoStream["client/video_stream.py<br/>OpenCV VideoCapture"]
-    VideoStream --> Tracker["client/person_tracker.py<br/>YOLO + ByteTrack"]
+    Pi --> EdgeMain["edge_pi/main.py"]
+    EdgeMain --> GStreamer["edge_pi/streaming.py<br/>GStreamer + MediaMTX"]
+    Pi --> Failover["edge_pi/failover.py<br/>network policy"]
+    GStreamer --> RTSP["RTSP Stream"]
+    RTSP --> Windows["windows_server/main.py"]
+    Windows --> VideoWorker["client/video_worker.py"]
+    VideoWorker --> Tracker["client/person_tracker.py<br/>YOLO + ByteTrack"]
     Tracker --> Processor["client/pipeline/person_frame_processor.py"]
-    Tracker --> Anomaly["anomaly/detector.py<br/>AnomalyDetector"]
-    Anomaly --> AlertMessage["alerts/message.py<br/>AlertMessage"]
-    AlertMessage --> AlertDispatcher["alerts/dispatcher.py<br/>AlertDispatcher"]
-    AlertDispatcher --> Chatbot["client/chat_bot<br/>Discord channel"]
-    Processor --> GUI["client/ui/main_window.py<br/>CCTVMainWindow"]
-    Anomaly --> GUI
-    Processor --> VLM["client/vlm_worker.py<br/>VLM analysis"]
-    VLM --> Chatbot
+    Tracker --> Anomaly["anomaly/detector.py"]
+    Anomaly --> CommonEvent["common/events.py"]
+    CommonEvent --> Alerts["alerts/dispatcher.py<br/>Discord default"]
+    Alerts --> User["User"]
+    Processor --> GUI["client/ui/main_window.py"]
 ```
 
 ## Responsibility Boundaries
 
 ```mermaid
 classDiagram
-    class PiStreamingConfig {
-        +width
-        +height
-        +fps
-        +bitrate
-        +mediamtx_url
-    }
-
-    class RpicamMediaMtxCommandBuilder {
+    class GStreamerMediaMtxCommandBuilder {
         +build_command()
         +build_shell_text()
     }
@@ -72,6 +73,7 @@ classDiagram
     class VideoWorker {
         +run()
         +stop()
+        -_create_default_alert_dispatcher()
         -_cleanup()
     }
 
@@ -79,19 +81,7 @@ classDiagram
         +track(frame)
     }
 
-    class PersonFrameProcessor {
-        +process(frame, person)
-    }
-
     class AnomalyDetector {
-        +evaluate(detections, now)
-    }
-
-    class ObjectPresenceRule {
-        +evaluate(detections, now)
-    }
-
-    class DwellTimeRule {
         +evaluate(detections, now)
     }
 
@@ -106,46 +96,36 @@ classDiagram
         +add_event(event)
     }
 
-    RpicamMediaMtxCommandBuilder --> PiStreamingConfig
+    GStreamerMediaMtxCommandBuilder --> NetworkFailoverPolicy
     VideoWorker --> PersonTracker
-    VideoWorker --> PersonFrameProcessor
     VideoWorker --> AnomalyDetector
-    AnomalyDetector --> ObjectPresenceRule
-    AnomalyDetector --> DwellTimeRule
     VideoWorker --> AlertDispatcher
     CCTVMainWindow --> VideoWorker
 ```
 
-## Document Alignment
-
-| 프로젝트 문서 기준 | 코드 구조 |
-|---|---|
-| Raspberry Pi 4B와 카메라 모듈 기반 송출 | `edge/streaming.py`에서 GStreamer + MediaMTX RTSP publish 명령 구조 제공 |
-| RTSP 기반 실시간 전송 | `client/video_stream.py`, `streaming/` 패키지 |
-| PC 기반 OpenCV/YOLO 분석 | `client/video_worker.py`, `client/person_tracker.py` |
-| 이상 상황 판단 | `anomaly/detector.py`의 규칙 기반 판단 계층 |
-| 챗봇 알림 전송 | `alerts/` 패키지와 기존 `client/chat_bot/` 연동 구조 |
-| 네트워크 장애 대응 | `edge/failover.py`의 스트리밍/로컬저장/최소알림 정책 |
-| microSD/LoRa 확장 | `edge/failover.py`, `alerts/dispatcher.py`에서 확장 지점 제공 |
-
 ## Execution
 
-로컬 개발 환경에서는 프로젝트 루트에서 다음 명령으로 실행합니다.
+로컬 개발 환경에서 Windows 서버는 다음 명령으로 실행합니다.
 
 ```bash
 python main.py
 ```
 
-패키지 설치 환경에서는 console script를 사용할 수 있습니다.
+설치 환경에서는 실행 묶음별 extras와 console script를 사용합니다.
 
 ```bash
-pip install -e .
-ai-cctv
+pip install -e ".[edge-pi]"
+ai-cctv-edge
 ```
 
-구조 검증은 다음 명령으로 수행합니다.
+```bash
+pip install -e ".[windows-server]"
+ai-cctv-windows-server
+```
+
+검증 명령은 다음과 같습니다.
 
 ```bash
-python -m compileall src main.py
+python -m compileall src main.py tests
 $env:PYTHONPATH="src"; python -m unittest discover -s tests
 ```

@@ -329,7 +329,7 @@ AI CCTV 소스 코드의 파일별 클래스와 함수를 정리한 문서입니
 | `stop` | stop 함수의 주요 기능을 수행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 | `cleanup` | cleanup 함수의 주요 기능을 수행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 
-## `src/ai_cctv/edge/failover.py`
+## `src/ai_cctv/edge_pi/failover.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
@@ -338,7 +338,14 @@ AI CCTV 소스 코드의 파일별 클래스와 함수를 정리한 문서입니
 | `__init__` | 장애 대응 정책을 초기화합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
 | `decide` | 네트워크 상태에 맞는 엣지 장치 동작을 결정합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
 
-## `src/ai_cctv/edge/streaming.py`
+## `src/ai_cctv/edge_pi/main.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `build_default_streaming_command` | 기본 Raspberry Pi 송출 명령을 생성합니다. | 생성된 객체 또는 값 | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+| `main` | Raspberry Pi 실행용 송출 명령을 출력합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
+
+## `src/ai_cctv/edge_pi/streaming.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
@@ -376,3 +383,9 @@ AI CCTV 소스 코드의 파일별 클래스와 함수를 정리한 문서입니
 |---|---|---|---|---|
 | `CameraRTSPServer` | CameraRTSPServer 클래스의 주요 책임을 수행합니다. | 인스턴스 생성 | 초기화 실패 시 예외 | 객체 지향 책임 단위 |
 | `__init__` | __init__ 함수의 주요 기능을 수행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 내부 보조 함수 |
+
+## `src/ai_cctv/windows_server/main.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `main` | Windows 서버 GUI 분석 애플리케이션을 실행합니다. | 처리 결과 또는 None | 실패 시 None, False, 예외 또는 오류 이벤트 | 공개 호출 함수 |
