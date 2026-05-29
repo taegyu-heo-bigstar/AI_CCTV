@@ -1,11 +1,10 @@
 # AI CCTV 메인 PyQt 창을 정의하는 파일입니다.
 # 화면 구성, 사용자 조작, VideoWorker 신호 연결을 담당합니다.
-# 영상 분석 자체는 VideoWorker와 파이프라인 객체에 위임합니다.
+# 무거운 영상 분석 의존성은 시작 버튼을 누른 뒤 지연 import합니다.
 
 import os
 import sys
 
-import cv2
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import (
@@ -21,7 +20,6 @@ from PyQt5.QtWidgets import (
 )
 
 from .settings_window import SettingsWindow
-from ..analysis.video_worker import VideoWorker
 from .event_presenter import EventPresenter
 
 
@@ -273,6 +271,8 @@ class CCTVMainWindow(QMainWindow):
         if self.worker is not None:
             return
 
+        from ..analysis.video_worker import VideoWorker
+
         self.worker = VideoWorker(
             source=self.video_source,
             use_vlm=self.use_vlm,
@@ -339,6 +339,8 @@ class CCTVMainWindow(QMainWindow):
         반환값:
             없음.
         """
+
+        import cv2
 
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         height, width, channels = rgb_frame.shape
