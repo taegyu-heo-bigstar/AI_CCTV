@@ -39,6 +39,22 @@ src/ai_cctv/ai_server/
 | Discord 알림 메시지와 전송인가? | `ai_server/alerts` |
 | 서버 실행을 시작하는 진입점인가? | `ai_server/server_run.py` |
 
+## 2-1. Edge node 구조
+
+Edge node는 더 이상 루트 `scripts/stream_and_record.sh`에 운영 책임을 두지 않습니다. Bash 스크립트가 하던 MediaMTX 준비, 송출, 로컬 백업 책임을 Python 패키지 내부로 옮겼습니다.
+
+```text
+src/ai_cctv/edge_node/
+  main.py          # ai-cctv-edge 실행 진입점
+  runtime.py       # MediaMTX 준비 후 GStreamer 실행
+  mediamtx.py      # MediaMTX 다운로드, 설치 확인, 프로세스 관리
+  streaming.py     # GStreamer tee 기반 송출/백업 파이프라인 생성
+  local_backup.py  # 백업 폴더와 10초 세그먼트 파일명 정책
+  failover.py      # 네트워크 장애 시 동작 정책
+```
+
+`ai-cctv-edge`는 실제 Raspberry Pi 런타임을 실행합니다. 명령만 확인해야 할 때는 `ai-cctv-edge --print-command`를 사용합니다.
+
 ## 3. 실행 진입점 변경
 
 기존 서버 실행 진입점은 `ai_cctv.ai_server.main:main`이었습니다. 이제는 역할을 더 명확히 하기 위해 `server_run.py`를 사용합니다.
@@ -54,6 +70,7 @@ src/ai_cctv/ai_server/
 
 | 이전 위치 | 현재 위치 | 이유 |
 |---|---|---|
+| `scripts/stream_and_record.sh` | `edge_node/runtime.py`, `edge_node/mediamtx.py`, `edge_node/streaming.py`, `edge_node/local_backup.py` | 엣지 노드 운영 책임을 Python 배포 단위 안으로 통합 |
 | `ai_server/control_center/ui` | `ai_server/ui` | UI는 서버 노드의 1차 책임이므로 바로 드러냄 |
 | `ai_server/control_center/storage` | `ai_server/storage` | 저장/녹화 책임을 분석 루프에서 분리 |
 | `ai_server/control_center/video_worker.py` | `ai_server/analysis/video_worker.py` | 영상 처리 루프는 분석 책임에 속함 |
@@ -81,6 +98,7 @@ ai_server/alerts/
 | 검증 항목 | 의미 |
 |---|---|
 | Edge node와 AI server 실행 진입점 분리 | 배포 단위가 명확함 |
+| Edge node Python 런타임 존재 | 라즈베리 파이 송출/백업 기능이 패키지 내부에 있음 |
 | `server_run.py` 존재 | 서버 실행 진입점이 명확함 |
 | `ui`, `analysis`, `storage`, `alerts` 존재 | 서버 책임이 1차 폴더로 드러남 |
 | `control_center`, `main.py`, `analysis.py` 제거 | 애매한 중간 계층과 모호한 파일 제거 |

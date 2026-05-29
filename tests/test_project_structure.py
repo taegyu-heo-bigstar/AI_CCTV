@@ -17,6 +17,8 @@ from ai_cctv.ai_server.analysis.anomaly.detector import (
     ObjectAppearanceRule,
 )
 from ai_cctv.edge_node.failover import EdgeNetworkFailoverPolicy
+from ai_cctv.edge_node.local_backup import LocalBackupConfig
+from ai_cctv.edge_node.mediamtx import MediaMtxConfig, MediaMtxReleaseResolver
 from ai_cctv.edge_node.streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
 
 
@@ -159,8 +161,8 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(action.should_record_local)
         self.assertTrue(action.should_send_minimal_alert)
 
-    def test_gstreamer_mediamtx_command_uses_rtsp_destination(self):
-        """GStreamer 송출 명령에 MediaMTX RTSP 목적지가 포함되는지 검증합니다.
+    def test_gstreamer_mediamtx_command_streams_and_records(self):
+        """GStreamer 명령이 MediaMTX 송출과 로컬 백업을 함께 수행하는지 검증합니다.
 
         인자:
             없음.
@@ -168,12 +170,34 @@ class ProjectStructureTest(unittest.TestCase):
             없음.
         """
 
-        config = EdgeStreamConfig(mediamtx_url="rtsp://127.0.0.1:8554/test")
-        command = MediaMtxGStreamerCommandBuilder(config).build_command_args()
+        config = EdgeStreamConfig(publish_url="rtmp://127.0.0.1:1935/test")
+        backup_config = LocalBackupConfig(directory="./test_backups", segment_seconds=10)
+        command = MediaMtxGStreamerCommandBuilder(
+            config,
+            backup_config,
+        ).build_command_args()
 
         self.assertIn("gst-launch-1.0", command)
         self.assertIn("libcamerasrc", command)
-        self.assertIn("location=rtsp://127.0.0.1:8554/test", command)
+        self.assertIn("tee", command)
+        self.assertIn("splitmuxsink", command)
+        self.assertIn("rtmpsink", command)
+        self.assertIn("location=rtmp://127.0.0.1:1935/test", command)
+        self.assertIn("max-size-time=10000000000", command)
+
+    def test_mediamtx_release_resolver_selects_raspberry_pi_package(self):
+        """Raspberry Pi 아키텍처에 맞는 MediaMTX 패키지 URL을 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        resolver = MediaMtxReleaseResolver(MediaMtxConfig(version="v1.9.0"))
+
+        self.assertIn("linux_arm64v8", resolver.resolve_download_url("aarch64"))
+        self.assertIn("linux_armv7", resolver.resolve_download_url("armv7l"))
 
     def test_console_scripts_are_split_by_deployment_bundle(self):
         """Edge node와 AI server 실행 진입점이 분리되어 있는지 검증합니다.
@@ -201,6 +225,9 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertNotIn("edge", extras)
         self.assertNotIn("ai-cctv-windows-server", scripts)
         self.assertTrue(Path("src/ai_cctv/edge_node").is_dir())
+        self.assertTrue(Path("src/ai_cctv/edge_node/local_backup.py").is_file())
+        self.assertTrue(Path("src/ai_cctv/edge_node/mediamtx.py").is_file())
+        self.assertTrue(Path("src/ai_cctv/edge_node/runtime.py").is_file())
         self.assertTrue(Path("src/ai_cctv/ai_server").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/server_run.py").is_file())
         self.assertTrue(Path("src/ai_cctv/ai_server/ui").is_dir())
@@ -227,6 +254,7 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertFalse(Path("src/ai_cctv/ai_server/ui/legacy_cctv_gui.py").exists())
         self.assertFalse(Path("src/ai_cctv/streaming/legacy_rtsp_receiver.py").exists())
         self.assertFalse(Path("src/ai_cctv/server/fail_over.py").exists())
+        self.assertFalse(Path("scripts/stream_and_record.sh").exists())
         self.assertTrue(Path("requirements/edge-node.txt").is_file())
         self.assertTrue(Path("requirements/ai-server.txt").is_file())
 

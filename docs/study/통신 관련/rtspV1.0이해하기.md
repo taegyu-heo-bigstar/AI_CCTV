@@ -6,7 +6,7 @@
 
 1. [시스템 전체 구조 및 데이터 흐름](https://www.notion.so/dsd-366dd18ce55b80bc8ab9e2632d5b5ce1?pvs=21)
 2. [알아야 하는 핵심 이론 (바이브 코딩 탈출하기)](https://www.notion.so/dsd-366dd18ce55b80bc8ab9e2632d5b5ce1?pvs=21)
-3. [GStreamer 송출 스크립트 (`stream_and_record.sh`) 라인 바이 라인 분석](https://www.notion.so/dsd-366dd18ce55b80bc8ab9e2632d5b5ce1?pvs=21)
+3. [GStreamer 송출 런타임 (`edge_node`) 라인 바이 라인 분석](https://www.notion.so/dsd-366dd18ce55b80bc8ab9e2632d5b5ce1?pvs=21)
 4. [PC 수신 파이썬 코드 (`rtsp_receiver.py`) 라인 바이 라인 분석](https://www.notion.so/dsd-366dd18ce55b80bc8ab9e2632d5b5ce1?pvs=21)
 5. [DSD 담당자 전달용 DSD 텍스트 및 표 (복사 가능)](https://www.notion.so/dsd-366dd18ce55b80bc8ab9e2632d5b5ce1?pvs=21)
 
@@ -101,9 +101,9 @@ graph TD
 
 ---
 
-## 3. GStreamer 송출 스크립트 (`stream_and_record.sh`) 라인 바이 라인 분석
+## 3. GStreamer 송출 런타임 (`src/ai_cctv/edge_node`) 라인 바이 라인 분석
 
-라즈베리파이에서 동작하는 GStreamer 파이프라인의 전체 실행 명령어 분석입니다.
+라즈베리파이에서 동작하는 GStreamer 파이프라인은 현재 `edge_node` Python 런타임에서 생성하고 실행합니다.
 
 ```bash
 gst-launch-1.0 -e \\

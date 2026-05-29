@@ -13,8 +13,11 @@ AI_CCTV/
 |-- src/
 |   `-- ai_cctv/
 |       |-- edge_node/              # Raspberry Pi Edge node 배포 단위
-|       |   |-- main.py             # Edge node 송출 명령 진입점
-|       |   |-- streaming.py        # GStreamer + MediaMTX RTSP publish 명령 생성
+|       |   |-- main.py             # Edge node 실행 진입점
+|       |   |-- runtime.py          # MediaMTX 준비와 GStreamer 실행 조율
+|       |   |-- mediamtx.py         # MediaMTX 다운로드, 설치 확인, 프로세스 관리
+|       |   |-- streaming.py        # GStreamer 송출/로컬 백업 파이프라인 생성
+|       |   |-- local_backup.py     # 로컬 백업 세그먼트 파일명 정책
 |       |   `-- failover.py         # 네트워크 장애 대응 정책
 |       `-- ai_server/              # Windows AI server 배포 단위
 |           |-- server_run.py       # AI server 실행 진입점
@@ -31,7 +34,7 @@ AI_CCTV/
 
 | 실행 묶음 | 설치 extras | console script | 주요 책임 |
 |---|---|---|---|
-| Edge node | `ai-cctv[edge-node]` | `ai-cctv-edge` | 카메라 송출, MediaMTX publish 명령 생성, 네트워크 장애 대응 정책 |
+| Edge node | `ai-cctv[edge-node]` | `ai-cctv-edge` | 카메라 송출, MediaMTX 실행, 로컬 백업, 네트워크 장애 대응 정책 |
 | AI server | `ai-cctv[ai-server]` | `ai-cctv-ai-server` 또는 `ai-cctv` | RTSP 수신, OpenCV/YOLO 분석, 이상 상황 판정, Discord 알림, GUI |
 
 ## System Flow
@@ -40,9 +43,13 @@ AI_CCTV/
 flowchart LR
     Camera["Camera Module"] --> Pi["Raspberry Pi 4B"]
     Pi --> EdgeMain["ai_cctv/edge_node/main.py"]
-    EdgeMain --> StreamBuilder["MediaMtxGStreamerCommandBuilder"]
+    EdgeMain --> EdgeRuntime["EdgeNodeRuntime"]
+    EdgeRuntime --> MediaMtxManager["MediaMtxInstaller / MediaMtxProcessManager"]
+    EdgeRuntime --> BackupConfig["LocalBackupConfig"]
+    EdgeRuntime --> StreamBuilder["MediaMtxGStreamerCommandBuilder"]
     Pi --> Failover["EdgeNetworkFailoverPolicy"]
-    StreamBuilder --> MediaMTX["MediaMTX RTSP publish"]
+    StreamBuilder --> BackupFiles["10초 단위 로컬 TS 백업"]
+    StreamBuilder --> MediaMTX["로컬 MediaMTX RTMP publish"]
     MediaMTX --> RTSP["RTSP Stream"]
     RTSP --> ServerRun["ai_cctv/ai_server/server_run.py"]
     ServerRun --> MainWindow["ai_server/ui/main_window.py"]
@@ -64,6 +71,29 @@ classDiagram
     class MediaMtxGStreamerCommandBuilder {
         +build_command_args()
         +build_shell_command_text()
+    }
+
+    class EdgeNodeRuntime {
+        +build_command_args()
+        +run()
+        +stop()
+    }
+
+    class MediaMtxInstaller {
+        +is_installed()
+        +ensure_installed()
+    }
+
+    class MediaMtxProcessManager {
+        +is_running()
+        +start()
+        +stop()
+    }
+
+    class LocalBackupConfig {
+        +ensure_directory()
+        +build_segment_pattern(started_at)
+        +segment_duration_nanoseconds()
     }
 
     class EdgeNetworkFailoverPolicy {
@@ -92,7 +122,11 @@ classDiagram
         +dispatch(message)
     }
 
-    MediaMtxGStreamerCommandBuilder --> EdgeNetworkFailoverPolicy
+    EdgeNodeRuntime --> MediaMtxInstaller
+    EdgeNodeRuntime --> MediaMtxProcessManager
+    EdgeNodeRuntime --> LocalBackupConfig
+    EdgeNodeRuntime --> MediaMtxGStreamerCommandBuilder
+    EdgeNodeRuntime --> EdgeNetworkFailoverPolicy
     CCTVMainWindow --> VideoWorker
     VideoWorker --> AnomalyRuleEngine
     VideoWorker --> NotificationDispatcher

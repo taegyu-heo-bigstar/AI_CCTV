@@ -353,20 +353,67 @@
 
 ## `src/ai_cctv/edge_node/main.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `build_default_edge_stream_command` | 기본 Edge node 송출 명령을 생성합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `main` | Edge node 실행 시 송출 명령을 출력합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `build_default_edge_stream_command` | 기본 Edge node 송출 명령 문자열을 생성합니다. | 문자열 | 런타임 구성 오류 | 명령 확인용 보조 함수 |
+| `build_argument_parser` | Edge node 실행 옵션 파서를 생성합니다. | ArgumentParser | 없음 | `--print-command` 옵션 제공 |
+| `main` | Edge node 런타임을 실행합니다. | None | 하위 프로세스 실행 오류 | 기본 동작은 실제 송출 실행 |
+
+## `src/ai_cctv/edge_node/local_backup.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `LocalBackupConfig` | Edge node 로컬 백업 저장 정책을 표현합니다. | LocalBackupConfig 객체 | 없음 | dataclass |
+| `LocalBackupConfig.ensure_directory` | 백업 저장 폴더를 생성하고 경로를 반환합니다. | Path | 권한/경로 오류 | `mkdir -p` 대체 |
+| `LocalBackupConfig.build_segment_pattern` | splitmuxsink 백업 세그먼트 파일명 패턴을 생성합니다. | 문자열 | 없음 | `%05d.ts` 패턴 사용 |
+| `LocalBackupConfig.segment_duration_nanoseconds` | 백업 세그먼트 길이를 나노초로 변환합니다. | 정수 | 없음 | 기본 10초 |
+
+## `src/ai_cctv/edge_node/mediamtx.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `MediaMtxConfig` | MediaMTX 설치와 실행 경로 설정을 표현합니다. | MediaMtxConfig 객체 | 없음 | dataclass |
+| `MediaMtxConfig.work_path` | MediaMTX 작업 폴더 경로를 반환합니다. | Path | 없음 | property |
+| `MediaMtxConfig.binary_path` | MediaMTX 실행 파일 경로를 반환합니다. | Path | 없음 | property |
+| `MediaMtxConfig.config_path` | MediaMTX 설정 파일 경로를 반환합니다. | Path | 없음 | property |
+| `MediaMtxConfig.log_path` | MediaMTX 로그 파일 경로를 반환합니다. | Path | 없음 | property |
+| `MediaMtxReleaseResolver` | Raspberry Pi 아키텍처에 맞는 MediaMTX 다운로드 주소를 결정합니다. | MediaMtxReleaseResolver 객체 | 없음 | ARM 전용 |
+| `MediaMtxReleaseResolver.__init__` | 릴리스 주소 결정에 사용할 설정을 초기화합니다. | None | 없음 | 설정 주입 가능 |
+| `MediaMtxReleaseResolver.resolve_download_url` | 현재 장비 아키텍처에 맞는 MediaMTX 압축 파일 URL을 반환합니다. | URL 문자열 | ValueError | aarch64, arm 계열 지원 |
+| `MediaMtxInstaller` | MediaMTX 실행 파일과 설정 파일의 존재를 보장합니다. | MediaMtxInstaller 객체 | 없음 | 다운로드 책임 |
+| `MediaMtxInstaller.__init__` | MediaMTX 설치 준비 객체를 초기화합니다. | None | 없음 | resolver 주입 가능 |
+| `MediaMtxInstaller.is_installed` | MediaMTX 실행 파일과 설정 파일 존재 여부를 확인합니다. | bool | 없음 | 네트워크 사용 없음 |
+| `MediaMtxInstaller.ensure_installed` | MediaMTX가 없으면 다운로드하고 압축을 해제합니다. | Path | 네트워크/압축 오류 | GitHub 릴리스 사용 |
+| `MediaMtxInstaller._extract_required_files` | 압축 파일에서 실행 파일과 설정 파일만 추출합니다. | None | tar 오류 | 내부 함수 |
+| `MediaMtxInstaller._make_binary_executable` | MediaMTX 실행 파일에 실행 권한을 부여합니다. | None | 권한 오류 | Linux에서만 동작 |
+| `MediaMtxProcessManager` | MediaMTX 프로세스의 실행 상태를 관리합니다. | MediaMtxProcessManager 객체 | 없음 | Popen 기반 |
+| `MediaMtxProcessManager.__init__` | MediaMTX 프로세스 관리 상태를 초기화합니다. | None | 없음 | 로그 핸들 보관 |
+| `MediaMtxProcessManager.is_running` | MediaMTX 프로세스가 이미 실행 중인지 확인합니다. | bool | 없음 | pgrep 사용 가능 |
+| `MediaMtxProcessManager.start` | MediaMTX를 백그라운드 프로세스로 실행합니다. | Popen 또는 None | 실행 파일 오류 | 이미 실행 중이면 None |
+| `MediaMtxProcessManager.stop` | 이 관리자가 실행한 MediaMTX 프로세스를 종료합니다. | None | 프로세스 종료 오류 | 로그 핸들 정리 |
+
+## `src/ai_cctv/edge_node/runtime.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `EdgeNodeRuntime` | Edge node 송출 프로세스의 실행 흐름을 조율합니다. | EdgeNodeRuntime 객체 | 없음 | 의존 객체 주입 가능 |
+| `EdgeNodeRuntime.__init__` | Edge node 런타임 의존 객체를 초기화합니다. | None | 없음 | 기본 MediaMTX 설정 생성 |
+| `EdgeNodeRuntime.build_command_args` | 현재 런타임 설정으로 GStreamer 실행 인자를 생성합니다. | list | 없음 | 테스트 가능 |
+| `EdgeNodeRuntime.run` | MediaMTX와 GStreamer를 순서대로 실행하고 종료 시 정리합니다. | 종료 코드 | 하위 프로세스 오류 | 실제 실행 진입점 |
+| `EdgeNodeRuntime.stop` | GStreamer와 MediaMTX 프로세스를 종료합니다. | None | 프로세스 종료 오류 | finally에서 호출 |
+| `EdgeNodeRuntime._install_signal_handlers` | 운영체제 종료 신호를 정리 동작에 연결합니다. | None | signal 등록 오류 | 내부 함수 |
+| `EdgeNodeRuntime._handle_stop_signal` | 종료 신호를 받으면 하위 프로세스를 정리합니다. | None | SystemExit | 내부 함수 |
+| `build_default_edge_runtime` | 기본 설정 Edge node 런타임을 생성합니다. | EdgeNodeRuntime 객체 | 없음 | main.py에서 사용 |
 
 ## `src/ai_cctv/edge_node/streaming.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `EdgeStreamConfig` | Edge node 영상 송출 설정을 표현합니다. | EdgeStreamConfig ???? | ??? ?? ?? ?? | ?? ?? ?? |
-| `MediaMtxGStreamerCommandBuilder` | GStreamer 기반 MediaMTX 송출 명령을 생성합니다. | MediaMtxGStreamerCommandBuilder ???? | ??? ?? ?? ?? | ?? ?? |
-| `MediaMtxGStreamerCommandBuilder.__init__` | 송출 명령 생성 설정을 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `MediaMtxGStreamerCommandBuilder.build_command_args` | GStreamer 송출 명령 인자 목록을 생성합니다. | list | ??? ?? ?? ?? | ?? ?? ?? |
-| `MediaMtxGStreamerCommandBuilder.build_shell_command_text` | 운영 스크립트에 표시할 송출 명령 문자열을 생성합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
+| `EdgeStreamConfig` | Edge node 영상 송출 파이프라인 설정을 표현합니다. | EdgeStreamConfig 객체 | 없음 | dataclass |
+| `MediaMtxGStreamerCommandBuilder` | GStreamer 기반 백업과 MediaMTX 송출 명령을 생성합니다. | MediaMtxGStreamerCommandBuilder 객체 | 없음 | 명령 생성 전용 |
+| `MediaMtxGStreamerCommandBuilder.__init__` | 송출 명령 생성 설정을 초기화합니다. | None | 없음 | 백업 설정 주입 가능 |
+| `MediaMtxGStreamerCommandBuilder.build_command_args` | GStreamer 백업 및 송출 명령 인자 목록을 생성합니다. | list | 없음 | tee, splitmuxsink, rtmpsink 포함 |
+| `MediaMtxGStreamerCommandBuilder.build_shell_command_text` | 운영자가 확인할 수 있는 GStreamer 명령 문자열을 생성합니다. | 문자열 | 없음 | `--print-command`에서 사용 |
 
 ## `tests/test_project_structure.py`
 
@@ -380,5 +427,6 @@
 | `ProjectStructureTest.test_dwell_time_rule_emits_after_threshold` | 체류 시간 초과 규칙이 임계 시간 이후 이벤트를 생성하는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `ProjectStructureTest.test_notification_dispatcher_sends_anomaly_message` | 이상 상황 이벤트가 알림 메시지로 변환되어 채널로 전달되는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `ProjectStructureTest.test_edge_failover_policy_matches_project_document` | 네트워크 장애 시 로컬 저장과 최소 알림을 선택하는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `ProjectStructureTest.test_gstreamer_mediamtx_command_uses_rtsp_destination` | GStreamer 송출 명령에 MediaMTX RTSP 목적지가 포함되는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `ProjectStructureTest.test_gstreamer_mediamtx_command_streams_and_records` | GStreamer 명령이 MediaMTX 송출과 로컬 백업을 함께 수행하는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `ProjectStructureTest.test_mediamtx_release_resolver_selects_raspberry_pi_package` | Raspberry Pi 아키텍처에 맞는 MediaMTX 패키지 URL을 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `ProjectStructureTest.test_console_scripts_are_split_by_deployment_bundle` | Edge node와 AI server 실행 진입점이 분리되어 있는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |

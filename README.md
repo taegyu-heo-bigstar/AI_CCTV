@@ -6,7 +6,7 @@ Raspberry Pi 기반 Edge node와 Windows 기반 AI server를 분리해 구성하
 
 | 묶음 | 역할 | 실행 명령 |
 |---|---|---|
-| Edge node | 카메라 영상 송출, GStreamer + MediaMTX RTSP publish, 네트워크 장애 대응 정책 | `ai-cctv-edge` |
+| Edge node | 카메라 영상 송출, MediaMTX 실행, GStreamer 송출/로컬 백업, 네트워크 장애 대응 정책 | `ai-cctv-edge` |
 | AI server | RTSP 수신, OpenCV/YOLO 분석, 이상 상황 판정, Discord 알림, GUI | `ai-cctv-ai-server` |
 
 ## 설치
@@ -16,6 +16,12 @@ Edge node 실행 환경:
 ```bash
 pip install -e ".[edge-node]"
 ai-cctv-edge
+```
+
+GStreamer 명령만 확인하려면 다음 옵션을 사용할 수 있습니다.
+
+```bash
+ai-cctv-edge --print-command
 ```
 
 AI server 실행 환경:
@@ -44,6 +50,11 @@ python main.py
 src/
 `-- ai_cctv/
     |-- edge_node/      # Raspberry Pi Edge node 실행 코드
+    |   |-- main.py     # Edge node 실행 진입점
+    |   |-- runtime.py  # MediaMTX 준비와 GStreamer 실행 조율
+    |   |-- mediamtx.py # MediaMTX 다운로드/프로세스 관리
+    |   |-- streaming.py # GStreamer 송출/백업 파이프라인 생성
+    |   `-- local_backup.py # 백업 세그먼트 경로 정책
     `-- ai_server/      # Windows AI server 실행 코드
         |-- server_run.py
         |-- ui/         # PyQt 화면, 설정창, 이벤트 표시
