@@ -2,6 +2,7 @@
 # 실제 Raspberry Pi 없이 `/monitor/top` 응답을 생성합니다.
 # AI server UI의 `엣지 노드 상태 조회` 버튼은 기본적으로 이 서버를 조회할 수 있습니다.
 # 표와 꺾은선 그래프가 변하는지 확인할 수 있도록 사용률 값을 매 요청마다 바꿉니다.
+# 10번 성공 응답한 뒤에는 일부러 응답을 보내지 않아 연결 실패 UI를 확인합니다.
 
 """Edge node 모니터링 API 모의 서버입니다."""
 
@@ -24,17 +25,31 @@ class MockResourceState:
         MockResourceState 인스턴스를 반환합니다.
     """
 
-    def __init__(self, process_id=None):
+    def __init__(self, process_id=None, max_successful_responses=10):
         """모의 응답 상태를 초기화합니다.
 
         인자:
             process_id: 응답에 표시할 임시 프로세스 ID이며 없으면 현재 프로세스입니다.
+            max_successful_responses: 정상 JSON을 반환할 최대 횟수입니다.
         반환값:
             없음.
         """
 
         self.started_at = time.monotonic()
         self.process_id = process_id if process_id is not None else os.getpid()
+        self.max_successful_responses = max_successful_responses
+        self.successful_response_count = 0
+
+    def can_respond(self):
+        """정상 JSON 응답을 더 보낼 수 있는지 판단합니다.
+
+        인자:
+            없음.
+        반환값:
+            정상 응답 가능 여부를 bool로 반환합니다.
+        """
+
+        return self.successful_response_count < self.max_successful_responses
 
     def build_response(self):
         """현재 시점의 모의 자원 사용률 JSON을 생성합니다.
@@ -45,6 +60,7 @@ class MockResourceState:
             Edge node 모니터링 API와 같은 구조의 딕셔너리를 반환합니다.
         """
 
+        self.successful_response_count += 1
         elapsed = time.monotonic() - self.started_at
         cpu_total = self._wave(elapsed, base=42.0, amplitude=28.0, speed=0.75)
         memory_total = self._wave(elapsed, base=55.0, amplitude=14.0, speed=0.35)
@@ -103,6 +119,11 @@ class MockResourceRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"detail": "not found"}, status_code=404)
             return
 
+        if not self.server.resource_state.can_respond():
+            print("[mock-edge] response limit reached; keeping request silent")
+            time.sleep(self.server.silent_seconds)
+            return
+
         self._send_json(self.server.resource_state.build_response())
 
     def log_message(self, format_text, *args):
@@ -145,18 +166,20 @@ class MockResourceServer(ThreadingHTTPServer):
         MockResourceServer 인스턴스를 반환합니다.
     """
 
-    def __init__(self, server_address, request_handler_class):
+    def __init__(self, server_address, request_handler_class, silent_seconds=30):
         """HTTP 서버와 모의 자원 상태를 초기화합니다.
 
         인자:
             server_address: 서버가 바인딩할 주소와 포트입니다.
             request_handler_class: 요청 처리 핸들러 클래스입니다.
+            silent_seconds: 응답 제한 이후 요청을 붙잡고 있을 시간입니다.
         반환값:
             없음.
         """
 
         super().__init__(server_address, request_handler_class)
         self.resource_state = MockResourceState()
+        self.silent_seconds = silent_seconds
 
 
 def build_argument_parser():
@@ -186,6 +209,7 @@ def run_server(host, port):
 
     server = MockResourceServer((host, port), MockResourceRequestHandler)
     print(f"Mock Edge node monitor API: http://{host}:{port}/monitor/top")
+    print("Normal responses: 10; then requests stay silent.")
     print("Stop: Ctrl+C")
     try:
         server.serve_forever()

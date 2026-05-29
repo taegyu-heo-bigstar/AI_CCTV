@@ -253,6 +253,7 @@ class EdgeNodeStatusWindow(QDialog):
         """
 
         super().__init__(parent)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
         self.setWindowTitle("엣지 노드 상태 조회")
         self.setMinimumSize(880, 620)
         self.setStyleSheet("background-color: #0f172a; color: #f8fafc;")

@@ -361,7 +361,7 @@
 | `ResourceLineGraph._draw_legend` | 그래프 상단에 시리즈 범례를 표시합니다. | None | 없음 | 색상별 선 의미 표시 |
 | `ResourceLineGraph._draw_series` | 지정한 사용률 시리즈를 선으로 연결해 그립니다. | None | 없음 | 0~100% 범위로 클램프 |
 | `EdgeNodeStatusWindow` | Edge node 상태 조회 버튼으로 열리는 그래프/표 표시 창입니다. | EdgeNodeStatusWindow 인스턴스 | 없음 | 2초 주기 자동 조회 |
-| `EdgeNodeStatusWindow.__init__` | 상태 조회 창의 UI 상태와 타이머를 초기화합니다. | None | 없음 | 실패 횟수와 경고 상태 보관 |
+| `EdgeNodeStatusWindow.__init__` | 상태 조회 창의 UI 상태와 타이머를 초기화합니다. | None | 없음 | Windows 기본 `?` 도움말 버튼 제거 |
 | `EdgeNodeStatusWindow._build_ui` | 제목, 새로고침 버튼, 그래프, 표를 구성합니다. | None | 없음 | 표는 읽기 전용 |
 | `EdgeNodeStatusWindow.start_monitoring` | 창이 열릴 때 즉시 조회하고 주기 갱신을 시작합니다. | None | 요청 실패 | 타이머 시작 |
 | `EdgeNodeStatusWindow.request_resource_status` | Edge node 상태 JSON 조회 worker를 시작합니다. | None | 요청 실패 신호 | 중복 요청 방지 |
@@ -515,15 +515,16 @@
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
 | `MockResourceState` | UI 검증용 모의 자원 사용률 상태를 생성하고 보관합니다. | MockResourceState 인스턴스 | 없음 | 실제 Edge node 없이 사용 |
-| `MockResourceState.__init__` | 서버 시작 시각과 응답용 PID를 초기화합니다. | None | 없음 | PID 기본값은 현재 프로세스 |
-| `MockResourceState.build_response` | `/monitor/top`이 반환할 모의 CPU, memory, process JSON을 생성합니다. | dict | 없음 | 요청마다 값이 변함 |
+| `MockResourceState.__init__` | 서버 시작 시각, 응답용 PID, 정상 응답 횟수 제한을 초기화합니다. | None | 없음 | PID 기본값은 현재 프로세스 |
+| `MockResourceState.can_respond` | 정상 JSON 응답을 더 보낼 수 있는지 판단합니다. | bool | 없음 | 기본 10회까지 True |
+| `MockResourceState.build_response` | `/monitor/top`이 반환할 모의 CPU, memory, process JSON을 생성합니다. | dict | 없음 | 요청마다 값이 변하고 성공 횟수 증가 |
 | `MockResourceState._wave` | 사인파 기반의 0~100 범위 백분율 값을 계산합니다. | float | 없음 | 그래프 변화 확인용 |
 | `MockResourceRequestHandler` | 모의 HTTP GET 요청을 처리합니다. | MockResourceRequestHandler 인스턴스 | 없음 | BaseHTTPRequestHandler 상속 |
-| `MockResourceRequestHandler.do_GET` | `/monitor/top` 요청에는 JSON을, 그 외 경로에는 404를 반환합니다. | None | 없음 | UI 클라이언트 호환 |
+| `MockResourceRequestHandler.do_GET` | `/monitor/top` 요청에는 JSON을, 10회 이후에는 응답을 보내지 않습니다. | None | 없음 | 연결 실패 UI 검증용 |
 | `MockResourceRequestHandler.log_message` | HTTP 접근 로그를 콘솔에 출력합니다. | None | 없음 | mock-edge 접두어 사용 |
 | `MockResourceRequestHandler._send_json` | 딕셔너리를 JSON HTTP 응답으로 전송합니다. | None | 직렬화 오류 | UTF-8 응답 |
 | `MockResourceServer` | 모의 자원 상태 객체를 포함한 ThreadingHTTPServer입니다. | MockResourceServer 인스턴스 | 서버 바인딩 오류 | 표준 라이브러리만 사용 |
-| `MockResourceServer.__init__` | HTTP 서버와 모의 자원 상태를 초기화합니다. | None | 서버 초기화 오류 | 127.0.0.1:8001 기본 사용 |
+| `MockResourceServer.__init__` | HTTP 서버, 모의 자원 상태, 무응답 대기 시간을 초기화합니다. | None | 서버 초기화 오류 | 127.0.0.1:8001 기본 사용 |
 | `build_argument_parser` | 모의 서버 실행용 명령행 인자 파서를 생성합니다. | ArgumentParser | 없음 | `--host`, `--port` 지원 |
 | `run_server` | 모의 Edge node 모니터링 HTTP 서버를 실행합니다. | 반환 없음 | 포트 충돌, 바인딩 오류 | Ctrl+C로 종료 |
 | `main` | 명령행 인자를 읽고 모의 서버를 시작합니다. | None | 서버 실행 오류 | 임시 테스트 진입점 |
