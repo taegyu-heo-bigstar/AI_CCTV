@@ -18,6 +18,7 @@ AI_CCTV/
 |       |   |-- mediamtx.py         # MediaMTX 다운로드, 설치 확인, 프로세스 관리
 |       |   |-- streaming.py        # GStreamer 송출/로컬 백업 파이프라인 생성
 |       |   |-- local_backup.py     # 로컬 백업 세그먼트 파일명 정책
+|       |   |-- monitoring/         # Edge node 자원 모니터링 FastAPI 서버
 |       |   `-- failover.py         # 네트워크 장애 대응 정책
 |       `-- ai_server/              # Windows AI server 배포 단위
 |           |-- server_run.py       # AI server 실행 진입점
@@ -26,7 +27,7 @@ AI_CCTV/
 |           |-- analysis/           # 영상 입력, 추적, VLM, 이상 상황 판정
 |           |-- storage/            # 저장 경로, 원본 녹화, 이벤트 클립 관리
 |           |-- alerts/             # Discord 알림 메시지, 디스패처, 챗봇 전송
-|           |-- monitoring/         # FastAPI 자원 모니터링 API와 HTTP 조회 클라이언트
+|           |-- monitoring/         # Edge node 자원 모니터링 HTTP 조회 클라이언트
 |           `-- common/             # 서버 노드 내부 공통 값 객체 재노출
 `-- tests/                          # 구조와 도메인 경계 단위 테스트
 ```
@@ -45,6 +46,7 @@ flowchart LR
     Camera["Camera Module"] --> Pi["Raspberry Pi 4B"]
     Pi --> EdgeMain["ai_cctv/edge_node/main.py"]
     EdgeMain --> EdgeRuntime["EdgeNodeRuntime"]
+    EdgeMain -. "same Edge node" .-> MonitorApi["edge_node/monitoring/resource_monitor_server.py"]
     EdgeRuntime --> MediaMtxManager["MediaMtxInstaller / MediaMtxProcessManager"]
     EdgeRuntime --> BackupConfig["LocalBackupConfig"]
     EdgeRuntime --> StreamBuilder["MediaMtxGStreamerCommandBuilder"]
@@ -54,7 +56,6 @@ flowchart LR
     MediaMTX --> RTSP["RTSP Stream"]
     RTSP --> ServerRun["ai_cctv/ai_server/server_run.py"]
     ServerRun --> MainWindow["ai_server/ui/main_window.py"]
-    ServerRun -. "same AI server node" .-> MonitorApi["ai_server/monitoring/resource_monitor_server.py"]
     MonitorClient["ResourceMonitorClient"] --> MonitorApi
     MonitorApi --> ResourceCollector["ResourceUsageCollector"]
     ResourceCollector --> ResourceJson["CPU/Memory/Process JSON"]
@@ -191,7 +192,7 @@ ai-cctv-ai-server
 ```
 
 ```bash
-python -m ai_cctv.ai_server.monitoring.resource_monitor_server
+python -m ai_cctv.edge_node.monitoring.resource_monitor_server
 python -m ai_cctv.ai_server.monitoring.resource_monitor_client
 ```
 

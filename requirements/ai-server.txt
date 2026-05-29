@@ -5,8 +5,6 @@ qwen-vl-utils
 bitsandbytes
 opencv-python
 ultralytics
-fastapi
-uvicorn
 numpy
 matplotlib
 scipy

@@ -1,1 +1,4 @@
 pygobject
+fastapi
+uvicorn
+psutil

@@ -1,9 +1,9 @@
-# AI server 자원 모니터링 FastAPI 앱 파일입니다.
-# 외부 요청을 받아 서버의 전체 CPU와 메모리 사용률을 JSON으로 반환합니다.
+# Edge node 자원 모니터링 FastAPI 앱 파일입니다.
+# AI server의 요청을 받아 Edge node의 전체 CPU와 메모리 사용률을 JSON으로 반환합니다.
 # 임시 모니터링 대상 프로세스는 현재 FastAPI 서버 프로세스입니다.
-# 운영 시 AI server 노드에서 별도 보조 API 프로세스로 실행할 수 있습니다.
+# Raspberry Pi에서 영상 송출 프로세스와 함께 보조 API로 실행할 수 있습니다.
 
-"""AI server 자원 모니터링 API 서버입니다."""
+"""Edge node 자원 모니터링 API 서버입니다."""
 
 import os
 from datetime import datetime
@@ -12,11 +12,11 @@ import psutil
 from fastapi import FastAPI, HTTPException
 
 
-app = FastAPI(title="AI CCTV Resource Monitor Server")
+app = FastAPI(title="AI CCTV Edge Resource Monitor Server")
 
 
 class ResourceUsageCollector:
-    """서버와 특정 프로세스의 자원 사용률을 수집합니다.
+    """Edge node와 특정 프로세스의 자원 사용률을 수집합니다.
 
     인자:
         process_id: 모니터링할 프로세스 ID입니다.
@@ -90,7 +90,7 @@ resource_usage_collector = ResourceUsageCollector()
 
 @app.get("/monitor/top")
 def read_resource_usage():
-    """서버 자원 사용률 JSON을 반환합니다.
+    """Edge node 자원 사용률 JSON을 반환합니다.
 
     인자:
         없음.
