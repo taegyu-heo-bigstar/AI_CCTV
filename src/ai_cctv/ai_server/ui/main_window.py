@@ -117,6 +117,7 @@ class CCTVMainWindow(QMainWindow):
         header_layout.addWidget(self.btn_start)
         header_layout.addWidget(self.btn_stop)
         header_layout.addWidget(self.btn_setting)
+        self._set_run_button_state(is_running=False)
         return header_layout
 
     def _create_button(self, text, background_color):
@@ -135,6 +136,45 @@ class CCTVMainWindow(QMainWindow):
             "padding: 8px 20px; border-radius: 5px; font-weight: bold;"
         )
         return button
+
+    def _set_run_button_state(self, is_running):
+        """영상 실행 상태에 맞춰 START와 STOP 버튼을 하이라이팅합니다.
+
+        인자:
+            is_running: 영상 작업자가 실행 중인지 여부입니다.
+        반환값:
+            없음.
+        """
+
+        self.btn_start.setStyleSheet(
+            self._build_run_button_style("#166534", is_running)
+        )
+        self.btn_stop.setStyleSheet(
+            self._build_run_button_style("#7f1d1d", not is_running)
+        )
+
+    def _build_run_button_style(self, background_color, is_active):
+        """실행 상태 버튼의 활성/비활성 스타일을 생성합니다.
+
+        인자:
+            background_color: 버튼의 기본 배경 색상 코드입니다.
+            is_active: 현재 상태와 일치해 강조할지 여부입니다.
+        반환값:
+            QPushButton에 적용할 스타일시트 문자열을 반환합니다.
+        """
+
+        if is_active:
+            return (
+                f"background-color: {background_color}; color: white; "
+                "padding: 8px 20px; border-radius: 5px; font-weight: bold; "
+                "border: 2px solid #facc15;"
+            )
+
+        return (
+            "background-color: #334155; color: #cbd5e1; "
+            "padding: 8px 20px; border-radius: 5px; font-weight: bold; "
+            "border: 1px solid #475569;"
+        )
 
     def _create_left_panel(self):
         """카메라 입력 상태 패널을 생성합니다.
@@ -292,6 +332,7 @@ class CCTVMainWindow(QMainWindow):
 
         self.cam_status.setText("CAM-01 - LIVE")
         self._set_camera_status_style("#22c55e", "#22c55e")
+        self._set_run_button_state(is_running=True)
 
     def stop_video(self):
         """영상 처리 작업자를 중지하고 카메라 상태를 갱신합니다.
@@ -308,6 +349,7 @@ class CCTVMainWindow(QMainWindow):
 
         self.cam_status.setText("CAM-01 - STOPPED")
         self._set_camera_status_style("#ef4444", "#ef4444")
+        self._set_run_button_state(is_running=False)
 
     def open_settings(self):
         """설정 창을 열고 적용된 값을 메인 창 상태에 반영합니다.
@@ -451,6 +493,7 @@ class CCTVMainWindow(QMainWindow):
         self.worker = None
         self.cam_status.setText("CAM-01 - ERROR")
         self._set_camera_status_style("#ef4444", "#ef4444")
+        self._set_run_button_state(is_running=False)
         self.add_event({
             "type": "error",
             "message": message,
