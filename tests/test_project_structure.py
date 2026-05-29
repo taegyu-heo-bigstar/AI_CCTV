@@ -234,6 +234,7 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(Path("src/ai_cctv/ai_server/analysis").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/analysis/anomaly").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/storage").is_dir())
+        self.assertTrue(Path("src/ai_cctv/ai_server/storage/clip_manager.py").is_file())
         self.assertTrue(Path("src/ai_cctv/ai_server/alerts").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/alerts/chat_bot").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/common").is_dir())

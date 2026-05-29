@@ -12,6 +12,7 @@ from .crop_manager import CropManager
 from .full_body_checker import FullBodyChecker
 from .pipeline.person_frame_processor import PersonFrameProcessor
 from .person_state_manager import PersonStateManager
+from ..storage.clip_manager import ClipManager
 from ..storage.recording_manager import RecordingManager
 from .video_stream import VideoStream
 
@@ -24,6 +25,7 @@ class VideoWorker(QThread):
         use_vlm: VLM 분석 사용 여부입니다.
         ai_cctv_path: 녹화 파일 저장 루트 경로입니다.
         original_segment_seconds: 원본 녹화 파일 분할 초 단위입니다.
+        clip_max_seconds: 이벤트 클립 파일 하나의 최대 길이 초 단위입니다.
     반환값:
         VideoWorker 인스턴스를 반환합니다.
     """
@@ -31,6 +33,7 @@ class VideoWorker(QThread):
     frame_ready = pyqtSignal(object)
     metrics_ready = pyqtSignal(dict)
     event_ready = pyqtSignal(dict)
+    loading_ready = pyqtSignal(str)
 
     def __init__(
         self,
@@ -38,6 +41,7 @@ class VideoWorker(QThread):
         use_vlm=False,
         ai_cctv_path="",
         original_segment_seconds=10,
+        clip_max_seconds=10,
         tracker_model_path="yolo26s.pt",
         anomaly_rule_engine=None,
         notification_dispatcher=None,
@@ -49,6 +53,7 @@ class VideoWorker(QThread):
             use_vlm: VLM 분석 사용 여부입니다.
             ai_cctv_path: 녹화 파일 저장 루트 경로입니다.
             original_segment_seconds: 원본 녹화 파일 분할 초 단위입니다.
+            clip_max_seconds: 이벤트 클립 파일 하나의 최대 길이 초 단위입니다.
             tracker_model_path: YOLO 추적 모델 파일 경로입니다.
             anomaly_rule_engine: 감지 결과를 이상 상황으로 변환하는 규칙 엔진입니다.
             notification_dispatcher: 이상 상황 알림을 전송하는 디스패처입니다.
@@ -73,6 +78,8 @@ class VideoWorker(QThread):
         self.ai_cctv_path = ai_cctv_path
         self.original_segment_seconds = original_segment_seconds
         self.recording_manager = None
+        self.clip_max_seconds = clip_max_seconds
+        self.clip_manager = None
         self.anomaly_rule_engine = anomaly_rule_engine or AnomalyRuleEngine()
         self.notification_dispatcher = (
             notification_dispatcher or self._create_default_notification_dispatcher()
@@ -98,6 +105,7 @@ class VideoWorker(QThread):
             없음.
         """
 
+        self.loading_ready.emit("영상 스트림 연결 중...")
         if not self.stream.open():
             self.event_ready.emit({
                 "type": "error",
@@ -105,16 +113,24 @@ class VideoWorker(QThread):
             })
             return
 
+        if self.ai_cctv_path:
+            fps = self.stream.get_fps()
+            self.recording_manager = RecordingManager(
+                base_dir=self.ai_cctv_path,
+                fps=fps,
+                segment_seconds=self.original_segment_seconds,
+            )
+            self.clip_manager = ClipManager(
+                base_dir=self.ai_cctv_path,
+                fps=fps,
+                max_clip_seconds=self.clip_max_seconds,
+                disappear_timeout=self.state_manager.disappear_timeout,
+            )
+
+        self.loading_ready.emit("실시간 화면 준비 중...")
         self._start_tracker_loading()
         if self.use_vlm:
             self._start_vlm_loading()
-
-        if self.ai_cctv_path:
-            self.recording_manager = RecordingManager(
-                base_dir=self.ai_cctv_path,
-                fps=self.stream.get_fps(),
-                segment_seconds=self.original_segment_seconds,
-            )
 
         while self.running:
             ret, frame = self.stream.read()
@@ -135,15 +151,19 @@ class VideoWorker(QThread):
                 continue
 
             persons = tracker.track(frame)
+            clip_frame = frame.copy() if self.clip_manager is not None else None
             for person in persons:
                 for event in self.person_processor.process(frame, person):
                     self.event_ready.emit(event)
+                self._record_person_clip(person, clip_frame)
 
             for anomaly_event in self.anomaly_rule_engine.evaluate_detections(persons):
                 self.event_ready.emit(anomaly_event.to_worker_event())
                 self.notification_dispatcher.dispatch_anomaly_event(anomaly_event)
 
             for removed_id in self.state_manager.remove_disappeared_persons():
+                if self.clip_manager is not None:
+                    self.clip_manager.finish_person(removed_id)
                 self.event_ready.emit({
                     "type": "disappear",
                     "person_id": removed_id,
@@ -174,6 +194,7 @@ class VideoWorker(QThread):
             "type": "status",
             "message": "AI 모델 로딩 중입니다. 먼저 영상 미리보기를 표시합니다.",
         })
+        self.loading_ready.emit("AI 모델 로딩 중...")
         self.tracker_thread = threading.Thread(
             target=self._load_tracker,
             name="PersonTrackerLoader",
@@ -211,6 +232,29 @@ class VideoWorker(QThread):
             "type": "status",
             "message": "AI 모델 로딩 완료. 분석을 시작합니다.",
         })
+
+    def _record_person_clip(self, person, frame):
+        """추적 인물의 이벤트 클립 저장을 ClipManager에 위임합니다.
+
+        인자:
+            person: 추적 결과 딕셔너리입니다.
+            frame: 주석이 그려지기 전 OpenCV BGR 프레임입니다.
+        반환값:
+            없음.
+        """
+
+        if self.clip_manager is None:
+            return
+
+        person_id = person["person_id"]
+        state = self.state_manager.get_state(person_id)
+        crop_path = state.get("crop_path") if state is not None else None
+        self.clip_manager.update_person(
+            person_id=person_id,
+            frame=frame,
+            bbox=person["bbox"],
+            crop_path=crop_path,
+        )
 
     def _get_tracker(self):
         """현재 사용할 수 있는 YOLO 추적 모델을 반환합니다.
@@ -318,6 +362,9 @@ class VideoWorker(QThread):
 
         if self.recording_manager is not None:
             self.recording_manager.stop_recording()
+
+        if self.clip_manager is not None:
+            self.clip_manager.finish_all()
 
         self._join_loader_threads()
         self.stream.release()

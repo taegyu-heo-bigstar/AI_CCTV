@@ -203,6 +203,7 @@
 | `VideoWorker.run` | 스레드 메인 루프에서 프레임 처리와 신호 발행을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `VideoWorker._start_tracker_loading` | YOLO 추적 모델을 별도 thread에서 비동기로 로드합니다. | None | 없음 | 프리뷰 우선 표시 |
 | `VideoWorker._load_tracker` | YOLO 추적 모델을 로드하고 준비되면 분석 루프에 연결합니다. | None | 모델 로딩 오류 | loader thread에서 실행 |
+| `VideoWorker._record_person_clip` | 추적 인물의 이벤트 클립 저장을 ClipManager에 위임합니다. | None | 없음 | 주석 없는 원본 프레임 저장 |
 | `VideoWorker._get_tracker` | 현재 사용할 수 있는 YOLO 추적 모델을 반환합니다. | PersonTracker 또는 None | 없음 | lock으로 보호 |
 | `VideoWorker._start_vlm_loading` | VLM 작업자를 별도 thread에서 준비합니다. | None | 없음 | 선택 기능 |
 | `VideoWorker._load_vlm_worker` | VLM 작업자를 생성하고 인물 처리 파이프라인에 연결합니다. | None | VLM 준비 오류 | loader thread에서 실행 |
@@ -256,6 +257,25 @@
 |---|---|---|---|---|
 | `preload_ai_runtime_libraries` | PyQt 로딩 전에 AI 런타임 네이티브 라이브러리를 초기화합니다. | None | PyTorch 초기화 오류 | torch DLL 로딩 순서 안정화 |
 | `main` | AI server 관제 GUI 애플리케이션을 실행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+
+## `src/ai_cctv/ai_server/storage/clip_manager.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `ClipManager` | 추적 인물별 이벤트 클립 저장을 담당합니다. | ClipManager 객체 | 없음 | `event_clips` 하위 폴더 사용 |
+| `ClipManager.__init__` | 클립 저장 경로와 인물별 클립 상태를 초기화합니다. | None | 경로 생성 오류 | FPS 기본값 보정 |
+| `ClipManager.update_person` | 현재 프레임을 해당 인물의 이벤트 클립에 기록합니다. | None | writer 생성 실패 | 클립 분할과 crop 복사 처리 |
+| `ClipManager.finish_person` | 인물 추적이 끝났을 때 클립 파일과 궤적 이미지를 마감합니다. | None | 없음 | 추적 종료 시 호출 |
+| `ClipManager.finish_all` | 현재 열려 있는 모든 인물 클립을 마감합니다. | None | 없음 | 작업자 종료 시 호출 |
+| `ClipManager._create_person_state` | 새 인물 클립 저장 상태와 전용 폴더를 생성합니다. | dict | 경로 생성 오류 | 중복 폴더명 회피 |
+| `ClipManager._start_new_clip` | 인물 상태에 새 MP4 클립 writer를 연결합니다. | None | writer 생성 실패 | `mp4v` 코덱 사용 |
+| `ClipManager._close_writer` | 인물 상태에 연결된 클립 writer를 닫습니다. | None | 없음 | writer release 처리 |
+| `ClipManager._should_rotate_clip` | 현재 클립 파일을 새 파일로 분리해야 하는지 판단합니다. | bool | 없음 | 기본 10초 단위 |
+| `ClipManager._save_trajectory_image` | 마지막 프레임 위에 인물 이동 궤적 이미지를 저장합니다. | None | 이미지 저장 실패 | `trajectory.jpg` 생성 |
+| `ClipManager._copy_crop_once` | 인물 전신 crop 이미지를 클립 폴더에 한 번만 복사합니다. | None | 복사 실패 | `full_crop.jpg` 생성 |
+| `ClipManager._get_bbox_center` | 바운딩 박스의 중심 좌표를 계산합니다. | tuple | 형 변환 오류 | 궤적 좌표 생성 |
+| `ClipManager._get_frame_size` | 프레임에서 VideoWriter용 크기 튜플을 계산합니다. | tuple | 잘못된 프레임 | `(width, height)` 반환 |
+| `ClipManager._get_unique_folder_path` | 중복되지 않는 인물 클립 폴더 경로를 생성합니다. | 문자열 | 없음 | `_2`, `_3` 접미사 사용 |
 
 ## `src/ai_cctv/ai_server/storage/path_manager.py`
 
@@ -317,11 +337,14 @@
 | `CCTVMainWindow.stop_video` | 영상 처리 작업자를 중지하고 카메라 상태를 갱신합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `CCTVMainWindow.open_settings` | 설정 창을 열고 적용된 값을 메인 창 상태에 반영합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `CCTVMainWindow.update_frame` | OpenCV 프레임을 PyQt 이미지로 변환해 화면에 표시합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `CCTVMainWindow.show_loading_screen` | 영상 영역에 현재 준비 단계 로딩 문구를 표시합니다. | None | 없음 | VideoWorker loading_ready 신호 수신 |
+| `CCTVMainWindow.show_idle_screen` | 영상 영역을 실행 전 기본 대기 화면으로 되돌립니다. | None | 없음 | STOP 또는 시작 실패 시 호출 |
 | `CCTVMainWindow.update_metrics` | 영상 처리 지표를 화면에 반영합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `CCTVMainWindow.add_event` | 이벤트 타임라인에 새 이벤트 항목을 추가합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `CCTVMainWindow.closeEvent` | 창 닫힘 이벤트에서 작업자를 정리합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `CCTVMainWindow._set_camera_status_style` | 카메라 상태 라벨의 색상을 설정합니다. | None | ??? ?? ?? ?? | ?? ?? |
 | `CCTVMainWindow._handle_video_start_failure` | 영상 처리 작업자 시작 실패를 화면 상태와 이벤트로 표시합니다. | None | 없음 | UI 프로세스 종료 방지 |
+| `CCTVMainWindow._handle_worker_finished` | 영상 작업자가 예기치 않게 종료된 경우 UI 상태를 정리합니다. | None | 없음 | 스트림 열기 실패 후 상태 정리 |
 | `CCTVMainWindow._build_storage_label` | 저장 경로 패널에 표시할 문자열을 생성합니다. | 'Storage path\nNo storage path selected.\n\nSelect a location in Settings > Storage.' | ??? ?? ?? ?? | ?? ?? |
 | `CCTVMainWindow._trim_event_list` | 이벤트 타임라인의 최대 표시 개수를 제한합니다. | None | ??? ?? ?? ?? | ?? ?? |
 | `main` | AI CCTV PyQt 애플리케이션을 실행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |

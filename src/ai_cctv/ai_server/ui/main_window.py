@@ -328,10 +328,13 @@ class CCTVMainWindow(QMainWindow):
         self.worker.frame_ready.connect(self.update_frame)
         self.worker.metrics_ready.connect(self.update_metrics)
         self.worker.event_ready.connect(self.add_event)
+        self.worker.loading_ready.connect(self.show_loading_screen)
+        self.worker.finished.connect(self._handle_worker_finished)
+        self.show_loading_screen("시스템 시작 중...")
         self.worker.start()
 
-        self.cam_status.setText("CAM-01 - LIVE")
-        self._set_camera_status_style("#22c55e", "#22c55e")
+        self.cam_status.setText("CAM-01 - LOADING")
+        self._set_camera_status_style("#facc15", "#facc15")
         self._set_run_button_state(is_running=True)
 
     def stop_video(self):
@@ -350,6 +353,7 @@ class CCTVMainWindow(QMainWindow):
         self.cam_status.setText("CAM-01 - STOPPED")
         self._set_camera_status_style("#ef4444", "#ef4444")
         self._set_run_button_state(is_running=False)
+        self.show_idle_screen()
 
     def open_settings(self):
         """설정 창을 열고 적용된 값을 메인 창 상태에 반영합니다.
@@ -390,6 +394,16 @@ class CCTVMainWindow(QMainWindow):
 
         import cv2
 
+        if self.cam_status.text() != "CAM-01 - LIVE":
+            self.cam_status.setText("CAM-01 - LIVE")
+            self._set_camera_status_style("#22c55e", "#22c55e")
+
+        self.video_label.clear()
+        self.video_label.setStyleSheet(
+            "background-color: #0f172a; border-radius: 5px; "
+            "font-size: 24px; color: #334155; font-weight: bold;"
+        )
+
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         height, width, channels = rgb_frame.shape
         qt_img = QImage(
@@ -406,6 +420,41 @@ class CCTVMainWindow(QMainWindow):
             Qt.KeepAspectRatio,
         )
         self.video_label.setPixmap(scaled_pixmap)
+
+    def show_loading_screen(self, message):
+        """영상 영역에 현재 준비 단계 로딩 문구를 표시합니다.
+
+        인자:
+            message: 사용자에게 표시할 로딩 단계 메시지입니다.
+        반환값:
+            없음.
+        """
+
+        self.video_label.clear()
+        self.video_label.setText(f"{message}\n잠시만 기다려 주세요.")
+        self.video_label.setAlignment(Qt.AlignCenter)
+        self.video_label.setStyleSheet(
+            "background-color: #0f172a; border: 1px solid #334155; "
+            "border-radius: 5px; font-size: 24px; color: #facc15; "
+            "font-weight: bold;"
+        )
+
+    def show_idle_screen(self):
+        """영상 영역을 실행 전 기본 대기 화면으로 되돌립니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        self.video_label.clear()
+        self.video_label.setText("LIVE VIDEO SURFACE")
+        self.video_label.setAlignment(Qt.AlignCenter)
+        self.video_label.setStyleSheet(
+            "background-color: #0f172a; border-radius: 5px; "
+            "font-size: 24px; color: #334155; font-weight: bold;"
+        )
 
     def update_metrics(self, data):
         """영상 처리 지표를 화면에 반영합니다.
@@ -494,10 +543,32 @@ class CCTVMainWindow(QMainWindow):
         self.cam_status.setText("CAM-01 - ERROR")
         self._set_camera_status_style("#ef4444", "#ef4444")
         self._set_run_button_state(is_running=False)
+        self.show_idle_screen()
         self.add_event({
             "type": "error",
             "message": message,
         })
+
+    def _handle_worker_finished(self):
+        """영상 작업자가 예기치 않게 종료된 경우 UI 상태를 정리합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        if self.worker is None:
+            return
+
+        if not self.worker.running:
+            return
+
+        self.worker = None
+        self.cam_status.setText("CAM-01 - ERROR")
+        self._set_camera_status_style("#ef4444", "#ef4444")
+        self._set_run_button_state(is_running=False)
+        self.show_idle_screen()
 
     def _build_storage_label(self):
         """저장 경로 패널에 표시할 문자열을 생성합니다.

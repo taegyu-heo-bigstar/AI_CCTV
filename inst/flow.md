@@ -24,7 +24,7 @@ AI_CCTV/
 |           |-- stream_receiver.py  # MediaMTX RTSP 수신 수동 점검 도구
 |           |-- ui/                 # PyQt 화면, 설정창, 이벤트 표시
 |           |-- analysis/           # 영상 입력, 추적, VLM, 이상 상황 판정
-|           |-- storage/            # 저장 경로와 녹화 관리
+|           |-- storage/            # 저장 경로, 원본 녹화, 이벤트 클립 관리
 |           |-- alerts/             # Discord 알림 메시지, 디스패처, 챗봇 전송
 |           `-- common/             # 서버 노드 내부 공통 값 객체 재노출
 `-- tests/                          # 구조와 도메인 경계 단위 테스트
@@ -58,6 +58,8 @@ flowchart LR
     Tracker --> Processor["PersonFrameProcessor"]
     Tracker --> RuleEngine["AnomalyRuleEngine"]
     VideoWorker --> Storage["storage/recording_manager.py"]
+    VideoWorker --> ClipManager["storage/clip_manager.py"]
+    ClipManager --> EventClips["event_clips/person별 MP4와 trajectory.jpg"]
     RuleEngine --> Event["AnomalyEvent"]
     Event --> Dispatcher["NotificationDispatcher"]
     Dispatcher --> Discord["alerts/chat_bot"]
@@ -103,14 +105,23 @@ classDiagram
     class CCTVMainWindow {
         +start_video()
         +stop_video()
+        +show_loading_screen(message)
+        +show_idle_screen()
         +add_event(event)
     }
 
     class VideoWorker {
         +run()
         +stop()
+        -_record_person_clip(person, frame)
         -_create_default_notification_dispatcher()
         -_cleanup()
+    }
+
+    class ClipManager {
+        +update_person(person_id, frame, bbox, crop_path)
+        +finish_person(person_id)
+        +finish_all()
     }
 
     class AnomalyRuleEngine {
@@ -130,6 +141,7 @@ classDiagram
     CCTVMainWindow --> VideoWorker
     VideoWorker --> AnomalyRuleEngine
     VideoWorker --> NotificationDispatcher
+    VideoWorker --> ClipManager
 ```
 
 ## Execution
