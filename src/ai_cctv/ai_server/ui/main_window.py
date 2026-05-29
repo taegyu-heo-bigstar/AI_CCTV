@@ -56,7 +56,7 @@ class CCTVMainWindow(QMainWindow):
         self.appear_count = 0
         self.disappear_count = 0
         self.video_source = 0
-        self.use_vlm = True
+        self.use_vlm = False
         self.storage_root_path = ""
         self.ai_cctv_path = ""
         self.original_segment_seconds = 10

@@ -40,7 +40,7 @@ class SettingsWindow(QDialog):
         self,
         parent=None,
         video_source=0,
-        use_vlm=True,
+        use_vlm=False,
         storage_root_path="",
         ai_cctv_path="",
         original_segment_seconds=10,

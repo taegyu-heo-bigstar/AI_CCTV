@@ -201,8 +201,15 @@
 | `VideoWorker` | 영상 캡처, 추적, 녹화, 선택적 VLM 분석을 조정합니다. | VideoWorker ???? | ??? ?? ?? ?? | ??: QThread, ?? ?? |
 | `VideoWorker.__init__` | 영상 처리 스레드와 협력 객체를 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
 | `VideoWorker.run` | 스레드 메인 루프에서 프레임 처리와 신호 발행을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `VideoWorker._start_tracker_loading` | YOLO 추적 모델을 별도 thread에서 비동기로 로드합니다. | None | 없음 | 프리뷰 우선 표시 |
+| `VideoWorker._load_tracker` | YOLO 추적 모델을 로드하고 준비되면 분석 루프에 연결합니다. | None | 모델 로딩 오류 | loader thread에서 실행 |
+| `VideoWorker._get_tracker` | 현재 사용할 수 있는 YOLO 추적 모델을 반환합니다. | PersonTracker 또는 None | 없음 | lock으로 보호 |
+| `VideoWorker._start_vlm_loading` | VLM 작업자를 별도 thread에서 준비합니다. | None | 없음 | 선택 기능 |
+| `VideoWorker._load_vlm_worker` | VLM 작업자를 생성하고 인물 처리 파이프라인에 연결합니다. | None | VLM 준비 오류 | loader thread에서 실행 |
+| `VideoWorker._emit_preview_frame` | AI 모델 준비 전 프리뷰 프레임과 기본 지표를 발행합니다. | None | 없음 | 영상 우선 출력 |
 | `VideoWorker.stop` | 영상 처리 루프를 중지하고 스레드 종료를 기다립니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `VideoWorker._cleanup` | 사용 중인 분석 작업자, 녹화기, 영상 스트림을 정리합니다. | None | ??? ?? ?? ?? | ?? ?? |
+| `VideoWorker._join_loader_threads` | 모델 로더 thread가 짧은 시간 안에 끝나면 정리합니다. | None | 없음 | 종료 대기 최소화 |
 | `VideoWorker._create_default_notification_dispatcher` | 기본 Discord 이상 상황 알림 디스패처를 생성합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? |
 
 ## `src/ai_cctv/ai_server/analysis/vlm_person_analyzer.py`

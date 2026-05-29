@@ -1,7 +1,8 @@
 # AI CCTV 영상 처리 스레드를 정의하는 파일입니다.
 # 스트림 읽기, 추적, 녹화, VLM 작업 시작과 종료 흐름을 조정합니다.
-# 인물별 세부 처리는 PersonFrameProcessor에 위임합니다.
+# 카메라 프리뷰를 먼저 표시하고 AI 모델은 별도 thread에서 준비합니다.
 
+import threading
 from datetime import datetime
 from PyQt5.QtCore import QThread, pyqtSignal
 
@@ -11,10 +12,8 @@ from .crop_manager import CropManager
 from .full_body_checker import FullBodyChecker
 from .pipeline.person_frame_processor import PersonFrameProcessor
 from .person_state_manager import PersonStateManager
-from .person_tracker import PersonTracker
 from ..storage.recording_manager import RecordingManager
 from .video_stream import VideoStream
-from .vlm_worker import VLMWorker
 
 
 class VideoWorker(QThread):
@@ -39,6 +38,7 @@ class VideoWorker(QThread):
         use_vlm=False,
         ai_cctv_path="",
         original_segment_seconds=10,
+        tracker_model_path="yolo26s.pt",
         anomaly_rule_engine=None,
         notification_dispatcher=None,
     ):
@@ -49,6 +49,7 @@ class VideoWorker(QThread):
             use_vlm: VLM 분석 사용 여부입니다.
             ai_cctv_path: 녹화 파일 저장 루트 경로입니다.
             original_segment_seconds: 원본 녹화 파일 분할 초 단위입니다.
+            tracker_model_path: YOLO 추적 모델 파일 경로입니다.
             anomaly_rule_engine: 감지 결과를 이상 상황으로 변환하는 규칙 엔진입니다.
             notification_dispatcher: 이상 상황 알림을 전송하는 디스패처입니다.
         반환값:
@@ -59,9 +60,13 @@ class VideoWorker(QThread):
         self.source = source
         self.running = True
         self.use_vlm = use_vlm
+        self.tracker_model_path = tracker_model_path
 
         self.stream = VideoStream(source=self.source)
-        self.tracker = PersonTracker(model_path="yolo26s.pt")
+        self.tracker = None
+        self.tracker_load_error = None
+        self.tracker_thread = None
+        self.tracker_lock = threading.Lock()
         self.full_body_checker = FullBodyChecker()
         self.crop_manager = CropManager()
         self.state_manager = PersonStateManager(disappear_timeout=3.0)
@@ -73,7 +78,10 @@ class VideoWorker(QThread):
             notification_dispatcher or self._create_default_notification_dispatcher()
         )
 
-        self.vlm_worker = VLMWorker(self.state_manager) if self.use_vlm else None
+        self.vlm_worker = None
+        self.vlm_load_error = None
+        self.vlm_thread = None
+        self.vlm_lock = threading.Lock()
         self.person_processor = PersonFrameProcessor(
             full_body_checker=self.full_body_checker,
             crop_manager=self.crop_manager,
@@ -97,15 +105,16 @@ class VideoWorker(QThread):
             })
             return
 
+        self._start_tracker_loading()
+        if self.use_vlm:
+            self._start_vlm_loading()
+
         if self.ai_cctv_path:
             self.recording_manager = RecordingManager(
                 base_dir=self.ai_cctv_path,
                 fps=self.stream.get_fps(),
                 segment_seconds=self.original_segment_seconds,
             )
-
-        if self.vlm_worker is not None:
-            self.vlm_worker.start()
 
         while self.running:
             ret, frame = self.stream.read()
@@ -120,7 +129,12 @@ class VideoWorker(QThread):
             if self.recording_manager is not None:
                 self.recording_manager.write_frame(frame)
 
-            persons = self.tracker.track(frame)
+            tracker = self._get_tracker()
+            if tracker is None:
+                self._emit_preview_frame(frame)
+                continue
+
+            persons = tracker.track(frame)
             for person in persons:
                 for event in self.person_processor.process(frame, person):
                     self.event_ready.emit(event)
@@ -143,6 +157,140 @@ class VideoWorker(QThread):
             self.frame_ready.emit(frame)
 
         self._cleanup()
+
+    def _start_tracker_loading(self):
+        """YOLO 추적 모델을 별도 thread에서 비동기로 로드합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        if self.tracker_thread is not None and self.tracker_thread.is_alive():
+            return
+
+        self.event_ready.emit({
+            "type": "status",
+            "message": "AI 모델 로딩 중입니다. 먼저 영상 미리보기를 표시합니다.",
+        })
+        self.tracker_thread = threading.Thread(
+            target=self._load_tracker,
+            name="PersonTrackerLoader",
+            daemon=True,
+        )
+        self.tracker_thread.start()
+
+    def _load_tracker(self):
+        """YOLO 추적 모델을 로드하고 준비되면 분석 루프에 연결합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        try:
+            from .person_tracker import PersonTracker
+
+            tracker = PersonTracker(model_path=self.tracker_model_path)
+        except Exception as exc:
+            self.tracker_load_error = exc
+            self.event_ready.emit({
+                "type": "error",
+                "message": f"AI 모델 로딩 실패: {exc}",
+            })
+            return
+
+        with self.tracker_lock:
+            if not self.running:
+                return
+            self.tracker = tracker
+
+        self.event_ready.emit({
+            "type": "status",
+            "message": "AI 모델 로딩 완료. 분석을 시작합니다.",
+        })
+
+    def _get_tracker(self):
+        """현재 사용할 수 있는 YOLO 추적 모델을 반환합니다.
+
+        인자:
+            없음.
+        반환값:
+            로딩 완료된 PersonTracker 객체 또는 None을 반환합니다.
+        """
+
+        with self.tracker_lock:
+            return self.tracker
+
+    def _start_vlm_loading(self):
+        """VLM 작업자를 별도 thread에서 준비합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        if self.vlm_thread is not None and self.vlm_thread.is_alive():
+            return
+
+        self.vlm_thread = threading.Thread(
+            target=self._load_vlm_worker,
+            name="VLMWorkerLoader",
+            daemon=True,
+        )
+        self.vlm_thread.start()
+
+    def _load_vlm_worker(self):
+        """VLM 작업자를 생성하고 인물 처리 파이프라인에 연결합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        try:
+            from .vlm_worker import VLMWorker
+
+            vlm_worker = VLMWorker(self.state_manager)
+            vlm_worker.start()
+        except Exception as exc:
+            self.vlm_load_error = exc
+            self.event_ready.emit({
+                "type": "error",
+                "message": f"VLM 작업자 준비 실패: {exc}",
+            })
+            return
+
+        with self.vlm_lock:
+            if not self.running:
+                vlm_worker.stop()
+                return
+            self.vlm_worker = vlm_worker
+            self.person_processor.vlm_worker = vlm_worker
+
+        self.event_ready.emit({
+            "type": "status",
+            "message": "VLM 작업자 준비를 시작했습니다.",
+        })
+
+    def _emit_preview_frame(self, frame):
+        """AI 모델 준비 전 프리뷰 프레임과 기본 지표를 발행합니다.
+
+        인자:
+            frame: OpenCV BGR 프레임입니다.
+        반환값:
+            없음.
+        """
+
+        self.metrics_ready.emit({
+            "current_objects": 0,
+            "tracked_total": len(self.state_manager.person_states),
+        })
+        self.frame_ready.emit(frame)
 
     def stop(self):
         """영상 처리 루프를 중지하고 스레드 종료를 기다립니다.
@@ -171,7 +319,21 @@ class VideoWorker(QThread):
         if self.recording_manager is not None:
             self.recording_manager.stop_recording()
 
+        self._join_loader_threads()
         self.stream.release()
+
+    def _join_loader_threads(self):
+        """모델 로더 thread가 짧은 시간 안에 끝나면 정리합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        for loader_thread in [self.tracker_thread, self.vlm_thread]:
+            if loader_thread is not None and loader_thread.is_alive():
+                loader_thread.join(timeout=1)
 
     def _create_default_notification_dispatcher(self):
         """기본 Discord 이상 상황 알림 디스패처를 생성합니다.
