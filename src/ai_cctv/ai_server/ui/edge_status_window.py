@@ -1,7 +1,7 @@
 # Edge node 상태 조회 창을 정의하는 PyQt 파일입니다.
 # AI server UI에서 Edge node 모니터링 API를 호출하고 결과를 시각화합니다.
 # 네트워크 요청은 별도 QThread에서 실행해 메인 UI 멈춤을 방지합니다.
-# 최신 JSON 값은 표로, 최근 사용률 변화는 선 그래프로 표시합니다.
+# 최신 JSON 값은 표로, 최근 사용률과 배터리 잔량 변화는 선 그래프로 표시합니다.
 
 """Edge node 상태 조회 PyQt 창입니다."""
 
@@ -80,6 +80,7 @@ class ResourceLineGraph(QWidget):
             ("memory_total", "Memory", QColor("#22c55e")),
             ("process_cpu", "Process CPU", QColor("#facc15")),
             ("process_memory", "Process Memory", QColor("#f97316")),
+            ("battery_remaining", "Battery", QColor("#a78bfa")),
         ]
         self.setMinimumHeight(260)
 
@@ -115,6 +116,9 @@ class ResourceLineGraph(QWidget):
             "process_memory": self._read_percent(
                 resource_usage, "process", "memory_percent"
             ),
+            "battery_remaining": self._read_percent(
+                resource_usage, "power", "battery_remaining_percent"
+            ),
         }
         self.samples.append(sample)
         if len(self.samples) > self.max_samples:
@@ -132,7 +136,10 @@ class ResourceLineGraph(QWidget):
             float 형태의 백분율 값을 반환합니다.
         """
 
-        return float(resource_usage.get(section_name, {}).get(field_name, 0.0))
+        value = resource_usage.get(section_name, {}).get(field_name, 0.0)
+        if value is None:
+            return 0.0
+        return float(value)
 
     def paintEvent(self, event):
         """위젯 영역에 작업 관리자 스타일의 선 그래프를 그립니다.
@@ -462,6 +469,12 @@ class EdgeNodeStatusWindow(QDialog):
             ("프로세스 이름", "-"),
             ("프로세스 CPU 사용률", "-"),
             ("프로세스 Memory 사용률", "-"),
+            ("배터리 잔량", "-"),
+            ("외부 전원 연결", "-"),
+            ("USB-C 입력 전압", "-"),
+            ("MicroUSB 입력 전압", "-"),
+            ("UPS 전원 상태 원본값", "-"),
+            ("UPS 읽기 상태", "응답 대기"),
         ]
 
     def _build_table_rows(self, resource_usage):
@@ -476,6 +489,7 @@ class EdgeNodeStatusWindow(QDialog):
         cpu = resource_usage.get("cpu", {})
         memory = resource_usage.get("memory", {})
         process = resource_usage.get("process", {})
+        power = resource_usage.get("power", {})
         return [
             ("수집 시간", str(resource_usage.get("collected_at", "-"))),
             ("전체 CPU 사용률", self._format_percent(cpu.get("total_percent"))),
@@ -487,6 +501,21 @@ class EdgeNodeStatusWindow(QDialog):
                 "프로세스 Memory 사용률",
                 self._format_percent(process.get("memory_percent")),
             ),
+            ("배터리 잔량", self._format_percent(power.get("battery_remaining_percent"))),
+            (
+                "외부 전원 연결",
+                self._format_power_connection(power.get("external_power_connected")),
+            ),
+            (
+                "USB-C 입력 전압",
+                self._format_millivolt(power.get("type_c_input_millivolt")),
+            ),
+            (
+                "MicroUSB 입력 전압",
+                self._format_millivolt(power.get("micro_usb_input_millivolt")),
+            ),
+            ("UPS 전원 상태 원본값", str(power.get("power_status_raw", "-"))),
+            ("UPS 읽기 상태", self._format_power_status(power)),
         ]
 
     def _format_percent(self, value):
@@ -501,6 +530,50 @@ class EdgeNodeStatusWindow(QDialog):
         if value is None:
             return "-"
         return f"{float(value):.1f}%"
+
+    def _format_millivolt(self, value):
+        """밀리볼트 단위 전압 값을 화면 표시 문자열로 변환합니다.
+
+        인자:
+            value: 밀리볼트 단위 숫자 값입니다.
+        반환값:
+            전압 표시 문자열을 반환합니다.
+        """
+
+        if value is None:
+            return "-"
+        return f"{int(value)} mV"
+
+    def _format_power_connection(self, value):
+        """외부 전원 연결 여부를 한글 상태 문자열로 변환합니다.
+
+        인자:
+            value: 외부 전원 연결 여부 bool 값입니다.
+        반환값:
+            연결 상태 표시 문자열을 반환합니다.
+        """
+
+        if value is None:
+            return "-"
+        return "연결됨" if bool(value) else "미연결"
+
+    def _format_power_status(self, power):
+        """UPS 전원 상태 읽기 결과를 화면 표시 문자열로 변환합니다.
+
+        인자:
+            power: `/monitor/top` JSON의 power 딕셔너리입니다.
+        반환값:
+            UPS 읽기 상태 표시 문자열을 반환합니다.
+        """
+
+        if not power:
+            return "-"
+        if power.get("available"):
+            return "정상"
+        error_message = power.get("error")
+        if error_message:
+            return f"실패: {error_message}"
+        return "실패"
 
     def closeEvent(self, event):
         """창이 닫힐 때 주기 조회 타이머를 중지합니다.

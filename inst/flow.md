@@ -18,7 +18,7 @@ AI_CCTV/
 |       |   |-- mediamtx.py         # MediaMTX 다운로드, 설치 확인, 프로세스 관리
 |       |   |-- streaming.py        # GStreamer 송출/로컬 백업 파이프라인 생성
 |       |   |-- local_backup.py     # 로컬 백업 세그먼트 파일명 정책
-|       |   |-- monitoring/         # Edge node 자원 모니터링 FastAPI 서버
+|       |   |-- monitoring/         # Edge node 자원/전원 모니터링 FastAPI 서버
 |       |   `-- failover.py         # 네트워크 장애 대응 정책
 |       `-- ai_server/              # Windows AI server 배포 단위
 |           |-- server_run.py       # AI server 실행 진입점
@@ -36,7 +36,7 @@ AI_CCTV/
 
 | 실행 묶음 | 설치 extras | console script | 주요 책임 |
 |---|---|---|---|
-| Edge node | `ai-cctv[edge-node]` | `ai-cctv-edge` | 카메라 송출, MediaMTX 실행, 로컬 백업, 네트워크 장애 대응 정책 |
+| Edge node | `ai-cctv[edge-node]` | `ai-cctv-edge` | 카메라 송출, MediaMTX 실행, 로컬 백업, 자원/전원 모니터링, 네트워크 장애 대응 정책 |
 | AI server | `ai-cctv[ai-server]` | `ai-cctv-ai-server` 또는 `ai-cctv` | RTSP 수신, OpenCV/YOLO 분석, 이상 상황 판정, Discord 알림, GUI |
 
 ## System Flow
@@ -47,6 +47,7 @@ flowchart LR
     Pi --> EdgeMain["ai_cctv/edge_node/main.py"]
     EdgeMain --> EdgeRuntime["EdgeNodeRuntime"]
     EdgeMain -. "same Edge node" .-> MonitorApi["edge_node/monitoring/resource_monitor_server.py"]
+    Pi --> UpsPlus["52Pi EP-0136 UPS Plus"]
     EdgeRuntime --> MediaMtxManager["MediaMtxInstaller / MediaMtxProcessManager"]
     EdgeRuntime --> BackupConfig["LocalBackupConfig"]
     EdgeRuntime --> StreamBuilder["MediaMtxGStreamerCommandBuilder"]
@@ -60,7 +61,10 @@ flowchart LR
     EdgeStatusWindow --> MonitorClient["ResourceMonitorClient"]
     MonitorClient --> MonitorApi
     MonitorApi --> ResourceCollector["ResourceUsageCollector"]
-    ResourceCollector --> ResourceJson["CPU/Memory/Process JSON"]
+    ResourceCollector --> PowerProvider["CachedPowerStatusProvider"]
+    PowerProvider --> PowerReader["UpsPlusPowerReader"]
+    PowerReader --> UpsPlus
+    ResourceCollector --> ResourceJson["CPU/Memory/Process/Power JSON"]
     MainWindow --> SettingsWindow["ui/settings_window.py"]
     SettingsWindow --> RuntimeOptions["YOLO/VLM on-off, 클립 길이, 저장 경로"]
     MainWindow --> VideoWorker["ai_server/analysis/video_worker.py"]
@@ -164,6 +168,24 @@ classDiagram
         -_get_process()
     }
 
+    class CachedPowerStatusProvider {
+        +get_snapshot()
+        -_is_cache_fresh(now)
+    }
+
+    class UpsPlusPowerReader {
+        +read_snapshot()
+        -_open_bus()
+        -_read_percent(bus)
+        -_read_word(bus, low_register, high_register)
+        -_read_byte(bus, register_address)
+    }
+
+    class PowerStatusSnapshot {
+        +to_dict()
+        +unavailable(error)
+    }
+
     class ResourceMonitorClient {
         +request_resource_usage()
     }
@@ -194,6 +216,9 @@ classDiagram
     VideoWorker --> ClipManager
     VideoWorker --> VLMWorker
     ResourceMonitorClient --> ResourceUsageCollector
+    ResourceUsageCollector --> CachedPowerStatusProvider
+    CachedPowerStatusProvider --> UpsPlusPowerReader
+    UpsPlusPowerReader --> PowerStatusSnapshot
 ```
 
 ## Execution

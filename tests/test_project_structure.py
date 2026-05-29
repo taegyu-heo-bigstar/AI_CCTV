@@ -19,7 +19,108 @@ from ai_cctv.ai_server.analysis.anomaly.detector import (
 from ai_cctv.edge_node.failover import EdgeNetworkFailoverPolicy
 from ai_cctv.edge_node.local_backup import LocalBackupConfig
 from ai_cctv.edge_node.mediamtx import MediaMtxConfig, MediaMtxReleaseResolver
+from ai_cctv.edge_node.monitoring.power_status import UpsPlusPowerReader
 from ai_cctv.edge_node.streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
+
+
+class FakeSmbus:
+    """UPS Plus 전원 리더 테스트용 가짜 SMBus입니다.
+
+    인자:
+        registers: 레지스터 주소별 반환 값을 담은 딕셔너리입니다.
+    반환값:
+        FakeSmbus 인스턴스를 반환합니다.
+    """
+
+    def __init__(self, registers):
+        """가짜 레지스터 저장소와 close 호출 여부를 초기화합니다.
+
+        인자:
+            registers: 레지스터 주소별 반환 값을 담은 딕셔너리입니다.
+        반환값:
+            없음.
+        """
+
+        self.registers = registers
+        self.closed = False
+
+    def read_byte_data(self, device_address, register_address):
+        """지정한 레지스터의 가짜 바이트 값을 반환합니다.
+
+        인자:
+            device_address: 요청된 I2C 장치 주소입니다.
+            register_address: 읽을 레지스터 주소입니다.
+        반환값:
+            레지스터에 저장된 정수 값을 반환합니다.
+        """
+
+        del device_address
+        return self.registers[register_address]
+
+    def close(self):
+        """가짜 SMBus가 닫혔음을 기록합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        self.closed = True
+
+
+class FakeUpsPlusPowerReader(UpsPlusPowerReader):
+    """가짜 SMBus를 주입받는 UPS Plus 전원 리더입니다.
+
+    인자:
+        bus: 테스트에 사용할 FakeSmbus 인스턴스입니다.
+    반환값:
+        FakeUpsPlusPowerReader 인스턴스를 반환합니다.
+    """
+
+    def __init__(self, bus):
+        """가짜 SMBus를 저장하고 기본 UPS Plus 리더 설정을 초기화합니다.
+
+        인자:
+            bus: 테스트에 사용할 FakeSmbus 인스턴스입니다.
+        반환값:
+            없음.
+        """
+
+        super().__init__()
+        self.bus = bus
+
+    def _open_bus(self):
+        """테스트용 가짜 SMBus를 반환합니다.
+
+        인자:
+            없음.
+        반환값:
+            FakeSmbus 인스턴스를 반환합니다.
+        """
+
+        return self.bus
+
+
+class FailingUpsPlusPowerReader(UpsPlusPowerReader):
+    """I2C 열기 실패를 재현하는 UPS Plus 전원 리더입니다.
+
+    인자:
+        없음.
+    반환값:
+        FailingUpsPlusPowerReader 인스턴스를 반환합니다.
+    """
+
+    def _open_bus(self):
+        """I2C 버스 열기 실패를 발생시킵니다.
+
+        인자:
+            없음.
+        반환값:
+            정상적으로 반환하지 않습니다.
+        """
+
+        raise RuntimeError("I2C unavailable")
 
 
 class MemoryNotificationChannel(NotificationChannel):
@@ -199,6 +300,51 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertIn("linux_arm64v8", resolver.resolve_download_url("aarch64"))
         self.assertIn("linux_armv7", resolver.resolve_download_url("armv7l"))
 
+    def test_ups_plus_power_reader_reads_battery_and_external_power(self):
+        """UPS Plus 레지스터에서 배터리 잔량과 외부 전원 상태를 해석하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        bus = FakeSmbus({
+            0x07: 0xEC,
+            0x08: 0x13,
+            0x09: 0x00,
+            0x0A: 0x00,
+            0x13: 75,
+            0x14: 0,
+            0x17: 1,
+        })
+        reader = FakeUpsPlusPowerReader(bus)
+
+        snapshot = reader.read_snapshot()
+
+        self.assertTrue(snapshot.available)
+        self.assertEqual(snapshot.battery_remaining_percent, 75)
+        self.assertTrue(snapshot.external_power_connected)
+        self.assertEqual(snapshot.type_c_input_millivolt, 5100)
+        self.assertEqual(snapshot.micro_usb_input_millivolt, 0)
+        self.assertEqual(snapshot.power_status_raw, 1)
+        self.assertTrue(bus.closed)
+
+    def test_ups_plus_power_reader_reports_unavailable_on_i2c_error(self):
+        """UPS Plus I2C 접근 실패가 사용 불가 스냅샷으로 변환되는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        snapshot = FailingUpsPlusPowerReader().read_snapshot()
+
+        self.assertFalse(snapshot.available)
+        self.assertIsNone(snapshot.battery_remaining_percent)
+        self.assertIn("I2C unavailable", snapshot.error)
+
     def test_console_scripts_are_split_by_deployment_bundle(self):
         """Edge node와 AI server 실행 진입점이 분리되어 있는지 검증합니다.
 
@@ -220,6 +366,7 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertEqual(scripts["ai-cctv"], "ai_cctv.ai_server.server_run:main")
         self.assertIn("edge-node", extras)
         self.assertIn("ai-server", extras)
+        self.assertIn("smbus2", extras["edge-node"])
         self.assertNotIn("edge-pi", extras)
         self.assertNotIn("windows-server", extras)
         self.assertNotIn("edge", extras)
@@ -231,6 +378,9 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(Path("src/ai_cctv/edge_node/monitoring").is_dir())
         self.assertTrue(
             Path("src/ai_cctv/edge_node/monitoring/resource_monitor_server.py").is_file()
+        )
+        self.assertTrue(
+            Path("src/ai_cctv/edge_node/monitoring/power_status.py").is_file()
         )
         self.assertTrue(Path("src/ai_cctv/ai_server").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/server_run.py").is_file())

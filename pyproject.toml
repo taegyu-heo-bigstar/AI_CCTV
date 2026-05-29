@@ -16,6 +16,7 @@ edge-node = [
     "fastapi",
     "uvicorn",
     "psutil",
+    "smbus2",
 ]
 ai-server = [
     "transformers>=4.51.0",

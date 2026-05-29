@@ -2,3 +2,4 @@ pygobject
 fastapi
 uvicorn
 psutil
+smbus2

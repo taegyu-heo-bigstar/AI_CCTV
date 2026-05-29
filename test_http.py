@@ -1,7 +1,7 @@
 # Edge node 상태 조회 UI를 임시 검증하기 위한 모의 HTTP 서버 파일입니다.
 # 실제 Raspberry Pi 없이 `/monitor/top` 응답을 생성합니다.
 # AI server UI의 `엣지 노드 상태 조회` 버튼은 기본적으로 이 서버를 조회할 수 있습니다.
-# 표와 꺾은선 그래프가 변하는지 확인할 수 있도록 사용률 값을 매 요청마다 바꿉니다.
+# 표와 꺾은선 그래프가 변하는지 확인할 수 있도록 사용률과 배터리 값을 바꿉니다.
 # 10번 성공 응답한 뒤에는 일부러 응답을 보내지 않아 연결 실패 UI를 확인합니다.
 
 """Edge node 모니터링 API 모의 서버입니다."""
@@ -66,6 +66,10 @@ class MockResourceState:
         memory_total = self._wave(elapsed, base=55.0, amplitude=14.0, speed=0.35)
         process_cpu = self._wave(elapsed, base=18.0, amplitude=16.0, speed=1.2)
         process_memory = self._wave(elapsed, base=3.5, amplitude=2.0, speed=0.5)
+        battery_remaining = self._wave(elapsed, base=62.0, amplitude=18.0, speed=0.2)
+        external_power_connected = int(elapsed / 8) % 2 == 0
+        type_c_input_millivolt = 5100 if external_power_connected else 0
+        micro_usb_input_millivolt = 0
         return {
             "collected_at": datetime.now().isoformat(timespec="seconds"),
             "cpu": {"total_percent": round(cpu_total, 1)},
@@ -75,6 +79,16 @@ class MockResourceState:
                 "name": "mock-edge-monitor",
                 "cpu_percent": round(process_cpu, 1),
                 "memory_percent": round(process_memory, 1),
+            },
+            "power": {
+                "captured_at": datetime.now().isoformat(timespec="seconds"),
+                "available": True,
+                "battery_remaining_percent": round(battery_remaining, 1),
+                "external_power_connected": external_power_connected,
+                "type_c_input_millivolt": type_c_input_millivolt,
+                "micro_usb_input_millivolt": micro_usb_input_millivolt,
+                "power_status_raw": 1,
+                "error": None,
             },
         }
 

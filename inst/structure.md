@@ -278,12 +278,32 @@
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `ResourceUsageCollector` | Edge node 전체 시스템과 지정 프로세스의 CPU/메모리 사용률 수집 책임을 담당합니다. | ResourceUsageCollector 인스턴스 | 없음 | 기본 프로세스 ID는 현재 FastAPI 서버 프로세스 |
-| `ResourceUsageCollector.__init__` | 수집 대상 프로세스 ID와 CPU 샘플링 시간을 초기화합니다. | None | 없음 | 기본 샘플링 시간 0.1초 |
-| `ResourceUsageCollector.collect` | 전체 CPU, 전체 메모리, 대상 프로세스 CPU/메모리 사용률을 딕셔너리로 반환합니다. | dict | RuntimeError | `collected_at` ISO 시간 포함 |
+| `ResourceUsageCollector` | Edge node 전체 시스템, 지정 프로세스, UPS 전원 상태 수집 책임을 담당합니다. | ResourceUsageCollector 인스턴스 | 없음 | 기본 프로세스 ID는 현재 FastAPI 서버 프로세스 |
+| `ResourceUsageCollector.__init__` | 수집 대상 프로세스 ID, CPU 샘플링 시간, 전원 상태 provider를 초기화합니다. | None | 없음 | 전원 provider 미주입 시 기본 캐시 provider 생성 |
+| `ResourceUsageCollector.collect` | 전체 CPU, 전체 메모리, 대상 프로세스, UPS 전원 상태를 딕셔너리로 반환합니다. | dict | RuntimeError | `power` 섹션을 함께 포함 |
 | `ResourceUsageCollector._get_process` | psutil 기준 모니터링 대상 프로세스 객체를 반환합니다. | psutil.Process | RuntimeError | 프로세스 없음/권한 오류를 한글 메시지로 변환 |
-| `read_resource_usage` | FastAPI `/monitor/top` 요청에 Edge node 자원 사용률 JSON을 반환합니다. | dict | HTTPException 500 | collector 오류를 HTTP 응답으로 변환 |
+| `read_resource_usage` | FastAPI `/monitor/top` 요청에 Edge node 자원 사용률과 전원 상태 JSON을 반환합니다. | dict | HTTPException 500 | collector 오류를 HTTP 응답으로 변환 |
 | `main` | 개발용 uvicorn 모니터링 서버를 `0.0.0.0:8001`에서 실행합니다. | 반환 없음 | uvicorn 실행 오류 | `python -m` 실행 진입점 |
+
+## `src/ai_cctv/edge_node/monitoring/power_status.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `PowerStatusSnapshot` | UPS Plus 전원 상태 한 번의 측정값을 표현합니다. | PowerStatusSnapshot 인스턴스 | 없음 | dataclass, JSON 변환 가능 |
+| `PowerStatusSnapshot.to_dict` | 전원 상태 스냅샷을 JSON 직렬화 가능한 딕셔너리로 변환합니다. | dict | 없음 | `battery_remaining_percent`, `external_power_connected` 포함 |
+| `PowerStatusSnapshot.unavailable` | UPS 값을 읽을 수 없을 때 사용할 실패 스냅샷을 생성합니다. | PowerStatusSnapshot 인스턴스 | 없음 | `available=False`와 오류 메시지 포함 |
+| `UpsPlusPowerReader` | 52Pi EP-0136 UPS Plus I2C 레지스터 읽기 책임을 담당합니다. | UpsPlusPowerReader 인스턴스 | 없음 | 기본 I2C 주소 `0x17` |
+| `UpsPlusPowerReader.__init__` | I2C 버스, 장치 주소, 외부 전원 판단 전압 기준을 초기화합니다. | None | 없음 | 기본 버스 1, 기준 4000mV |
+| `UpsPlusPowerReader.read_snapshot` | 배터리 잔량, USB-C/MicroUSB 입력 전압, 전원 상태 원본값을 읽습니다. | PowerStatusSnapshot 인스턴스 | 실패 스냅샷 | SMBus 오류를 API 장애로 전파하지 않음 |
+| `UpsPlusPowerReader._open_bus` | SMBus 인스턴스를 열어 I2C 통신을 준비합니다. | SMBus 인스턴스 | RuntimeError | `smbus2` 우선, `smbus` fallback |
+| `UpsPlusPowerReader._read_percent` | 배터리 잔량 레지스터 `0x13-0x14`를 백분율로 읽습니다. | int | SMBus 읽기 오류 | 0~100 범위로 보정 |
+| `UpsPlusPowerReader._read_word` | 연속된 저위/고위 바이트 레지스터를 16비트 정수로 읽습니다. | int | SMBus 읽기 오류 | EP-0136 데모 코드의 little-endian 조합 기준 |
+| `UpsPlusPowerReader._read_byte` | UPS Plus 단일 레지스터 바이트 값을 읽습니다. | int | SMBus 읽기 오류 | `read_byte_data` 사용 |
+| `CachedPowerStatusProvider` | UPS Plus 전원 상태를 일정 시간 캐시합니다. | CachedPowerStatusProvider 인스턴스 | 없음 | 반복 HTTP 조회 시 I2C 접근 감소 |
+| `CachedPowerStatusProvider.__init__` | 전원 상태 리더, 캐시 유지 시간, 동기화 lock을 초기화합니다. | None | 없음 | 기본 캐시 2초 |
+| `CachedPowerStatusProvider.get_snapshot` | 캐시가 유효하면 저장값을, 아니면 새 UPS 측정값을 반환합니다. | PowerStatusSnapshot 인스턴스 | 실패 스냅샷 | thread lock으로 동시 요청 보호 |
+| `CachedPowerStatusProvider._is_cache_fresh` | 현재 캐시가 재사용 가능한지 판단합니다. | bool | 없음 | monotonic 시간 기준 |
+| `_load_smbus_class` | 설치된 SMBus 구현체를 찾아 반환합니다. | SMBus 클래스 | RuntimeError | `smbus2` 또는 `smbus` 필요 |
 
 ## `src/ai_cctv/ai_server/storage/clip_manager.py`
 
@@ -351,7 +371,7 @@
 |---|---|---|---|---|
 | `ResourceMonitorRequestWorker` | Edge node 모니터링 API 요청을 UI와 분리된 QThread에서 수행합니다. | ResourceMonitorRequestWorker 인스턴스 | 요청 예외 문자열 | UI 멈춤 방지 |
 | `ResourceMonitorRequestWorker.run` | 자원 사용률 요청 결과 또는 오류를 PyQt 신호로 전달합니다. | None | error_ready 신호 | 백그라운드 실행 |
-| `ResourceLineGraph` | 최근 자원 사용률 샘플을 작업 관리자 형태의 선 그래프로 표시합니다. | ResourceLineGraph 인스턴스 | 없음 | CPU, Memory, Process CPU/Memory 표시 |
+| `ResourceLineGraph` | 최근 자원 사용률과 배터리 잔량 샘플을 작업 관리자 형태의 선 그래프로 표시합니다. | ResourceLineGraph 인스턴스 | 없음 | CPU, Memory, Process CPU/Memory, Battery 표시 |
 | `ResourceLineGraph.__init__` | 그래프 샘플 목록과 시리즈 색상을 초기화합니다. | None | 없음 | 최대 60개 샘플 유지 |
 | `ResourceLineGraph.sizeHint` | 그래프 위젯의 권장 크기를 반환합니다. | QSize | 없음 | PyQt 레이아웃용 |
 | `ResourceLineGraph.append_sample` | 수신 JSON에서 백분율 값을 추출해 그래프 샘플로 누적합니다. | None | 값 변환 오류 | 화면 갱신 호출 |
@@ -370,9 +390,12 @@
 | `EdgeNodeStatusWindow._clear_request_worker` | 완료된 요청 worker 참조를 정리합니다. | None | 없음 | 다음 요청 허용 |
 | `EdgeNodeStatusWindow._update_table` | 최신 정상 JSON 값을 표로 표시합니다. | None | 없음 | 실패 시 기존 표 유지 |
 | `EdgeNodeStatusWindow._set_table_rows` | 표에 표시할 행 목록을 일괄 반영합니다. | None | 없음 | 고정 행 구조 유지 |
-| `EdgeNodeStatusWindow._build_waiting_rows` | 정상 응답 전이나 실패 중에도 표 형태를 유지할 대기 행을 생성합니다. | list | 없음 | 7개 기본 항목 유지 |
-| `EdgeNodeStatusWindow._build_table_rows` | 자원 사용률 JSON을 표 행 목록으로 변환합니다. | list | 없음 | 전체/프로세스 지표 분리 |
+| `EdgeNodeStatusWindow._build_waiting_rows` | 정상 응답 전이나 실패 중에도 표 형태를 유지할 대기 행을 생성합니다. | list | 없음 | 자원 지표와 UPS 전원 항목 유지 |
+| `EdgeNodeStatusWindow._build_table_rows` | 자원 사용률과 UPS 전원 상태 JSON을 표 행 목록으로 변환합니다. | list | 없음 | 전체/프로세스/전원 지표 분리 |
 | `EdgeNodeStatusWindow._format_percent` | 숫자 백분율을 소수점 한 자리 문자열로 변환합니다. | 문자열 | 값 변환 오류 | None은 `-` 표시 |
+| `EdgeNodeStatusWindow._format_millivolt` | 밀리볼트 전압 값을 화면 표시 문자열로 변환합니다. | 문자열 | 값 변환 오류 | None은 `-` 표시 |
+| `EdgeNodeStatusWindow._format_power_connection` | 외부 전원 연결 여부를 한글 상태 문자열로 변환합니다. | 문자열 | 없음 | True는 `연결됨`, False는 `미연결` |
+| `EdgeNodeStatusWindow._format_power_status` | UPS 전원 상태 읽기 결과를 화면 표시 문자열로 변환합니다. | 문자열 | 없음 | 읽기 실패 원인을 표에 표시 |
 | `EdgeNodeStatusWindow.closeEvent` | 창이 닫힐 때 주기 조회 타이머를 중지합니다. | None | 없음 | 백그라운드 갱신 중단 |
 
 ## `src/ai_cctv/ai_server/ui/main_window.py`
@@ -519,7 +542,7 @@
 | `MockResourceState` | UI 검증용 모의 자원 사용률 상태를 생성하고 보관합니다. | MockResourceState 인스턴스 | 없음 | 실제 Edge node 없이 사용 |
 | `MockResourceState.__init__` | 서버 시작 시각, 응답용 PID, 정상 응답 횟수 제한을 초기화합니다. | None | 없음 | PID 기본값은 현재 프로세스 |
 | `MockResourceState.can_respond` | 정상 JSON 응답을 더 보낼 수 있는지 판단합니다. | bool | 없음 | 기본 10회까지 True |
-| `MockResourceState.build_response` | `/monitor/top`이 반환할 모의 CPU, memory, process JSON을 생성합니다. | dict | 없음 | 요청마다 값이 변하고 성공 횟수 증가 |
+| `MockResourceState.build_response` | `/monitor/top`이 반환할 모의 CPU, memory, process, power JSON을 생성합니다. | dict | 없음 | 요청마다 값이 변하고 성공 횟수 증가 |
 | `MockResourceState._wave` | 사인파 기반의 0~100 범위 백분율 값을 계산합니다. | float | 없음 | 그래프 변화 확인용 |
 | `MockResourceRequestHandler` | 모의 HTTP GET 요청을 처리합니다. | MockResourceRequestHandler 인스턴스 | 없음 | BaseHTTPRequestHandler 상속 |
 | `MockResourceRequestHandler.do_GET` | `/monitor/top` 요청에는 JSON을, 10회 이후에는 응답을 보내지 않습니다. | None | 없음 | 연결 실패 UI 검증용 |
@@ -535,6 +558,15 @@
 
 | ?? | ?? | ??? | ??? | ?? ?? |
 |---|---|---|---|---|
+| `FakeSmbus` | UPS Plus 전원 리더 테스트용 가짜 SMBus입니다. | FakeSmbus 인스턴스 | 없음 | 하드웨어 없이 레지스터 값을 주입 |
+| `FakeSmbus.__init__` | 가짜 레지스터 저장소와 close 호출 여부를 초기화합니다. | None | 없음 | 테스트 전용 |
+| `FakeSmbus.read_byte_data` | 지정한 레지스터의 가짜 바이트 값을 반환합니다. | int | KeyError | 실제 SMBus 메서드 형태 모방 |
+| `FakeSmbus.close` | 가짜 SMBus가 닫혔음을 기록합니다. | None | 없음 | 리더의 close 처리 검증 |
+| `FakeUpsPlusPowerReader` | 가짜 SMBus를 주입받는 UPS Plus 전원 리더입니다. | FakeUpsPlusPowerReader 인스턴스 | 없음 | `UpsPlusPowerReader` 상속 |
+| `FakeUpsPlusPowerReader.__init__` | 가짜 SMBus를 저장하고 기본 UPS Plus 리더 설정을 초기화합니다. | None | 없음 | 테스트 전용 |
+| `FakeUpsPlusPowerReader._open_bus` | 테스트용 가짜 SMBus를 반환합니다. | FakeSmbus 인스턴스 | 없음 | 실제 I2C 접근 없음 |
+| `FailingUpsPlusPowerReader` | I2C 열기 실패를 재현하는 UPS Plus 전원 리더입니다. | FailingUpsPlusPowerReader 인스턴스 | 없음 | 실패 스냅샷 검증용 |
+| `FailingUpsPlusPowerReader._open_bus` | I2C 버스 열기 실패를 발생시킵니다. | 반환 없음 | RuntimeError | 테스트 전용 |
 | `MemoryNotificationChannel` | 테스트용 메모리 알림 채널입니다. | MemoryNotificationChannel ???? | ??? ?? ?? ?? | ??: NotificationChannel, ?? ?? |
 | `MemoryNotificationChannel.__init__` | 전송 메시지 저장 목록을 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
 | `MemoryNotificationChannel.send` | 전송된 알림 메시지를 메모리에 저장합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
@@ -545,4 +577,6 @@
 | `ProjectStructureTest.test_edge_failover_policy_matches_project_document` | 네트워크 장애 시 로컬 저장과 최소 알림을 선택하는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `ProjectStructureTest.test_gstreamer_mediamtx_command_streams_and_records` | GStreamer 명령이 MediaMTX 송출과 로컬 백업을 함께 수행하는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `ProjectStructureTest.test_mediamtx_release_resolver_selects_raspberry_pi_package` | Raspberry Pi 아키텍처에 맞는 MediaMTX 패키지 URL을 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `ProjectStructureTest.test_ups_plus_power_reader_reads_battery_and_external_power` | UPS Plus 레지스터에서 배터리 잔량과 외부 전원 상태를 해석하는지 검증합니다. | None | AssertionError | 가짜 SMBus 사용 |
+| `ProjectStructureTest.test_ups_plus_power_reader_reports_unavailable_on_i2c_error` | UPS Plus I2C 접근 실패가 사용 불가 스냅샷으로 변환되는지 검증합니다. | None | AssertionError | 실패 리더 사용 |
 | `ProjectStructureTest.test_console_scripts_are_split_by_deployment_bundle` | Edge node와 AI server 실행 진입점이 분리되어 있는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
