@@ -258,6 +258,7 @@ class EdgeNodeStatusWindow(QDialog):
         self.setMinimumSize(880, 620)
         self.setStyleSheet("background-color: #0f172a; color: #f8fafc;")
         self.failure_count = 0
+        self.has_received_response = False
         self.connection_warning_shown = False
         self.is_monitoring_active = False
         self.request_worker = None
@@ -333,6 +334,7 @@ class EdgeNodeStatusWindow(QDialog):
 
         if not self.is_monitoring_active:
             self.failure_count = 0
+            self.has_received_response = False
             self.connection_warning_shown = False
         self.is_monitoring_active = True
         self.request_resource_status()
@@ -350,8 +352,9 @@ class EdgeNodeStatusWindow(QDialog):
         if self.request_worker is not None and self.request_worker.isRunning():
             return
 
-        self.status_label.setText("조회 중")
-        self.status_label.setStyleSheet("color: #facc15; font-weight: bold;")
+        if not self.has_received_response or self.failure_count > 0:
+            self.status_label.setText("조회중")
+            self.status_label.setStyleSheet("color: #facc15; font-weight: bold;")
         self.request_worker = ResourceMonitorRequestWorker()
         self.request_worker.result_ready.connect(self.handle_resource_status)
         self.request_worker.error_ready.connect(self.handle_resource_error)
@@ -371,6 +374,7 @@ class EdgeNodeStatusWindow(QDialog):
             return
 
         self.failure_count = 0
+        self.has_received_response = True
         self.connection_warning_shown = False
         self.status_label.setText("연결됨")
         self.status_label.setStyleSheet("color: #22c55e; font-weight: bold;")
@@ -390,8 +394,13 @@ class EdgeNodeStatusWindow(QDialog):
             return
 
         self.failure_count += 1
-        self.status_label.setText(f"연결 실패 {self.failure_count}회")
-        self.status_label.setStyleSheet("color: #ef4444; font-weight: bold;")
+        if self.failure_count >= 3:
+            self.status_label.setText("연결실패")
+            self.status_label.setStyleSheet("color: #ef4444; font-weight: bold;")
+        else:
+            self.status_label.setText("조회중")
+            self.status_label.setStyleSheet("color: #facc15; font-weight: bold;")
+
         if self.failure_count >= 3 and not self.connection_warning_shown:
             self.connection_warning_shown = True
             QMessageBox.warning(self, "Edge node", "connection lose!")

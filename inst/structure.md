@@ -361,12 +361,12 @@
 | `ResourceLineGraph._draw_legend` | 그래프 상단에 시리즈 범례를 표시합니다. | None | 없음 | 색상별 선 의미 표시 |
 | `ResourceLineGraph._draw_series` | 지정한 사용률 시리즈를 선으로 연결해 그립니다. | None | 없음 | 0~100% 범위로 클램프 |
 | `EdgeNodeStatusWindow` | Edge node 상태 조회 버튼으로 열리는 그래프/표 표시 창입니다. | EdgeNodeStatusWindow 인스턴스 | 없음 | 2초 주기 자동 조회 |
-| `EdgeNodeStatusWindow.__init__` | 상태 조회 창의 UI 상태와 타이머를 초기화합니다. | None | 없음 | Windows 기본 `?` 도움말 버튼 제거 |
+| `EdgeNodeStatusWindow.__init__` | 상태 조회 창의 UI 상태와 타이머를 초기화합니다. | None | 없음 | 응답 수신 여부 보관, Windows `?` 버튼 제거 |
 | `EdgeNodeStatusWindow._build_ui` | 제목, 새로고침 버튼, 그래프, 표를 구성합니다. | None | 없음 | 표는 읽기 전용 |
 | `EdgeNodeStatusWindow.start_monitoring` | 창이 열릴 때 즉시 조회하고 주기 갱신을 시작합니다. | None | 요청 실패 | 타이머 시작 |
 | `EdgeNodeStatusWindow.request_resource_status` | Edge node 상태 JSON 조회 worker를 시작합니다. | None | 요청 실패 신호 | 중복 요청 방지 |
-| `EdgeNodeStatusWindow.handle_resource_status` | 성공 JSON을 그래프와 표에 반영하고 실패 횟수를 초기화합니다. | None | 없음 | 연결 상태 녹색 표시 |
-| `EdgeNodeStatusWindow.handle_resource_error` | 조회 실패를 누적하고 3회 이상이면 `connection lose!` 경고를 표시합니다. | None | 없음 | 연속 실패 기준 |
+| `EdgeNodeStatusWindow.handle_resource_status` | 성공 JSON을 그래프와 표에 반영하고 실패 횟수를 초기화합니다. | None | 없음 | 상태를 `연결됨`으로 표시 |
+| `EdgeNodeStatusWindow.handle_resource_error` | 조회 실패를 누적하고 상태 라벨과 경고를 갱신합니다. | None | 없음 | 1~2회 실패는 `조회중`, 3회 이상은 `연결실패` |
 | `EdgeNodeStatusWindow._clear_request_worker` | 완료된 요청 worker 참조를 정리합니다. | None | 없음 | 다음 요청 허용 |
 | `EdgeNodeStatusWindow._update_table` | 최신 JSON 또는 오류 메시지를 표로 표시합니다. | None | 없음 | 오류 시 단일 행 표시 |
 | `EdgeNodeStatusWindow._build_table_rows` | 자원 사용률 JSON을 표 행 목록으로 변환합니다. | list | 없음 | 전체/프로세스 지표 분리 |
