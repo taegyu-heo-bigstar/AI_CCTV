@@ -368,7 +368,9 @@
 | `EdgeNodeStatusWindow.handle_resource_status` | 성공 JSON을 그래프와 표에 반영하고 실패 횟수를 초기화합니다. | None | 없음 | 상태를 `연결됨`으로 표시 |
 | `EdgeNodeStatusWindow.handle_resource_error` | 조회 실패를 누적하고 상태 라벨과 경고를 갱신합니다. | None | 없음 | 1~2회 실패는 `조회중`, 3회 이상은 `연결실패` |
 | `EdgeNodeStatusWindow._clear_request_worker` | 완료된 요청 worker 참조를 정리합니다. | None | 없음 | 다음 요청 허용 |
-| `EdgeNodeStatusWindow._update_table` | 최신 JSON 또는 오류 메시지를 표로 표시합니다. | None | 없음 | 오류 시 단일 행 표시 |
+| `EdgeNodeStatusWindow._update_table` | 최신 정상 JSON 값을 표로 표시합니다. | None | 없음 | 실패 시 기존 표 유지 |
+| `EdgeNodeStatusWindow._set_table_rows` | 표에 표시할 행 목록을 일괄 반영합니다. | None | 없음 | 고정 행 구조 유지 |
+| `EdgeNodeStatusWindow._build_waiting_rows` | 정상 응답 전이나 실패 중에도 표 형태를 유지할 대기 행을 생성합니다. | list | 없음 | 7개 기본 항목 유지 |
 | `EdgeNodeStatusWindow._build_table_rows` | 자원 사용률 JSON을 표 행 목록으로 변환합니다. | list | 없음 | 전체/프로세스 지표 분리 |
 | `EdgeNodeStatusWindow._format_percent` | 숫자 백분율을 소수점 한 자리 문자열로 변환합니다. | 문자열 | 값 변환 오류 | None은 `-` 표시 |
 | `EdgeNodeStatusWindow.closeEvent` | 창이 닫힐 때 주기 조회 타이머를 중지합니다. | None | 없음 | 백그라운드 갱신 중단 |

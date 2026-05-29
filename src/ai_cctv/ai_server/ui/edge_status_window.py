@@ -321,6 +321,7 @@ class EdgeNodeStatusWindow(QDialog):
             "QHeaderView::section { background-color: #1e293b; color: #f8fafc; "
             "padding: 6px; border: none; }"
         )
+        self._set_table_rows(self._build_waiting_rows())
         layout.addWidget(self.table, stretch=1)
 
     def start_monitoring(self):
@@ -405,8 +406,8 @@ class EdgeNodeStatusWindow(QDialog):
             self.connection_warning_shown = True
             QMessageBox.warning(self, "Edge node", "connection lose!")
 
-        if error_message:
-            self._update_table({"error": error_message})
+        if not self.has_received_response:
+            self._set_table_rows(self._build_waiting_rows())
 
     def _clear_request_worker(self):
         """완료된 요청 worker 참조를 정리합니다.
@@ -428,15 +429,40 @@ class EdgeNodeStatusWindow(QDialog):
             없음.
         """
 
-        if "error" in resource_usage:
-            rows = [("오류", resource_usage["error"])]
-        else:
-            rows = self._build_table_rows(resource_usage)
+        self._set_table_rows(self._build_table_rows(resource_usage))
+
+    def _set_table_rows(self, rows):
+        """표에 표시할 행 목록을 일괄 반영합니다.
+
+        인자:
+            rows: 항목 이름과 표시 값을 담은 튜플 목록입니다.
+        반환값:
+            없음.
+        """
 
         self.table.setRowCount(len(rows))
         for row_index, (name, value) in enumerate(rows):
             self.table.setItem(row_index, 0, QTableWidgetItem(name))
             self.table.setItem(row_index, 1, QTableWidgetItem(value))
+
+    def _build_waiting_rows(self):
+        """정상 응답 전이나 실패 중에도 표 형태를 유지할 대기 행을 생성합니다.
+
+        인자:
+            없음.
+        반환값:
+            항목 이름과 대기 값을 담은 튜플 목록을 반환합니다.
+        """
+
+        return [
+            ("수집 시간", "응답 대기"),
+            ("전체 CPU 사용률", "-"),
+            ("전체 Memory 사용률", "-"),
+            ("프로세스 ID", "-"),
+            ("프로세스 이름", "-"),
+            ("프로세스 CPU 사용률", "-"),
+            ("프로세스 Memory 사용률", "-"),
+        ]
 
     def _build_table_rows(self, resource_usage):
         """자원 사용률 JSON을 화면 표시용 행 목록으로 변환합니다.
