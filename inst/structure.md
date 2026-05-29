@@ -345,6 +345,34 @@
 | `EventPresenter.build_display` | 이벤트 유형별 설명과 색상을 생성합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
 | `EventPresenter.get_time_text` | 이벤트 시간 문자열을 가져오거나 현재 시각으로 대체합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
 
+## `src/ai_cctv/ai_server/ui/edge_status_window.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `ResourceMonitorRequestWorker` | Edge node 모니터링 API 요청을 UI와 분리된 QThread에서 수행합니다. | ResourceMonitorRequestWorker 인스턴스 | 요청 예외 문자열 | UI 멈춤 방지 |
+| `ResourceMonitorRequestWorker.run` | 자원 사용률 요청 결과 또는 오류를 PyQt 신호로 전달합니다. | None | error_ready 신호 | 백그라운드 실행 |
+| `ResourceLineGraph` | 최근 자원 사용률 샘플을 작업 관리자 형태의 선 그래프로 표시합니다. | ResourceLineGraph 인스턴스 | 없음 | CPU, Memory, Process CPU/Memory 표시 |
+| `ResourceLineGraph.__init__` | 그래프 샘플 목록과 시리즈 색상을 초기화합니다. | None | 없음 | 최대 60개 샘플 유지 |
+| `ResourceLineGraph.sizeHint` | 그래프 위젯의 권장 크기를 반환합니다. | QSize | 없음 | PyQt 레이아웃용 |
+| `ResourceLineGraph.append_sample` | 수신 JSON에서 백분율 값을 추출해 그래프 샘플로 누적합니다. | None | 값 변환 오류 | 화면 갱신 호출 |
+| `ResourceLineGraph._read_percent` | 중첩 JSON에서 백분율 값을 안전하게 읽습니다. | float | 값 변환 오류 | 누락 값은 0 처리 |
+| `ResourceLineGraph.paintEvent` | 그래프 배경, 격자, 범례, 선을 그립니다. | None | 없음 | 샘플 2개 미만이면 대기 문구 표시 |
+| `ResourceLineGraph._draw_grid` | 그래프 격자와 0~100% 축 눈금을 그립니다. | None | 없음 | QPainter 사용 |
+| `ResourceLineGraph._draw_legend` | 그래프 상단에 시리즈 범례를 표시합니다. | None | 없음 | 색상별 선 의미 표시 |
+| `ResourceLineGraph._draw_series` | 지정한 사용률 시리즈를 선으로 연결해 그립니다. | None | 없음 | 0~100% 범위로 클램프 |
+| `EdgeNodeStatusWindow` | Edge node 상태 조회 버튼으로 열리는 그래프/표 표시 창입니다. | EdgeNodeStatusWindow 인스턴스 | 없음 | 2초 주기 자동 조회 |
+| `EdgeNodeStatusWindow.__init__` | 상태 조회 창의 UI 상태와 타이머를 초기화합니다. | None | 없음 | 실패 횟수와 경고 상태 보관 |
+| `EdgeNodeStatusWindow._build_ui` | 제목, 새로고침 버튼, 그래프, 표를 구성합니다. | None | 없음 | 표는 읽기 전용 |
+| `EdgeNodeStatusWindow.start_monitoring` | 창이 열릴 때 즉시 조회하고 주기 갱신을 시작합니다. | None | 요청 실패 | 타이머 시작 |
+| `EdgeNodeStatusWindow.request_resource_status` | Edge node 상태 JSON 조회 worker를 시작합니다. | None | 요청 실패 신호 | 중복 요청 방지 |
+| `EdgeNodeStatusWindow.handle_resource_status` | 성공 JSON을 그래프와 표에 반영하고 실패 횟수를 초기화합니다. | None | 없음 | 연결 상태 녹색 표시 |
+| `EdgeNodeStatusWindow.handle_resource_error` | 조회 실패를 누적하고 3회 이상이면 `connection lose!` 경고를 표시합니다. | None | 없음 | 연속 실패 기준 |
+| `EdgeNodeStatusWindow._clear_request_worker` | 완료된 요청 worker 참조를 정리합니다. | None | 없음 | 다음 요청 허용 |
+| `EdgeNodeStatusWindow._update_table` | 최신 JSON 또는 오류 메시지를 표로 표시합니다. | None | 없음 | 오류 시 단일 행 표시 |
+| `EdgeNodeStatusWindow._build_table_rows` | 자원 사용률 JSON을 표 행 목록으로 변환합니다. | list | 없음 | 전체/프로세스 지표 분리 |
+| `EdgeNodeStatusWindow._format_percent` | 숫자 백분율을 소수점 한 자리 문자열로 변환합니다. | 문자열 | 값 변환 오류 | None은 `-` 표시 |
+| `EdgeNodeStatusWindow.closeEvent` | 창이 닫힐 때 주기 조회 타이머를 중지합니다. | None | 없음 | 백그라운드 갱신 중단 |
+
 ## `src/ai_cctv/ai_server/ui/main_window.py`
 
 | ?? | ?? | ??? | ??? | ?? ?? |
@@ -363,6 +391,7 @@
 | `CCTVMainWindow.start_video` | 영상 처리 작업자를 시작하고 신호를 연결합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `CCTVMainWindow.stop_video` | 영상 처리 작업자를 중지하고 카메라 상태를 갱신합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `CCTVMainWindow.open_settings` | 설정 창을 열고 적용된 값을 메인 창 상태에 반영합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `CCTVMainWindow.open_edge_status` | Edge node 상태 조회 창을 열고 모니터링 요청을 시작합니다. | None | 모니터링 창 생성 오류 | 헤더 버튼에서 호출 |
 | `CCTVMainWindow.update_frame` | OpenCV 프레임을 PyQt 이미지로 변환해 화면에 표시합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `CCTVMainWindow.show_loading_screen` | 영상 영역에 현재 준비 단계 로딩 문구를 표시합니다. | None | 없음 | VideoWorker loading_ready 신호 수신 |
 | `CCTVMainWindow.show_idle_screen` | 영상 영역을 실행 전 기본 대기 화면으로 되돌립니다. | None | 없음 | STOP 또는 시작 실패 시 호출 |

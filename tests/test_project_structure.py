@@ -242,6 +242,7 @@ class ProjectStructureTest(unittest.TestCase):
             Path("src/ai_cctv/ai_server/monitoring/resource_monitor_server.py").exists()
         )
         self.assertTrue(Path("src/ai_cctv/ai_server/ui").is_dir())
+        self.assertTrue(Path("src/ai_cctv/ai_server/ui/edge_status_window.py").is_file())
         self.assertTrue(Path("src/ai_cctv/ai_server/analysis").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/analysis/anomaly").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/storage").is_dir())

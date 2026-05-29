@@ -63,6 +63,7 @@ class CCTVMainWindow(QMainWindow):
         self.original_segment_seconds = 10
         self.clip_max_seconds = 10
         self.event_presenter = EventPresenter()
+        self.edge_status_window = None
 
         self.init_ui()
 
@@ -114,10 +115,14 @@ class CCTVMainWindow(QMainWindow):
         self.btn_setting = self._create_button("Settings", "#334155")
         self.btn_setting.clicked.connect(self.open_settings)
 
+        self.btn_edge_status = self._create_button("엣지 노드 상태 조회", "#0f766e")
+        self.btn_edge_status.clicked.connect(self.open_edge_status)
+
         header_layout.addWidget(title_label)
         header_layout.addStretch()
         header_layout.addWidget(self.btn_start)
         header_layout.addWidget(self.btn_stop)
+        header_layout.addWidget(self.btn_edge_status)
         header_layout.addWidget(self.btn_setting)
         self._set_run_button_state(is_running=False)
         return header_layout
@@ -391,6 +396,25 @@ class CCTVMainWindow(QMainWindow):
             self.cam_status.setText(f"CAM-01 - INPUT SET: {self.video_source}")
             self.storage_label.setText(self._build_storage_label())
 
+    def open_edge_status(self):
+        """Edge node 자원 상태 조회 창을 열고 모니터링 요청을 시작합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        if self.edge_status_window is None:
+            from .edge_status_window import EdgeNodeStatusWindow
+
+            self.edge_status_window = EdgeNodeStatusWindow(self)
+
+        self.edge_status_window.show()
+        self.edge_status_window.raise_()
+        self.edge_status_window.activateWindow()
+        self.edge_status_window.start_monitoring()
+
     def update_frame(self, frame):
         """OpenCV 프레임을 PyQt 이미지로 변환해 화면에 표시합니다.
 
@@ -517,6 +541,8 @@ class CCTVMainWindow(QMainWindow):
         """
 
         self.stop_video()
+        if self.edge_status_window is not None:
+            self.edge_status_window.close()
         event.accept()
 
     def _set_camera_status_style(self, border_color, text_color):

@@ -56,7 +56,9 @@ flowchart LR
     MediaMTX --> RTSP["RTSP Stream"]
     RTSP --> ServerRun["ai_cctv/ai_server/server_run.py"]
     ServerRun --> MainWindow["ai_server/ui/main_window.py"]
-    MonitorClient["ResourceMonitorClient"] --> MonitorApi
+    MainWindow --> EdgeStatusWindow["ui/edge_status_window.py"]
+    EdgeStatusWindow --> MonitorClient["ResourceMonitorClient"]
+    MonitorClient --> MonitorApi
     MonitorApi --> ResourceCollector["ResourceUsageCollector"]
     ResourceCollector --> ResourceJson["CPU/Memory/Process JSON"]
     MainWindow --> SettingsWindow["ui/settings_window.py"]
@@ -114,6 +116,7 @@ classDiagram
     class CCTVMainWindow {
         +start_video()
         +stop_video()
+        +open_edge_status()
         +show_loading_screen(message)
         +show_idle_screen()
         +add_event(event)
@@ -165,6 +168,17 @@ classDiagram
         +request_resource_usage()
     }
 
+    class EdgeNodeStatusWindow {
+        +start_monitoring()
+        +request_resource_status()
+        +handle_resource_status(resource_usage)
+        +handle_resource_error(error_message)
+    }
+
+    class ResourceLineGraph {
+        +append_sample(resource_usage)
+    }
+
     EdgeNodeRuntime --> MediaMtxInstaller
     EdgeNodeRuntime --> MediaMtxProcessManager
     EdgeNodeRuntime --> LocalBackupConfig
@@ -172,6 +186,9 @@ classDiagram
     EdgeNodeRuntime --> EdgeNetworkFailoverPolicy
     CCTVMainWindow --> SettingsWindow
     CCTVMainWindow --> VideoWorker
+    CCTVMainWindow --> EdgeNodeStatusWindow
+    EdgeNodeStatusWindow --> ResourceMonitorClient
+    EdgeNodeStatusWindow --> ResourceLineGraph
     VideoWorker --> AnomalyRuleEngine
     VideoWorker --> NotificationDispatcher
     VideoWorker --> ClipManager
