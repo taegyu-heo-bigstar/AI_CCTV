@@ -53,10 +53,13 @@ flowchart LR
     MediaMTX --> RTSP["RTSP Stream"]
     RTSP --> ServerRun["ai_cctv/ai_server/server_run.py"]
     ServerRun --> MainWindow["ai_server/ui/main_window.py"]
+    MainWindow --> SettingsWindow["ui/settings_window.py"]
+    SettingsWindow --> RuntimeOptions["YOLO/VLM on-off, 클립 길이, 저장 경로"]
     MainWindow --> VideoWorker["ai_server/analysis/video_worker.py"]
     VideoWorker --> Tracker["PersonTracker"]
     Tracker --> Processor["PersonFrameProcessor"]
     Tracker --> RuleEngine["AnomalyRuleEngine"]
+    VideoWorker --> VLMWorker["VLMWorker ready/failed 대기"]
     VideoWorker --> Storage["storage/recording_manager.py"]
     VideoWorker --> ClipManager["storage/clip_manager.py"]
     ClipManager --> EventClips["event_clips/person별 MP4와 trajectory.jpg"]
@@ -110,12 +113,26 @@ classDiagram
         +add_event(event)
     }
 
+    class SettingsWindow {
+        +update_ai_mode()
+        +save_basic_settings()
+        +save_storage_settings()
+    }
+
     class VideoWorker {
         +run()
         +stop()
+        -_disable_ai_pipeline(message)
         -_record_person_clip(person, frame)
         -_create_default_notification_dispatcher()
         -_cleanup()
+    }
+
+    class VLMWorker {
+        +is_ready()
+        +has_failed()
+        +wait_until_ready(timeout)
+        +add_task(person_id, crop_path)
     }
 
     class ClipManager {
@@ -138,10 +155,12 @@ classDiagram
     EdgeNodeRuntime --> LocalBackupConfig
     EdgeNodeRuntime --> MediaMtxGStreamerCommandBuilder
     EdgeNodeRuntime --> EdgeNetworkFailoverPolicy
+    CCTVMainWindow --> SettingsWindow
     CCTVMainWindow --> VideoWorker
     VideoWorker --> AnomalyRuleEngine
     VideoWorker --> NotificationDispatcher
     VideoWorker --> ClipManager
+    VideoWorker --> VLMWorker
 ```
 
 ## Execution

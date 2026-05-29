@@ -56,10 +56,12 @@ class CCTVMainWindow(QMainWindow):
         self.appear_count = 0
         self.disappear_count = 0
         self.video_source = 0
+        self.use_yolo = True
         self.use_vlm = False
         self.storage_root_path = ""
         self.ai_cctv_path = ""
         self.original_segment_seconds = 10
+        self.clip_max_seconds = 10
         self.event_presenter = EventPresenter()
 
         self.init_ui()
@@ -316,9 +318,11 @@ class CCTVMainWindow(QMainWindow):
 
             worker = VideoWorker(
                 source=self.video_source,
+                use_yolo=self.use_yolo,
                 use_vlm=self.use_vlm,
                 ai_cctv_path=self.ai_cctv_path,
                 original_segment_seconds=self.original_segment_seconds,
+                clip_max_seconds=self.clip_max_seconds,
             )
         except Exception as exc:
             self._handle_video_start_failure(exc)
@@ -367,18 +371,22 @@ class CCTVMainWindow(QMainWindow):
         dialog = SettingsWindow(
             self,
             video_source=self.video_source,
+            use_yolo=self.use_yolo,
             use_vlm=self.use_vlm,
             storage_root_path=self.storage_root_path,
             ai_cctv_path=self.ai_cctv_path,
             original_segment_seconds=self.original_segment_seconds,
+            clip_max_seconds=self.clip_max_seconds,
         )
 
         if dialog.exec_():
             self.video_source = dialog.selected_source
+            self.use_yolo = dialog.use_yolo
             self.use_vlm = dialog.use_vlm
             self.storage_root_path = dialog.storage_root_path
             self.ai_cctv_path = dialog.ai_cctv_path
             self.original_segment_seconds = dialog.original_segment_seconds
+            self.clip_max_seconds = dialog.clip_max_seconds
 
             self.cam_status.setText(f"CAM-01 - INPUT SET: {self.video_source}")
             self.storage_label.setText(self._build_storage_label())
@@ -584,8 +592,8 @@ class CCTVMainWindow(QMainWindow):
                 "Storage path\n"
                 f"{self.ai_cctv_path}\n\n"
                 "Subfolders\n"
-                "original_records\n"
-                "event_clips"
+                "original_records - 원본 녹화본\n"
+                "event_clips - 이벤트 CLIP(YOLO 사용 시)"
             )
         return (
             "Storage path\n"

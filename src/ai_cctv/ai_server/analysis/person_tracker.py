@@ -1,8 +1,7 @@
 # YOLO 기반 객체 추적기를 정의하는 파일입니다.
 # 사람뿐 아니라 문서 기준의 차량, 특정 객체 등으로 대상 클래스를 확장할 수 있습니다.
 # VideoWorker는 이 객체를 통해 프레임별 추적 결과를 획득합니다.
-
-from ultralytics import YOLO
+# YOLO 라이브러리는 실제 추적기 생성 시점에 지연 import합니다.
 
 
 class PersonTracker:
@@ -23,7 +22,7 @@ class PersonTracker:
         model_path="yolo26s.pt",
         target_class="person",
         target_classes=None,
-        conf_threshold=0.5,
+        conf_threshold=0.7,
         tracker_config="bytetrack.yaml",
     ):
         """객체 추적 모델과 대상 클래스 설정을 초기화합니다.
@@ -37,6 +36,8 @@ class PersonTracker:
         반환값:
             없음.
         """
+
+        from ultralytics import YOLO
 
         self.model = YOLO(model_path)
         self.target_classes = set(target_classes or [target_class])

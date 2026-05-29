@@ -1,5 +1,5 @@
 # AI CCTV 설정 대화상자를 정의하는 파일입니다.
-# 영상 입력, VLM 사용 여부, 저장 경로와 녹화 분할 시간을 설정합니다.
+# 영상 입력, YOLO/VLM 사용 여부, 저장 경로와 녹화 분할 시간을 설정합니다.
 # 저장소 폴더 생성은 StoragePathManager에 위임합니다.
 
 from PyQt5.QtCore import Qt
@@ -28,10 +28,12 @@ class SettingsWindow(QDialog):
     인자:
         parent: 부모 PyQt 위젯입니다.
         video_source: 현재 영상 입력 소스입니다.
+        use_yolo: YOLO 분석 사용 여부입니다.
         use_vlm: VLM 분석 사용 여부입니다.
         storage_root_path: 사용자가 선택한 저장 루트 경로입니다.
         ai_cctv_path: 실제 AI_CCTV 저장 폴더 경로입니다.
         original_segment_seconds: 원본 녹화 파일 분할 초 단위입니다.
+        clip_max_seconds: 이벤트 클립 파일 하나의 최대 길이 초 단위입니다.
     반환값:
         SettingsWindow 인스턴스를 반환합니다.
     """
@@ -40,30 +42,36 @@ class SettingsWindow(QDialog):
         self,
         parent=None,
         video_source=0,
+        use_yolo=True,
         use_vlm=False,
         storage_root_path="",
         ai_cctv_path="",
         original_segment_seconds=10,
+        clip_max_seconds=10,
     ):
         """설정 창의 초기 상태를 구성합니다.
 
         인자:
             parent: 부모 PyQt 위젯입니다.
             video_source: 현재 영상 입력 소스입니다.
+            use_yolo: YOLO 분석 사용 여부입니다.
             use_vlm: VLM 분석 사용 여부입니다.
             storage_root_path: 사용자가 선택한 저장 루트 경로입니다.
             ai_cctv_path: 실제 AI_CCTV 저장 폴더 경로입니다.
             original_segment_seconds: 원본 녹화 파일 분할 초 단위입니다.
+            clip_max_seconds: 이벤트 클립 파일 하나의 최대 길이 초 단위입니다.
         반환값:
             없음.
         """
 
         super().__init__(parent)
         self.selected_source = video_source
-        self.use_vlm = use_vlm
+        self.use_yolo = use_yolo
+        self.use_vlm = use_yolo and use_vlm
         self.storage_root_path = storage_root_path
         self.ai_cctv_path = ai_cctv_path
         self.original_segment_seconds = original_segment_seconds
+        self.clip_max_seconds = clip_max_seconds
         self.storage_path_manager = StoragePathManager()
         self.menu_buttons = []
 
@@ -194,7 +202,7 @@ class SettingsWindow(QDialog):
         )
 
     def create_basic_page(self):
-        """영상 입력과 VLM 사용 여부 설정 페이지를 생성합니다.
+        """영상 입력과 AI 분석 사용 여부 설정 페이지를 생성합니다.
 
         인자:
             없음.
@@ -211,7 +219,7 @@ class SettingsWindow(QDialog):
         title.setStyleSheet("font-size: 24px; font-weight: bold;")
         layout.addWidget(title)
 
-        desc = QLabel("카메라 입력 방식과 VLM 사용 여부를 설정합니다.")
+        desc = QLabel("카메라 입력 방식과 AI 분석 가동 여부를 설정합니다.")
         desc.setStyleSheet("font-size: 15px; color: #94a3b8;")
         layout.addWidget(desc)
 
@@ -222,7 +230,7 @@ class SettingsWindow(QDialog):
         input_layout.setSpacing(15)
 
         self._add_input_controls(input_layout)
-        self._add_vlm_controls(input_layout)
+        self._add_ai_controls(input_layout)
         layout.addWidget(input_box)
         layout.addLayout(self._create_basic_save_row())
 
@@ -277,8 +285,8 @@ class SettingsWindow(QDialog):
         self.radio_webcam.toggled.connect(self.update_input_mode)
         self.radio_rtsp.toggled.connect(self.update_input_mode)
 
-    def _add_vlm_controls(self, layout):
-        """기본 설정 페이지에 VLM 사용 여부 컨트롤을 추가합니다.
+    def _add_ai_controls(self, layout):
+        """기본 설정 페이지에 YOLO와 VLM 사용 여부 컨트롤을 추가합니다.
 
         인자:
             layout: 컨트롤을 추가할 QVBoxLayout 객체입니다.
@@ -290,12 +298,21 @@ class SettingsWindow(QDialog):
         vlm_label.setStyleSheet("font-size: 17px; font-weight: bold; margin-top: 10px;")
         layout.addWidget(vlm_label)
 
-        self.vlm_checkbox = QCheckBox("VLM 영상 분석 사용")
-        self.vlm_checkbox.setChecked(self.use_vlm)
-        self.vlm_checkbox.setStyleSheet(
+        checkbox_style = (
             "QCheckBox { font-size: 15px; color: #f8fafc; spacing: 8px; }"
         )
+
+        self.yolo_checkbox = QCheckBox("YOLO 사람 탐지/추적 사용")
+        self.yolo_checkbox.setChecked(self.use_yolo)
+        self.yolo_checkbox.setStyleSheet(checkbox_style)
+        layout.addWidget(self.yolo_checkbox)
+
+        self.vlm_checkbox = QCheckBox("VLM 의상 분석 사용")
+        self.vlm_checkbox.setChecked(self.use_yolo and self.use_vlm)
+        self.vlm_checkbox.setStyleSheet(checkbox_style)
         layout.addWidget(self.vlm_checkbox)
+        self.update_ai_mode()
+        self.yolo_checkbox.toggled.connect(self.update_ai_mode)
 
     def _create_label(self, text, left_padding=False):
         """설정 폼 라벨을 생성합니다.
@@ -364,6 +381,20 @@ class SettingsWindow(QDialog):
         self.rtsp_input.setEnabled(rtsp_selected)
         self.camera_index_input.setEnabled(not rtsp_selected)
 
+    def update_ai_mode(self):
+        """YOLO 사용 여부에 맞춰 VLM 옵션 활성 상태를 동기화합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        yolo_enabled = self.yolo_checkbox.isChecked()
+        self.vlm_checkbox.setEnabled(yolo_enabled)
+        if not yolo_enabled:
+            self.vlm_checkbox.setChecked(False)
+
     def save_basic_settings(self):
         """기본 설정 값을 검증하고 대화상자 상태에 반영합니다.
 
@@ -385,7 +416,8 @@ class SettingsWindow(QDialog):
                 return
 
         self.selected_source = source
-        self.use_vlm = self.vlm_checkbox.isChecked()
+        self.use_yolo = self.yolo_checkbox.isChecked()
+        self.use_vlm = self.use_yolo and self.vlm_checkbox.isChecked()
         self.accept()
 
     def _parse_camera_index(self):
@@ -446,7 +478,7 @@ class SettingsWindow(QDialog):
         return page
 
     def create_storage_page(self):
-        """저장 경로와 원본 녹화 분할 설정 페이지를 생성합니다.
+        """저장 경로, 원본 녹화 분할, 이벤트 클립 분할 설정 페이지를 생성합니다.
 
         인자:
             없음.
@@ -475,6 +507,7 @@ class SettingsWindow(QDialog):
 
         self._add_storage_path_controls(storage_layout)
         self._add_original_segment_controls(storage_layout)
+        self._add_clip_segment_controls(storage_layout)
         self.storage_result_label = QLabel("")
         self.storage_result_label.setStyleSheet("font-size: 14px; color: #22c55e;")
         storage_layout.addWidget(self.storage_result_label)
@@ -502,7 +535,8 @@ class SettingsWindow(QDialog):
 
         path_desc = QLabel(
             "위치를 선택하면 해당 위치에 AI_CCTV 폴더가 생성되고,\n"
-            "하위 폴더로 original_records와 event_clips 폴더가 생성됩니다."
+            "하위 폴더로 원본 녹화본(original_records)과 "
+            "이벤트 CLIP(event_clips) 폴더가 생성됩니다."
         )
         path_desc.setStyleSheet("font-size: 14px; color: #94a3b8;")
         layout.addWidget(path_desc)
@@ -566,8 +600,49 @@ class SettingsWindow(QDialog):
         else:
             self.original_1m_radio.setChecked(True)
 
+    def _add_clip_segment_controls(self, layout):
+        """이벤트 클립 분할 시간 라디오 버튼을 추가합니다.
+
+        인자:
+            layout: 컨트롤을 추가할 QVBoxLayout 객체입니다.
+        반환값:
+            없음.
+        """
+
+        clip_unit_label = QLabel("이벤트 클립 저장 단위")
+        clip_unit_label.setStyleSheet(
+            "font-size: 17px; font-weight: bold; margin-top: 10px;"
+        )
+        layout.addWidget(clip_unit_label)
+
+        self.clip_10s_radio = QRadioButton("10초")
+        self.clip_30s_radio = QRadioButton("30초")
+        self.clip_full_radio = QRadioButton("전체 이벤트")
+        self.clip_unit_group = QButtonGroup(self)
+
+        radio_row = QHBoxLayout()
+        for radio in [
+            self.clip_10s_radio,
+            self.clip_30s_radio,
+            self.clip_full_radio,
+        ]:
+            self.clip_unit_group.addButton(radio)
+            radio.setStyleSheet(
+                "QRadioButton { font-size: 15px; color: #f8fafc; spacing: 8px; }"
+            )
+            radio_row.addWidget(radio)
+        radio_row.addStretch()
+        layout.addLayout(radio_row)
+
+        if self.clip_max_seconds == 10:
+            self.clip_10s_radio.setChecked(True)
+        elif self.clip_max_seconds == 30:
+            self.clip_30s_radio.setChecked(True)
+        else:
+            self.clip_full_radio.setChecked(True)
+
     def _create_storage_save_row(self):
-        """저장 설정 적용 버튼 행을 생성합니다.
+        """저장 설정 저장 버튼 행을 생성합니다.
 
         인자:
             없음.
@@ -577,7 +652,7 @@ class SettingsWindow(QDialog):
 
         button_layout = QHBoxLayout()
         button_layout.addStretch()
-        self.btn_storage_save = QPushButton("적용")
+        self.btn_storage_save = QPushButton("저장")
         self.btn_storage_save.setStyleSheet(
             "background-color: #2563eb; color: white; padding: 10px 24px; "
             "border-radius: 6px; font-weight: bold;"
@@ -626,6 +701,13 @@ class SettingsWindow(QDialog):
             self.original_segment_seconds = 30
         else:
             self.original_segment_seconds = 60
+
+        if self.clip_10s_radio.isChecked():
+            self.clip_max_seconds = 10
+        elif self.clip_30s_radio.isChecked():
+            self.clip_max_seconds = 30
+        else:
+            self.clip_max_seconds = None
 
         self.storage_save_result.setStyleSheet("font-size: 14px; color: #22c55e;")
         self.storage_save_result.setText("저장 설정이 적용되었습니다.")

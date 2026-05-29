@@ -22,6 +22,7 @@ class VideoWorker(QThread):
 
     인자:
         source: OpenCV VideoCapture에 전달할 입력 소스입니다.
+        use_yolo: YOLO 추적 분석 사용 여부입니다.
         use_vlm: VLM 분석 사용 여부입니다.
         ai_cctv_path: 녹화 파일 저장 루트 경로입니다.
         original_segment_seconds: 원본 녹화 파일 분할 초 단위입니다.
@@ -38,6 +39,7 @@ class VideoWorker(QThread):
     def __init__(
         self,
         source=0,
+        use_yolo=True,
         use_vlm=False,
         ai_cctv_path="",
         original_segment_seconds=10,
@@ -50,6 +52,7 @@ class VideoWorker(QThread):
 
         인자:
             source: OpenCV VideoCapture 입력 소스입니다.
+            use_yolo: YOLO 추적 분석 사용 여부입니다.
             use_vlm: VLM 분석 사용 여부입니다.
             ai_cctv_path: 녹화 파일 저장 루트 경로입니다.
             original_segment_seconds: 원본 녹화 파일 분할 초 단위입니다.
@@ -64,7 +67,8 @@ class VideoWorker(QThread):
         super().__init__()
         self.source = source
         self.running = True
-        self.use_vlm = use_vlm
+        self.use_yolo = use_yolo
+        self.use_vlm = use_yolo and use_vlm
         self.tracker_model_path = tracker_model_path
 
         self.stream = VideoStream(source=self.source)
@@ -120,17 +124,19 @@ class VideoWorker(QThread):
                 fps=fps,
                 segment_seconds=self.original_segment_seconds,
             )
-            self.clip_manager = ClipManager(
-                base_dir=self.ai_cctv_path,
-                fps=fps,
-                max_clip_seconds=self.clip_max_seconds,
-                disappear_timeout=self.state_manager.disappear_timeout,
-            )
+            if self.use_yolo:
+                self.clip_manager = ClipManager(
+                    base_dir=self.ai_cctv_path,
+                    fps=fps,
+                    max_clip_seconds=self.clip_max_seconds,
+                    disappear_timeout=self.state_manager.disappear_timeout,
+                )
 
         self.loading_ready.emit("실시간 화면 준비 중...")
-        self._start_tracker_loading()
-        if self.use_vlm:
-            self._start_vlm_loading()
+        if self.use_yolo:
+            self._start_tracker_loading()
+            if self.use_vlm:
+                self._start_vlm_loading()
 
         while self.running:
             ret, frame = self.stream.read()
@@ -145,12 +151,24 @@ class VideoWorker(QThread):
             if self.recording_manager is not None:
                 self.recording_manager.write_frame(frame)
 
+            if not self.use_yolo:
+                self._emit_preview_frame(frame)
+                continue
+
             tracker = self._get_tracker()
             if tracker is None:
                 self._emit_preview_frame(frame)
                 continue
 
-            persons = tracker.track(frame)
+            try:
+                persons = tracker.track(frame)
+            except Exception as exc:
+                self._disable_ai_pipeline(
+                    f"YOLO 추론 실패: CCTV 모드로 전환합니다. ({exc})"
+                )
+                self._emit_preview_frame(frame)
+                continue
+
             clip_frame = frame.copy() if self.clip_manager is not None else None
             for person in persons:
                 for event in self.person_processor.process(frame, person):
@@ -217,10 +235,9 @@ class VideoWorker(QThread):
             tracker = PersonTracker(model_path=self.tracker_model_path)
         except Exception as exc:
             self.tracker_load_error = exc
-            self.event_ready.emit({
-                "type": "error",
-                "message": f"AI 모델 로딩 실패: {exc}",
-            })
+            self._disable_ai_pipeline(
+                f"YOLO 초기화 실패: CCTV 모드로 전환합니다. ({exc})"
+            )
             return
 
         with self.tracker_lock:
@@ -231,6 +248,36 @@ class VideoWorker(QThread):
         self.event_ready.emit({
             "type": "status",
             "message": "AI 모델 로딩 완료. 분석을 시작합니다.",
+        })
+
+    def _disable_ai_pipeline(self, message):
+        """AI 분석 파이프라인을 끄고 CCTV 프리뷰 모드로 전환합니다.
+
+        인자:
+            message: UI 이벤트로 표시할 전환 사유입니다.
+        반환값:
+            없음.
+        """
+
+        self.use_yolo = False
+        self.use_vlm = False
+
+        with self.tracker_lock:
+            self.tracker = None
+
+        if self.vlm_worker is not None:
+            self.vlm_worker.stop()
+            self.vlm_worker = None
+            self.person_processor.vlm_worker = None
+
+        if self.clip_manager is not None:
+            self.clip_manager.finish_all()
+            self.clip_manager = None
+
+        self.state_manager.person_states.clear()
+        self.event_ready.emit({
+            "type": "error",
+            "message": message,
         })
 
     def _record_person_clip(self, person, frame):
@@ -280,6 +327,7 @@ class VideoWorker(QThread):
         if self.vlm_thread is not None and self.vlm_thread.is_alive():
             return
 
+        self.loading_ready.emit("VLM 모델 로딩 중...")
         self.vlm_thread = threading.Thread(
             target=self._load_vlm_worker,
             name="VLMWorkerLoader",
@@ -303,10 +351,25 @@ class VideoWorker(QThread):
             vlm_worker.start()
         except Exception as exc:
             self.vlm_load_error = exc
-            self.event_ready.emit({
-                "type": "error",
-                "message": f"VLM 작업자 준비 실패: {exc}",
-            })
+            self._disable_ai_pipeline(
+                f"VLM 초기화 실패: CCTV 모드로 전환합니다. ({exc})"
+            )
+            return
+
+        while self.running and self.use_yolo and self.use_vlm:
+            if vlm_worker.wait_until_ready(timeout=0.1):
+                break
+            if vlm_worker.has_failed():
+                error = vlm_worker.error_message or "알 수 없는 오류"
+                self.vlm_load_error = RuntimeError(error)
+                vlm_worker.stop()
+                self._disable_ai_pipeline(
+                    f"VLM 초기화 실패: CCTV 모드로 전환합니다. ({error})"
+                )
+                return
+
+        if not self.running or not self.use_yolo or not self.use_vlm:
+            vlm_worker.stop()
             return
 
         with self.vlm_lock:
@@ -318,7 +381,7 @@ class VideoWorker(QThread):
 
         self.event_ready.emit({
             "type": "status",
-            "message": "VLM 작업자 준비를 시작했습니다.",
+            "message": "VLM 작업자 준비 완료. VLM 분석을 시작합니다.",
         })
 
     def _emit_preview_frame(self, frame):

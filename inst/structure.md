@@ -167,7 +167,7 @@
 | ?? | ?? | ??? | ??? | ?? ?? |
 |---|---|---|---|---|
 | `PersonTracker` | YOLO와 ByteTrack으로 대상 객체를 추적합니다. | PersonTracker ???? | ??? ?? ?? ?? | ?? ?? |
-| `PersonTracker.__init__` | 객체 추적 모델과 대상 클래스 설정을 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
+| `PersonTracker.__init__` | 객체 추적 모델과 대상 클래스 설정을 초기화합니다. | None | YOLO 모델 로딩 오류 | 기본 신뢰도 임계값 0.7, YOLO 지연 import |
 | `PersonTracker.track` | 프레임에서 대상 객체를 탐지하고 추적합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
 
 ## `src/ai_cctv/ai_server/analysis/pipeline/person_frame_processor.py`
@@ -203,6 +203,7 @@
 | `VideoWorker.run` | 스레드 메인 루프에서 프레임 처리와 신호 발행을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `VideoWorker._start_tracker_loading` | YOLO 추적 모델을 별도 thread에서 비동기로 로드합니다. | None | 없음 | 프리뷰 우선 표시 |
 | `VideoWorker._load_tracker` | YOLO 추적 모델을 로드하고 준비되면 분석 루프에 연결합니다. | None | 모델 로딩 오류 | loader thread에서 실행 |
+| `VideoWorker._disable_ai_pipeline` | AI 분석 파이프라인을 끄고 CCTV 프리뷰 모드로 전환합니다. | None | 없음 | YOLO/VLM 실패 시 사용 |
 | `VideoWorker._record_person_clip` | 추적 인물의 이벤트 클립 저장을 ClipManager에 위임합니다. | None | 없음 | 주석 없는 원본 프레임 저장 |
 | `VideoWorker._get_tracker` | 현재 사용할 수 있는 YOLO 추적 모델을 반환합니다. | PersonTracker 또는 None | 없음 | lock으로 보호 |
 | `VideoWorker._start_vlm_loading` | VLM 작업자를 별도 thread에서 준비합니다. | None | 없음 | 선택 기능 |
@@ -243,13 +244,16 @@
 
 | ?? | ?? | ??? | ??? | ?? ?? |
 |---|---|---|---|---|
-| `VLMWorker` | VLMWorker 클래스의 주요 책임을 수행합니다. | VLMWorker ???? | ??? ?? ?? ?? | ?? ?? |
-| `VLMWorker.__init__` | __init__ 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `VLMWorker.start` | start 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `VLMWorker.add_task` | add_task 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `VLMWorker._run` | _run 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `VLMWorker.stop` | stop 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `VLMWorker.cleanup` | cleanup 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `VLMWorker` | VLM 모델 로딩과 crop 이미지 분석 작업을 관리합니다. | VLMWorker 객체 | 없음 | 준비/실패 이벤트 제공 |
+| `VLMWorker.__init__` | VLM 작업 큐와 준비 상태 이벤트를 초기화합니다. | None | 없음 | ready/failed event 보유 |
+| `VLMWorker.start` | VLM 모델 로딩과 분석 큐 처리를 위한 thread를 시작합니다. | None | thread 시작 오류 | 중복 시작 방지 |
+| `VLMWorker.is_ready` | VLM 모델이 분석 가능한 상태인지 반환합니다. | bool | 없음 | ready_event 조회 |
+| `VLMWorker.has_failed` | VLM 모델 로딩이 실패했는지 반환합니다. | bool | 없음 | failed_event 조회 |
+| `VLMWorker.wait_until_ready` | 지정 시간 동안 VLM 준비 완료를 기다립니다. | bool | 없음 | VideoWorker가 대기/실패 판단에 사용 |
+| `VLMWorker.add_task` | VLM 분석 큐에 인물 crop 이미지를 등록합니다. | None | 없음 | 준비 전 작업은 무시 |
+| `VLMWorker._run` | VLM 모델을 로딩하고 큐에 등록된 분석 작업을 반복 처리합니다. | None | 모델 로딩/분석 오류 | Discord 알림 전송 |
+| `VLMWorker.stop` | VLM 분석 thread를 중지하고 모델 자원을 정리합니다. | None | 없음 | 종료 대기 포함 |
+| `VLMWorker.cleanup` | VLM 분석기와 GPU 캐시 자원을 해제합니다. | None | 없음 | torch 지연 import |
 
 ## `src/ai_cctv/ai_server/server_run.py`
 
@@ -361,21 +365,23 @@
 | `SettingsWindow.select_page` | 설정 페이지를 전환하고 좌측 메뉴 선택 상태를 갱신합니다. | None | 없음 | sidebar 하이라이트 갱신 |
 | `SettingsWindow._update_menu_highlight` | 현재 선택된 설정 메뉴 버튼을 하이라이팅합니다. | None | 없음 | 선택 버튼 스타일 적용 |
 | `SettingsWindow._build_menu_button_style` | 설정 메뉴 버튼의 선택 여부에 따른 스타일 문자열을 생성합니다. | 문자열 | 없음 | 선택/비선택 스타일 분리 |
-| `SettingsWindow.create_basic_page` | 영상 입력과 VLM 사용 여부 설정 페이지를 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
+| `SettingsWindow.create_basic_page` | 영상 입력과 AI 분석 사용 여부 설정 페이지를 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
 | `SettingsWindow._add_input_controls` | 기본 설정 페이지에 영상 입력 컨트롤을 추가합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `SettingsWindow._add_vlm_controls` | 기본 설정 페이지에 VLM 사용 여부 컨트롤을 추가합니다. | None | ??? ?? ?? ?? | ?? ?? |
+| `SettingsWindow._add_ai_controls` | 기본 설정 페이지에 YOLO와 VLM 사용 여부 컨트롤을 추가합니다. | None | 없음 | YOLO off 시 VLM 비활성화 |
 | `SettingsWindow._create_label` | 설정 폼 라벨을 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
 | `SettingsWindow._create_line_edit` | 표준 스타일의 입력 필드를 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
 | `SettingsWindow._create_basic_save_row` | 기본 설정 저장 버튼 행을 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
 | `SettingsWindow.update_input_mode` | 선택된 입력 방식에 맞춰 입력 필드를 활성화합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `SettingsWindow.update_ai_mode` | YOLO 사용 여부에 맞춰 VLM 옵션 활성 상태를 동기화합니다. | None | 없음 | VLM 종속 옵션 처리 |
 | `SettingsWindow.save_basic_settings` | 기본 설정 값을 검증하고 대화상자 상태에 반영합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `SettingsWindow._parse_camera_index` | 웹캠 번호 입력값을 정수로 변환합니다. | None | ??? ?? ?? ?? | ?? ?? |
 | `SettingsWindow._show_basic_error` | 기본 설정 페이지에 오류 메시지를 표시합니다. | None | ??? ?? ?? ?? | ?? ?? |
 | `SettingsWindow.create_empty_page` | 빈 안내 페이지를 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `SettingsWindow.create_storage_page` | 저장 경로와 원본 녹화 분할 설정 페이지를 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
+| `SettingsWindow.create_storage_page` | 저장 경로, 원본 녹화 분할, 이벤트 클립 분할 설정 페이지를 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
 | `SettingsWindow._add_storage_path_controls` | 저장 경로 선택 컨트롤을 추가합니다. | None | ??? ?? ?? ?? | ?? ?? |
 | `SettingsWindow._add_original_segment_controls` | 원본 녹화 분할 시간 라디오 버튼을 추가합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `SettingsWindow._create_storage_save_row` | 저장 설정 적용 버튼 행을 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
+| `SettingsWindow._add_clip_segment_controls` | 이벤트 클립 분할 시간 라디오 버튼을 추가합니다. | None | 없음 | 10초/30초/전체 이벤트 |
+| `SettingsWindow._create_storage_save_row` | 저장 설정 저장 버튼 행을 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
 | `SettingsWindow.select_storage_path` | 사용자에게 저장 루트 경로를 선택받고 표준 폴더를 생성합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `SettingsWindow.save_storage_settings` | 저장소 설정 값을 검증하고 대화상자를 완료합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 
