@@ -510,6 +510,24 @@
 | `MediaMtxGStreamerCommandBuilder.build_command_args` | GStreamer 백업 및 송출 명령 인자 목록을 생성합니다. | list | 없음 | tee, splitmuxsink, rtmpsink 포함 |
 | `MediaMtxGStreamerCommandBuilder.build_shell_command_text` | 운영자가 확인할 수 있는 GStreamer 명령 문자열을 생성합니다. | 문자열 | 없음 | `--print-command`에서 사용 |
 
+## `test_http.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `MockResourceState` | UI 검증용 모의 자원 사용률 상태를 생성하고 보관합니다. | MockResourceState 인스턴스 | 없음 | 실제 Edge node 없이 사용 |
+| `MockResourceState.__init__` | 서버 시작 시각과 응답용 PID를 초기화합니다. | None | 없음 | PID 기본값은 현재 프로세스 |
+| `MockResourceState.build_response` | `/monitor/top`이 반환할 모의 CPU, memory, process JSON을 생성합니다. | dict | 없음 | 요청마다 값이 변함 |
+| `MockResourceState._wave` | 사인파 기반의 0~100 범위 백분율 값을 계산합니다. | float | 없음 | 그래프 변화 확인용 |
+| `MockResourceRequestHandler` | 모의 HTTP GET 요청을 처리합니다. | MockResourceRequestHandler 인스턴스 | 없음 | BaseHTTPRequestHandler 상속 |
+| `MockResourceRequestHandler.do_GET` | `/monitor/top` 요청에는 JSON을, 그 외 경로에는 404를 반환합니다. | None | 없음 | UI 클라이언트 호환 |
+| `MockResourceRequestHandler.log_message` | HTTP 접근 로그를 콘솔에 출력합니다. | None | 없음 | mock-edge 접두어 사용 |
+| `MockResourceRequestHandler._send_json` | 딕셔너리를 JSON HTTP 응답으로 전송합니다. | None | 직렬화 오류 | UTF-8 응답 |
+| `MockResourceServer` | 모의 자원 상태 객체를 포함한 ThreadingHTTPServer입니다. | MockResourceServer 인스턴스 | 서버 바인딩 오류 | 표준 라이브러리만 사용 |
+| `MockResourceServer.__init__` | HTTP 서버와 모의 자원 상태를 초기화합니다. | None | 서버 초기화 오류 | 127.0.0.1:8001 기본 사용 |
+| `build_argument_parser` | 모의 서버 실행용 명령행 인자 파서를 생성합니다. | ArgumentParser | 없음 | `--host`, `--port` 지원 |
+| `run_server` | 모의 Edge node 모니터링 HTTP 서버를 실행합니다. | 반환 없음 | 포트 충돌, 바인딩 오류 | Ctrl+C로 종료 |
+| `main` | 명령행 인자를 읽고 모의 서버를 시작합니다. | None | 서버 실행 오류 | 임시 테스트 진입점 |
+
 ## `tests/test_project_structure.py`
 
 | ?? | ?? | ??? | ??? | ?? ?? |
