@@ -65,6 +65,7 @@ class SettingsWindow(QDialog):
         self.ai_cctv_path = ai_cctv_path
         self.original_segment_seconds = original_segment_seconds
         self.storage_path_manager = StoragePathManager()
+        self.menu_buttons = []
 
         self.setWindowTitle("설정")
         self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
@@ -93,8 +94,10 @@ class SettingsWindow(QDialog):
         self.pages.addWidget(self.create_basic_page())
         self.pages.addWidget(self.create_storage_page())
 
-        self.btn_basic.clicked.connect(lambda: self.pages.setCurrentIndex(0))
-        self.btn_storage.clicked.connect(lambda: self.pages.setCurrentIndex(1))
+        self.menu_buttons = [self.btn_basic, self.btn_storage]
+        self.btn_basic.clicked.connect(lambda: self.select_page(0))
+        self.btn_storage.clicked.connect(lambda: self.select_page(1))
+        self.select_page(0)
 
         main_layout.addWidget(menu_panel)
         main_layout.addWidget(self.pages, stretch=1)
@@ -137,11 +140,58 @@ class SettingsWindow(QDialog):
 
         button = QPushButton(text)
         button.setFixedHeight(45)
-        button.setStyleSheet(
-            "background-color: #0f172a; color: #f8fafc; "
-            "border-radius: 6px; font-size: 15px; text-align: left; padding-left: 15px;"
-        )
+        button.setCheckable(True)
+        button.setStyleSheet(self._build_menu_button_style(False))
         return button
+
+    def select_page(self, page_index):
+        """설정 페이지를 전환하고 좌측 메뉴 선택 상태를 갱신합니다.
+
+        인자:
+            page_index: 표시할 설정 페이지의 인덱스입니다.
+        반환값:
+            없음.
+        """
+
+        self.pages.setCurrentIndex(page_index)
+        self._update_menu_highlight(page_index)
+
+    def _update_menu_highlight(self, selected_index):
+        """현재 선택된 설정 메뉴 버튼을 하이라이팅합니다.
+
+        인자:
+            selected_index: 선택된 메뉴 버튼의 인덱스입니다.
+        반환값:
+            없음.
+        """
+
+        for index, button in enumerate(self.menu_buttons):
+            is_selected = index == selected_index
+            button.setChecked(is_selected)
+            button.setStyleSheet(self._build_menu_button_style(is_selected))
+
+    def _build_menu_button_style(self, is_selected):
+        """설정 메뉴 버튼의 선택 여부에 따른 스타일 문자열을 생성합니다.
+
+        인자:
+            is_selected: 버튼이 현재 선택된 상태인지 여부입니다.
+        반환값:
+            QPushButton에 적용할 스타일시트 문자열을 반환합니다.
+        """
+
+        if is_selected:
+            return (
+                "background-color: #2563eb; color: #ffffff; "
+                "border-left: 4px solid #38bdf8; border-radius: 6px; "
+                "font-size: 15px; font-weight: bold; text-align: left; "
+                "padding-left: 11px;"
+            )
+
+        return (
+            "background-color: #0f172a; color: #f8fafc; "
+            "border: 1px solid #1e293b; border-radius: 6px; "
+            "font-size: 15px; text-align: left; padding-left: 15px;"
+        )
 
     def create_basic_page(self):
         """영상 입력과 VLM 사용 여부 설정 페이지를 생성합니다.

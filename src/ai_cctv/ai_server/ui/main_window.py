@@ -1,6 +1,6 @@
 # AI CCTV 메인 PyQt 창을 정의하는 파일입니다.
 # 화면 구성, 사용자 조작, VideoWorker 신호 연결을 담당합니다.
-# 무거운 영상 분석 의존성은 시작 버튼을 누른 뒤 지연 import합니다.
+# PyTorch는 server_run.py에서 PyQt보다 먼저 초기화하고 영상 작업자는 지연 import합니다.
 
 import os
 import sys
@@ -271,14 +271,20 @@ class CCTVMainWindow(QMainWindow):
         if self.worker is not None:
             return
 
-        from ..analysis.video_worker import VideoWorker
+        try:
+            from ..analysis.video_worker import VideoWorker
 
-        self.worker = VideoWorker(
-            source=self.video_source,
-            use_vlm=self.use_vlm,
-            ai_cctv_path=self.ai_cctv_path,
-            original_segment_seconds=self.original_segment_seconds,
-        )
+            worker = VideoWorker(
+                source=self.video_source,
+                use_vlm=self.use_vlm,
+                ai_cctv_path=self.ai_cctv_path,
+                original_segment_seconds=self.original_segment_seconds,
+            )
+        except Exception as exc:
+            self._handle_video_start_failure(exc)
+            return
+
+        self.worker = worker
         self.worker.frame_ready.connect(self.update_frame)
         self.worker.metrics_ready.connect(self.update_metrics)
         self.worker.event_ready.connect(self.add_event)
@@ -430,6 +436,25 @@ class CCTVMainWindow(QMainWindow):
             "border-radius: 5px; padding: 15px; "
             f"color: {text_color};"
         )
+
+    def _handle_video_start_failure(self, error):
+        """영상 처리 작업자 시작 실패를 화면 상태와 이벤트로 표시합니다.
+
+        인자:
+            error: 영상 시작 중 발생한 예외 객체입니다.
+        반환값:
+            없음.
+        """
+
+        message = f"영상 시작 실패: {error}"
+        print(message)
+        self.worker = None
+        self.cam_status.setText("CAM-01 - ERROR")
+        self._set_camera_status_style("#ef4444", "#ef4444")
+        self.add_event({
+            "type": "error",
+            "message": message,
+        })
 
     def _build_storage_label(self):
         """저장 경로 패널에 표시할 문자열을 생성합니다.
