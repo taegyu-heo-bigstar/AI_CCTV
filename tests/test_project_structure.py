@@ -230,6 +230,13 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(Path("src/ai_cctv/edge_node/runtime.py").is_file())
         self.assertTrue(Path("src/ai_cctv/ai_server").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/server_run.py").is_file())
+        self.assertTrue(Path("src/ai_cctv/ai_server/monitoring").is_dir())
+        self.assertTrue(
+            Path("src/ai_cctv/ai_server/monitoring/resource_monitor_server.py").is_file()
+        )
+        self.assertTrue(
+            Path("src/ai_cctv/ai_server/monitoring/resource_monitor_client.py").is_file()
+        )
         self.assertTrue(Path("src/ai_cctv/ai_server/ui").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/analysis").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/analysis/anomaly").is_dir())

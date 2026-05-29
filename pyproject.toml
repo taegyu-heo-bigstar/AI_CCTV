@@ -22,6 +22,8 @@ ai-server = [
     "bitsandbytes",
     "opencv-python",
     "ultralytics",
+    "fastapi",
+    "uvicorn",
     "numpy",
     "matplotlib",
     "scipy",

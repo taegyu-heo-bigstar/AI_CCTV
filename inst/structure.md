@@ -262,6 +262,29 @@
 | `preload_ai_runtime_libraries` | PyQt 로딩 전에 AI 런타임 네이티브 라이브러리를 초기화합니다. | None | PyTorch 초기화 오류 | torch DLL 로딩 순서 안정화 |
 | `main` | AI server 관제 GUI 애플리케이션을 실행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 
+## `src/ai_cctv/ai_server/monitoring/resource_monitor_client.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `ResourceMonitorClient` | AI server 자원 모니터링 API 호출 책임을 담당합니다. | ResourceMonitorClient 인스턴스 | 없음 | HTTP 요청만 수행하며 FastAPI를 사용하지 않음 |
+| `ResourceMonitorClient.__init__` | 모니터링 서버 주소와 요청 제한 시간을 초기화합니다. | None | 없음 | 서버 주소 끝의 `/` 제거 |
+| `ResourceMonitorClient.request_resource_usage` | `/monitor/top` 엔드포인트에 GET 요청을 보내 자원 사용률 JSON을 받습니다. | dict | RuntimeError | requests 예외와 400 이상 응답을 오류로 변환 |
+| `build_monitor_client` | 환경 변수 기준으로 모니터링 클라이언트를 생성합니다. | ResourceMonitorClient 인스턴스 | 없음 | `RESOURCE_MONITOR_SERVER_URL` 지원 |
+| `request_resource_usage` | 기본 모니터링 클라이언트로 자원 사용률을 요청합니다. | dict | RuntimeError | 외부 호출용 편의 함수 |
+| `print_resource_usage` | 자원 사용률 응답을 JSON 문자열로 출력합니다. | None | JSON 직렬화 오류 | 한글 출력 보존 |
+| `main` | 서버 자원 모니터링 결과를 요청하고 콘솔에 출력합니다. | None | RuntimeError | `python -m` 실행 진입점 |
+
+## `src/ai_cctv/ai_server/monitoring/resource_monitor_server.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `ResourceUsageCollector` | 전체 시스템과 지정 프로세스의 CPU/메모리 사용률 수집 책임을 담당합니다. | ResourceUsageCollector 인스턴스 | 없음 | 기본 프로세스 ID는 현재 FastAPI 서버 프로세스 |
+| `ResourceUsageCollector.__init__` | 수집 대상 프로세스 ID와 CPU 샘플링 시간을 초기화합니다. | None | 없음 | 기본 샘플링 시간 0.1초 |
+| `ResourceUsageCollector.collect` | 전체 CPU, 전체 메모리, 대상 프로세스 CPU/메모리 사용률을 딕셔너리로 반환합니다. | dict | RuntimeError | `collected_at` ISO 시간 포함 |
+| `ResourceUsageCollector._get_process` | psutil 기준 모니터링 대상 프로세스 객체를 반환합니다. | psutil.Process | RuntimeError | 프로세스 없음/권한 오류를 한글 메시지로 변환 |
+| `read_resource_usage` | FastAPI `/monitor/top` 요청에 자원 사용률 JSON을 반환합니다. | dict | HTTPException 500 | collector 오류를 HTTP 응답으로 변환 |
+| `main` | 개발용 uvicorn 모니터링 서버를 `0.0.0.0:8001`에서 실행합니다. | 반환 없음 | uvicorn 실행 오류 | `python -m` 실행 진입점 |
+
 ## `src/ai_cctv/ai_server/storage/clip_manager.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |

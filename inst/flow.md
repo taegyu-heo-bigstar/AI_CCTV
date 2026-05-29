@@ -26,6 +26,7 @@ AI_CCTV/
 |           |-- analysis/           # 영상 입력, 추적, VLM, 이상 상황 판정
 |           |-- storage/            # 저장 경로, 원본 녹화, 이벤트 클립 관리
 |           |-- alerts/             # Discord 알림 메시지, 디스패처, 챗봇 전송
+|           |-- monitoring/         # FastAPI 자원 모니터링 API와 HTTP 조회 클라이언트
 |           `-- common/             # 서버 노드 내부 공통 값 객체 재노출
 `-- tests/                          # 구조와 도메인 경계 단위 테스트
 ```
@@ -53,6 +54,10 @@ flowchart LR
     MediaMTX --> RTSP["RTSP Stream"]
     RTSP --> ServerRun["ai_cctv/ai_server/server_run.py"]
     ServerRun --> MainWindow["ai_server/ui/main_window.py"]
+    ServerRun -. "same AI server node" .-> MonitorApi["ai_server/monitoring/resource_monitor_server.py"]
+    MonitorClient["ResourceMonitorClient"] --> MonitorApi
+    MonitorApi --> ResourceCollector["ResourceUsageCollector"]
+    ResourceCollector --> ResourceJson["CPU/Memory/Process JSON"]
     MainWindow --> SettingsWindow["ui/settings_window.py"]
     SettingsWindow --> RuntimeOptions["YOLO/VLM on-off, 클립 길이, 저장 경로"]
     MainWindow --> VideoWorker["ai_server/analysis/video_worker.py"]
@@ -150,6 +155,15 @@ classDiagram
         +dispatch(message)
     }
 
+    class ResourceUsageCollector {
+        +collect()
+        -_get_process()
+    }
+
+    class ResourceMonitorClient {
+        +request_resource_usage()
+    }
+
     EdgeNodeRuntime --> MediaMtxInstaller
     EdgeNodeRuntime --> MediaMtxProcessManager
     EdgeNodeRuntime --> LocalBackupConfig
@@ -161,6 +175,7 @@ classDiagram
     VideoWorker --> NotificationDispatcher
     VideoWorker --> ClipManager
     VideoWorker --> VLMWorker
+    ResourceMonitorClient --> ResourceUsageCollector
 ```
 
 ## Execution
@@ -173,6 +188,11 @@ ai-cctv-edge
 ```bash
 pip install -e ".[ai-server]"
 ai-cctv-ai-server
+```
+
+```bash
+python -m ai_cctv.ai_server.monitoring.resource_monitor_server
+python -m ai_cctv.ai_server.monitoring.resource_monitor_client
 ```
 
 검증 명령은 다음과 같습니다.
