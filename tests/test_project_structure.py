@@ -24,6 +24,10 @@ from ai_cctv.ai_server.monitoring.resource_monitor_client import (
     MqttResourceMonitorConfig as MqttResourceSubscriberConfig,
 )
 from ai_cctv.ai_server.analysis.rtsp_receiver import RtspFrameReceiver, is_rtsp_source
+from ai_cctv.ai_server.connection.edge_connection import (
+    EdgeConnectionConfig,
+    parse_edge_startup_text,
+)
 from ai_cctv.ai_server.recovery.network_recovery_manager import (
     NetworkRecoveryConfig,
     NetworkRecoveryManager,
@@ -424,6 +428,10 @@ class ProjectStructureTest(unittest.TestCase):
         )
         self.assertTrue(Path("src/ai_cctv/ai_server").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/server_run.py").is_file())
+        self.assertTrue(Path("src/ai_cctv/ai_server/connection").is_dir())
+        self.assertTrue(
+            Path("src/ai_cctv/ai_server/connection/edge_connection.py").is_file()
+        )
         self.assertTrue(Path("src/ai_cctv/ai_server/monitoring").is_dir())
         self.assertTrue(
             Path("src/ai_cctv/ai_server/monitoring/resource_monitor_client.py").is_file()
@@ -432,6 +440,9 @@ class ProjectStructureTest(unittest.TestCase):
             Path("src/ai_cctv/ai_server/monitoring/resource_monitor_server.py").exists()
         )
         self.assertTrue(Path("src/ai_cctv/ai_server/ui").is_dir())
+        self.assertTrue(
+            Path("src/ai_cctv/ai_server/ui/edge_connection_dialog.py").is_file()
+        )
         self.assertTrue(Path("src/ai_cctv/ai_server/ui/edge_status_window.py").is_file())
         self.assertTrue(Path("src/ai_cctv/ai_server/analysis").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/analysis/rtsp_receiver.py").is_file())
@@ -597,6 +608,38 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertIn(
             '$env:AI_CCTV_RECOVERY_SERVER_URL="http://192.168.137.2:8002/recover"',
             terminal_text,
+        )
+
+    def test_ai_server_parses_edge_startup_connection_text(self):
+        """AI server 시작 UI가 Edge node 표준 출력값을 설정 객체로 해석하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        startup_text = """
+        [AI_CCTV Edge Node Connection]
+        EDGE_HOST=192.168.137.2
+        RTSP_URL=rtsp://192.168.137.2:8554/live
+        MQTT_BROKER=192.168.137.1:1883
+        MQTT_TOPIC=ai-cctv/edge-node/status
+        BACKUP_RECOVERY_URL=http://192.168.137.2:8002/recover
+        """
+
+        config = parse_edge_startup_text(
+            startup_text,
+            base_config=EdgeConnectionConfig(),
+        )
+
+        self.assertEqual(config.rtsp_url, "rtsp://192.168.137.2:8554/live")
+        self.assertEqual(config.mqtt_host, "192.168.137.1")
+        self.assertEqual(config.mqtt_port, 1883)
+        self.assertEqual(config.mqtt_topic, "ai-cctv/edge-node/status")
+        self.assertEqual(
+            config.backup_recovery_url,
+            "http://192.168.137.2:8002/recover",
         )
 
 

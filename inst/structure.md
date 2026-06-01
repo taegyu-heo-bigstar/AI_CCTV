@@ -292,7 +292,36 @@
 | ?? | ?? | ??? | ??? | ?? ?? |
 |---|---|---|---|---|
 | `preload_ai_runtime_libraries` | PyQt 로딩 전에 AI 런타임 네이티브 라이브러리를 초기화합니다. | None | PyTorch 초기화 오류 | torch DLL 로딩 순서 안정화 |
-| `main` | AI server 관제 GUI 애플리케이션을 실행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `main` | 연결 설정 UI를 먼저 실행하고 성공 후 AI server 관제 GUI 애플리케이션을 실행합니다. | None | PyTorch 초기화 오류, 연결 UI 종료 | 메인 창 표시 전 연결 검증 |
+
+## `src/ai_cctv/ai_server/connection/__init__.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `EdgeConnectionConfig` | Edge node 연결 설정 객체를 패키지 외부로 노출합니다. | 클래스 참조 | 없음 | `edge_connection.py` 재노출 |
+| `EdgeConnectionValidationResult` | Edge node 연결 검증 결과 객체를 패키지 외부로 노출합니다. | 클래스 참조 | 없음 | `edge_connection.py` 재노출 |
+| `EdgeConnectionValidator` | Edge node 연결 검증 객체를 패키지 외부로 노출합니다. | 클래스 참조 | 없음 | `edge_connection.py` 재노출 |
+| `parse_edge_startup_text` | Edge node 표준 출력 파서 함수를 패키지 외부로 노출합니다. | 함수 참조 | 없음 | UI에서 import 경로 단순화 |
+
+## `src/ai_cctv/ai_server/connection/edge_connection.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `EdgeConnectionConfig` | AI server가 Edge node에 접속하는 데 필요한 RTSP, MQTT, 백업 복구 설정을 보관합니다. | EdgeConnectionConfig 객체 | 없음 | dataclass |
+| `EdgeConnectionConfig.from_environment` | 환경 변수에서 AI server 연결 설정을 생성합니다. | EdgeConnectionConfig 객체 | 잘못된 포트 값 | 기존 환경 변수 호환 |
+| `EdgeConnectionConfig.apply_environment` | 현재 연결 설정을 기존 AI server 코드가 읽는 환경 변수에 반영합니다. | None | 환경 변수 설정 오류 | MQTT/복구/RTSP 값 반영 |
+| `EdgeConnectionValidationResult` | Edge node 연결 검증 결과를 표현합니다. | EdgeConnectionValidationResult 객체 | 없음 | dataclass |
+| `EdgeConnectionValidationResult.message` | 검증 결과를 화면 표시용 문자열로 변환합니다. | 문자열 | 없음 | 실패 사유 줄바꿈 |
+| `EdgeConnectionValidator` | RTSP, MQTT, 백업 복구 API의 접속 가능 여부를 검증합니다. | EdgeConnectionValidator 객체 | 없음 | UI와 검증 책임 분리 |
+| `EdgeConnectionValidator.__init__` | 연결 검증 제한 시간을 초기화합니다. | None | 없음 | 테스트 시 timeout 주입 가능 |
+| `EdgeConnectionValidator.validate` | Edge node 연결 설정의 필수 접속 가능 여부를 검증합니다. | EdgeConnectionValidationResult | 네트워크 실패 결과 | 메인 창 시작 조건 |
+| `EdgeConnectionValidator._validate_rtsp` | RTSP URL 형식과 TCP 포트 접근 가능 여부를 검증합니다. | 오류 목록 | 없음 | 내부 함수 |
+| `EdgeConnectionValidator._validate_mqtt` | MQTT broker TCP 포트 접근 가능 여부를 검증합니다. | 오류 목록 | 없음 | 내부 함수 |
+| `EdgeConnectionValidator._validate_backup_recovery` | 백업 복구 HTTP endpoint 접근 가능 여부를 검증합니다. | 오류 목록 | 없음 | HTTP 4xx는 연결 성공으로 판단 |
+| `parse_edge_startup_text` | Edge node 표준 출력 블록에서 AI server 연결 설정을 추출합니다. | EdgeConnectionConfig 객체 | ValueError | 출력 블록 붙여넣기 지원 |
+| `_parse_key_value_lines` | 여러 줄 문자열에서 KEY=VALUE 형식의 값을 추출합니다. | dict | 없음 | 내부 함수 |
+| `_normalize_key` | 환경 변수 또는 출력 항목 이름을 내부 키로 정규화합니다. | 문자열 | 없음 | PowerShell `$env:` 제거 |
+| `_split_host_port` | host:port 문자열을 호스트와 포트로 분리합니다. | tuple | 없음 | MQTT_BROKER 해석 |
 
 ## `src/ai_cctv/ai_server/recovery/network_recovery_manager.py`
 
@@ -492,6 +521,7 @@
 | `CCTVMainWindow.stop_video` | 영상 처리 작업자를 중지하고 카메라 상태를 갱신합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `CCTVMainWindow.open_settings` | 설정 창을 열고 적용된 값을 메인 창 상태에 반영합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `CCTVMainWindow.open_edge_status` | Edge node 상태 조회 창을 열고 모니터링 요청을 시작합니다. | None | 모니터링 창 생성 오류 | 헤더 버튼에서 호출 |
+| `CCTVMainWindow._resolve_initial_video_source` | 시작 전 검증된 Edge node 연결 설정에서 초기 영상 입력 소스를 결정합니다. | RTSP URL 또는 0 | 없음 | 연결 UI 결과 반영 |
 | `CCTVMainWindow.update_frame` | OpenCV 프레임을 PyQt 이미지로 변환해 화면에 표시합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `CCTVMainWindow.show_loading_screen` | 영상 영역에 현재 준비 단계 로딩 문구를 표시합니다. | None | 없음 | VideoWorker loading_ready 신호 수신 |
 | `CCTVMainWindow.show_idle_screen` | 영상 영역을 실행 전 기본 대기 화면으로 되돌립니다. | None | 없음 | STOP 또는 시작 실패 시 호출 |
@@ -503,7 +533,21 @@
 | `CCTVMainWindow._handle_worker_finished` | 영상 작업자가 예기치 않게 종료된 경우 UI 상태를 정리합니다. | None | 없음 | 스트림 열기 실패 후 상태 정리 |
 | `CCTVMainWindow._build_storage_label` | 저장 경로 패널에 표시할 문자열을 생성합니다. | 'Storage path\nNo storage path selected.\n\nSelect a location in Settings > Storage.' | ??? ?? ?? ?? | ?? ?? |
 | `CCTVMainWindow._trim_event_list` | 이벤트 타임라인의 최대 표시 개수를 제한합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `main` | AI CCTV PyQt 애플리케이션을 실행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `main` | Edge node 연결 설정 UI를 먼저 표시하고 성공 후 AI CCTV PyQt 애플리케이션을 실행합니다. | None | 연결 검증 실패, AI 런타임 초기화 오류 | 메인 창 생성 전 연결 강제 |
+
+## `src/ai_cctv/ai_server/ui/edge_connection_dialog.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `EdgeConnectionDialog` | AI server 시작 전 Edge node 연결 설정을 입력받고 검증합니다. | EdgeConnectionDialog 객체 | 없음 | QDialog |
+| `EdgeConnectionDialog.__init__` | 연결 입력 대화상자의 상태와 UI를 초기화합니다. | None | 환경 변수 포트 해석 오류 | 기본값 자동 입력 |
+| `EdgeConnectionDialog._build_ui` | 연결 입력 대화상자의 전체 UI를 구성합니다. | None | PyQt 위젯 생성 오류 | 붙여넣기 영역과 필드 제공 |
+| `EdgeConnectionDialog._create_button` | 대화상자에서 사용할 공통 버튼을 생성합니다. | QPushButton | 없음 | 공통 스타일 |
+| `EdgeConnectionDialog.apply_startup_text` | 붙여넣은 Edge node 표준 출력값을 입력 필드에 반영합니다. | None | ValueError | 출력값 적용 버튼 |
+| `EdgeConnectionDialog.validate_and_accept` | 입력된 연결값을 검증하고 성공하면 대화상자를 종료합니다. | None | 연결 검증 실패 | 성공 시 환경 변수 반영 |
+| `EdgeConnectionDialog._set_pending_state` | 연결 검증 진행 중 UI 상태를 표시합니다. | None | 없음 | 중복 클릭 방지 |
+| `EdgeConnectionDialog._read_form_config` | 현재 입력 필드 값을 EdgeConnectionConfig로 변환합니다. | EdgeConnectionConfig 객체 | ValueError | MQTT 포트 정수 검증 |
+| `EdgeConnectionDialog._populate_fields` | 연결 설정 객체의 값을 입력 필드에 표시합니다. | None | 없음 | 표준 출력 파싱 결과 반영 |
 
 ## `src/ai_cctv/ai_server/ui/settings_window.py`
 
@@ -695,3 +739,4 @@
 | `ProjectStructureTest.test_backup_recovery_service_archives_overlapping_segments` | 요청 시간대와 겹치는 TS 백업 파일을 ZIP으로 묶는지 검증합니다. | None | AssertionError | 임시 파일 기반 |
 | `ProjectStructureTest.test_resource_monitor_mqtt_defaults_match_between_nodes` | Edge node와 AI server의 기본 MQTT 접속 설정이 일치하는지 검증합니다. | None | AssertionError | 상태 topic 불일치 방지 |
 | `ProjectStructureTest.test_edge_connection_info_prints_ai_server_settings` | Edge node 시작 정보가 AI server 설정값을 포함하는지 검증합니다. | None | AssertionError | SSH 실행 안내 출력 회귀 방지 |
+| `ProjectStructureTest.test_ai_server_parses_edge_startup_connection_text` | AI server 시작 UI가 Edge node 표준 출력값을 설정 객체로 해석하는지 검증합니다. | None | AssertionError | 연결 UI 붙여넣기 회귀 방지 |

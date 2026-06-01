@@ -25,6 +25,7 @@ AI_CCTV/
 |       `-- ai_server/              # Windows AI server 배포 단위
 |           |-- server_run.py       # AI server 실행 진입점
 |           |-- stream_receiver.py  # MediaMTX RTSP 수신 수동 점검 도구
+|           |-- connection/         # 시작 전 Edge node 연결 설정과 검증
 |           |-- ui/                 # PyQt 화면, 설정창, 이벤트 표시
 |           |-- analysis/           # 영상 입력, RTSP 재연결, 추적, VLM, 이상 상황 판정
 |           |-- recovery/           # RTSP 단절 구간 백업 복구 요청
@@ -63,7 +64,12 @@ flowchart LR
     MediaMTX --> RTSP["RTSP Stream"]
     MonitorPublisher --> MQTTBroker["MQTT Broker"]
     RTSP --> ServerRun["ai_cctv/ai_server/server_run.py"]
-    ServerRun --> MainWindow["ai_server/ui/main_window.py"]
+    ServerRun --> EdgeConnectionDialog["ui/edge_connection_dialog.py"]
+    EdgeConnectionDialog --> EdgeConnectionValidator["EdgeConnectionValidator"]
+    EdgeConnectionValidator --> RTSP
+    EdgeConnectionValidator --> MQTTBroker
+    EdgeConnectionValidator --> BackupRecoveryServer
+    EdgeConnectionDialog --> MainWindow["ai_server/ui/main_window.py"]
     MainWindow --> EdgeStatusWindow["ui/edge_status_window.py"]
     EdgeStatusWindow --> MonitorClient["ResourceMonitorClient"]
     MonitorClient --> MQTTBroker
@@ -147,6 +153,20 @@ classDiagram
         +show_loading_screen(message)
         +show_idle_screen()
         +add_event(event)
+    }
+
+    class EdgeConnectionDialog {
+        +apply_startup_text()
+        +validate_and_accept()
+    }
+
+    class EdgeConnectionValidator {
+        +validate(config)
+    }
+
+    class EdgeConnectionConfig {
+        +from_environment()
+        +apply_environment()
     }
 
     class SettingsWindow {
@@ -260,6 +280,9 @@ classDiagram
     EdgeNodeRuntime --> EdgeConnectionInfo
     EdgeNodeRuntime --> EdgeNetworkFailoverPolicy
     BackupRecoveryService --> BackupSegmentFinder
+    EdgeConnectionDialog --> EdgeConnectionValidator
+    EdgeConnectionDialog --> EdgeConnectionConfig
+    EdgeConnectionValidator --> EdgeConnectionConfig
     CCTVMainWindow --> SettingsWindow
     CCTVMainWindow --> VideoWorker
     CCTVMainWindow --> EdgeNodeStatusWindow
@@ -321,6 +344,8 @@ BACKUP_DIR=~/backups
 ```
 
 자동 감지가 SSH 서버 IP, 지정 인터페이스 IP, UDP 라우팅 결과 순서로 실패하면 `127.0.0.1`이 출력될 수 있습니다. 이때는 Edge node에서 `AI_CCTV_EDGE_HOST`를 유선 IP로 지정한 뒤 다시 실행합니다.
+
+AI server는 시작 시 `EdgeConnectionDialog`를 먼저 표시합니다. 이 창에서 Edge node 표준 출력 블록을 붙여넣거나 RTSP, MQTT, 백업 복구 URL을 직접 입력하고, `EdgeConnectionValidator`가 RTSP 포트, MQTT broker 포트, 백업 복구 HTTP endpoint 연결을 모두 확인해야 `CCTVMainWindow`가 생성됩니다. 검증에 성공한 값은 `AI_CCTV_MQTT_*`, `AI_CCTV_RECOVERY_SERVER_URL`, `AI_CCTV_RTSP_URL` 환경 변수와 메인 창의 영상 입력 소스에 반영됩니다.
 
 검증 명령은 다음과 같습니다.
 

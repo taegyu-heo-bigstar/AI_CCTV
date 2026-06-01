@@ -9,10 +9,12 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import (
     QApplication,
+    QDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
@@ -31,16 +33,16 @@ class CCTVMainWindow(QMainWindow):
     """AI CCTV 클라이언트의 메인 제어 창입니다.
 
     인자:
-        없음.
+        edge_connection_config: 시작 전 검증된 Edge node 연결 설정입니다.
     반환값:
         CCTVMainWindow 인스턴스를 반환합니다.
     """
 
-    def __init__(self):
+    def __init__(self, edge_connection_config=None):
         """메인 창 상태와 UI를 초기화합니다.
 
         인자:
-            없음.
+            edge_connection_config: 시작 전 검증된 Edge node 연결 설정입니다.
         반환값:
             없음.
         """
@@ -55,7 +57,8 @@ class CCTVMainWindow(QMainWindow):
         self.worker = None
         self.appear_count = 0
         self.disappear_count = 0
-        self.video_source = 0
+        self.edge_connection_config = edge_connection_config
+        self.video_source = self._resolve_initial_video_source(edge_connection_config)
         self.use_yolo = True
         self.use_vlm = False
         self.storage_root_path = ""
@@ -415,6 +418,19 @@ class CCTVMainWindow(QMainWindow):
         self.edge_status_window.activateWindow()
         self.edge_status_window.start_monitoring()
 
+    def _resolve_initial_video_source(self, edge_connection_config):
+        """검증된 Edge node 연결 설정에서 초기 영상 입력 소스를 결정합니다.
+
+        인자:
+            edge_connection_config: 시작 전 검증된 Edge node 연결 설정입니다.
+        반환값:
+            RTSP URL 문자열 또는 기본 카메라 번호를 반환합니다.
+        """
+
+        if edge_connection_config is not None:
+            return edge_connection_config.rtsp_url
+        return 0
+
     def update_frame(self, frame):
         """OpenCV 프레임을 PyQt 이미지로 변환해 화면에 표시합니다.
 
@@ -645,17 +661,33 @@ class CCTVMainWindow(QMainWindow):
             old_item.widget().deleteLater()
 
 
-def main():
+def main(pre_start_callback=None):
     """AI CCTV PyQt 애플리케이션을 실행합니다.
 
     인자:
-        없음.
+        pre_start_callback: 연결 검증 후 메인 창 표시 전에 실행할 초기화 함수입니다.
     반환값:
         정상적으로는 반환하지 않고 Qt 이벤트 루프 종료 코드를 사용합니다.
     """
 
     app = QApplication(sys.argv)
-    window = CCTVMainWindow()
+    from .edge_connection_dialog import EdgeConnectionDialog
+
+    connection_dialog = EdgeConnectionDialog()
+    if connection_dialog.exec_() != QDialog.Accepted:
+        sys.exit(1)
+
+    if pre_start_callback is not None:
+        app.setOverrideCursor(Qt.WaitCursor)
+        try:
+            pre_start_callback()
+        except Exception as error:
+            QMessageBox.critical(None, "AI runtime", str(error))
+            sys.exit(1)
+        finally:
+            app.restoreOverrideCursor()
+
+    window = CCTVMainWindow(edge_connection_config=connection_dialog.connection_config)
     window.show()
     sys.exit(app.exec_())
 

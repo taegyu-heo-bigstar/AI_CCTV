@@ -128,4 +128,16 @@ BACKUP_RECOVERY_URL=http://192.168.137.2:8002/recover
 BACKUP_DIR=~/backups
 ```
 
-Windows AI server에서는 위 출력의 PowerShell 블록을 적용한 뒤 `ai-cctv-ai-server` 또는 `python main.py`를 실행하고, UI 영상 입력 주소에 `RTSP_URL` 값을 넣습니다.
+Windows AI server를 실행하면 메인 관제 창보다 먼저 Edge node 연결 설정 창이 표시됩니다. 위 출력 블록을 붙여넣고 `출력값 적용`을 누른 뒤 `연결 확인 후 시작`을 누르면 RTSP, MQTT broker, 백업 복구 API 접속을 확인합니다. 세 연결이 모두 성공해야 메인 관제 창이 열립니다.
+
+```powershell
+ai-cctv-ai-server
+```
+
+연결 설정 창에서 성공한 값은 자동으로 다음 항목에 반영됩니다.
+
+| 값 | 반영 위치 |
+|---|---|
+| `RTSP_URL` | 메인 영상 입력 소스 |
+| `MQTT_BROKER`, `MQTT_TOPIC` | Edge node 상태 조회 MQTT 구독 설정 |
+| `BACKUP_RECOVERY_URL` | RTSP 장애 구간 백업 복구 요청 URL |

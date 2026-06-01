@@ -33,11 +33,9 @@ def main():
         없음.
     """
 
-    preload_ai_runtime_libraries()
-
     from .ui.main_window import main as run_main_window
 
-    run_main_window()
+    run_main_window(pre_start_callback=preload_ai_runtime_libraries)
 
 
 if __name__ == "__main__":
