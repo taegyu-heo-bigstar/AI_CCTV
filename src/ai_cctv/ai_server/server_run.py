@@ -4,7 +4,7 @@
 
 """AI server 실행 진입점입니다."""
 
-from .runtime import ensure_windows_os
+from .runtime import ensure_pyqt5_available, ensure_windows_os
 
 
 def preload_ai_runtime_libraries():
@@ -36,6 +36,7 @@ def main():
     """
 
     ensure_windows_os()
+    ensure_pyqt5_available()
 
     from .ui.main_window import main as run_main_window
     run_main_window(pre_start_callback=preload_ai_runtime_libraries)

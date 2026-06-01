@@ -66,6 +66,7 @@ flowchart LR
     MonitorPublisher --> MQTTBroker["MQTT Broker"]
     RTSP --> ServerRun["ai_cctv/ai_server/server_run.py"]
     ServerRun --> OsGuard["ensure_windows_os"]
+    ServerRun --> PyQtBootstrap["ensure_pyqt5_available"]
     ServerRun --> RuntimeReadiness["RuntimeReadinessDialog"]
     RuntimeReadiness --> RuntimeChecker["RuntimeEnvironmentChecker"]
     RuntimeReadiness --> RuntimeInstaller["RuntimeInstaller"]
@@ -179,6 +180,10 @@ classDiagram
 
     class RuntimeEnvironmentChecker {
         +check()
+    }
+
+    class PyQtBootstrap {
+        +ensure_pyqt5_available()
     }
 
     class RuntimeReadinessDialog {
@@ -367,7 +372,7 @@ BACKUP_DIR=~/backups
 
 자동 감지가 SSH 서버 IP, 지정 인터페이스 IP, UDP 라우팅 결과 순서로 실패하면 `127.0.0.1`이 출력될 수 있습니다. 이때는 Edge node에서 `AI_CCTV_EDGE_HOST`를 유선 IP로 지정한 뒤 다시 실행합니다.
 
-AI server는 `server_run.main` 진입 직후 Windows OS 여부를 확인합니다. Windows가 아니면 한국어 오류 메시지를 표준 오류로 출력하고 종료합니다. Windows에서는 `RuntimeEnvironmentChecker`가 PyTorch, PyQt5, OpenCV, Ultralytics, Transformers, Accelerate, bitsandbytes, HuggingFace Hub, Qwen 관련 패키지, Discord 알림 패키지, 얼굴 식별 패키지, MQTT/복구용 패키지, YOLO 모델 파일, Qwen 모델 캐시를 점검합니다. 누락 항목이 있으면 `RuntimeReadinessDialog`가 표시되고, 사용자가 `O - 자동 설치`를 누른 경우에만 `RuntimeInstaller`가 pip 설치와 모델 다운로드를 시도합니다. `X - 설치하지 않음`을 누르거나 설치 후에도 준비가 끝나지 않으면 메인 창은 생성되지 않습니다.
+AI server는 `server_run.main` 진입 직후 Windows OS 여부를 확인합니다. Windows가 아니면 한국어 오류 메시지를 표준 오류로 출력하고 종료합니다. Windows에서는 먼저 PyQt5가 있는지 확인하고, 없으면 표준 라이브러리 tkinter 창으로 PyQt5 설치 여부를 묻습니다. PyQt5가 준비되면 `RuntimeEnvironmentChecker`가 PyTorch, PyQt5, OpenCV, Ultralytics, Transformers, Accelerate, bitsandbytes, HuggingFace Hub, Qwen 관련 패키지, Discord 알림 패키지, 얼굴 식별 패키지, MQTT/복구용 패키지, YOLO 모델 파일, Qwen 모델 캐시를 점검합니다. 누락 항목이 있으면 `RuntimeReadinessDialog`가 표시되고, 사용자가 `O - 자동 설치`를 누른 경우에만 `RuntimeInstaller`가 pip 설치와 모델 다운로드를 시도합니다. `X - 설치하지 않음`을 누르거나 설치 후에도 준비가 끝나지 않으면 메인 창은 생성되지 않습니다.
 
 런타임 준비가 끝나면 AI server는 `EdgeConnectionDialog`를 표시합니다. Edge node 모드에서는 Edge node 표준 출력 블록을 붙여넣거나 RTSP, MQTT, 백업 복구 URL을 직접 입력하고, `EdgeConnectionValidator`가 RTSP 포트, MQTT broker 포트, 백업 복구 HTTP endpoint 연결을 모두 확인해야 `CCTVMainWindow`가 생성됩니다. Windows 데스크톱 자체 카메라 모드에서는 로컬 카메라 인덱스를 입력하고 OpenCV가 해당 카메라를 열 수 있는지만 검증합니다. 검증에 성공한 값은 `AI_CCTV_MQTT_*`, `AI_CCTV_RECOVERY_SERVER_URL`, `AI_CCTV_RTSP_URL` 환경 변수와 메인 창의 영상 입력 소스에 반영됩니다.
 

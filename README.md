@@ -134,7 +134,7 @@ Windows AI server를 실행하면 메인 관제 창보다 먼저 Edge node 연�
 ai-cctv-ai-server
 ```
 
-AI server 진입점은 Windows가 아닌 OS를 감지하면 오류 메시지를 출력하고 즉시 종료합니다. Windows에서는 먼저 실행 환경을 검사하며 PyTorch, PyQt5, OpenCV, Ultralytics, Transformers, Accelerate, bitsandbytes, HuggingFace Hub, Qwen 관련 패키지, Discord 알림 패키지, 얼굴 식별 패키지, YOLO/Qwen 모델이 없으면 설치 확인 창을 표시합니다. `O - 자동 설치`를 누르면 누락 항목 설치를 시도하고, `X - 설치하지 않음`을 누르면 프로그램을 시작하지 않습니다.
+AI server 진입점은 Windows가 아닌 OS를 감지하면 오류 메시지를 출력하고 즉시 종료합니다. Windows에서는 먼저 PyQt5를 확인하고, PyQt5가 없으면 표준 라이브러리 tkinter 창으로 설치 여부를 묻습니다. 이후 실행 환경을 검사하며 PyTorch, PyQt5, OpenCV, Ultralytics, Transformers, Accelerate, bitsandbytes, HuggingFace Hub, Qwen 관련 패키지, Discord 알림 패키지, 얼굴 식별 패키지, YOLO/Qwen 모델이 없으면 설치 확인 창을 표시합니다. `O - 자동 설치`를 누르면 누락 항목 설치를 시도하고, `X - 설치하지 않음`을 누르면 프로그램을 시작하지 않습니다.
 
 연결 설정 창에서 성공한 값은 자동으로 다음 항목에 반영됩니다.
 

@@ -292,7 +292,7 @@
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
 | `preload_ai_runtime_libraries` | PyQt 로딩 전에 AI 런타임 네이티브 라이브러리를 초기화합니다. | None | PyTorch 초기화 오류 | torch DLL 로딩 순서 안정화 |
-| `main` | Windows OS 여부를 먼저 확인한 뒤 AI server 관제 GUI 애플리케이션을 실행합니다. | None | 비 Windows 환경 SystemExit, PyTorch 초기화 오류 | OS guard 이후 UI 시작 |
+| `main` | Windows OS와 PyQt5 bootstrap을 먼저 확인한 뒤 AI server 관제 GUI 애플리케이션을 실행합니다. | None | 비 Windows 환경 SystemExit, PyQt5 설치 거부, PyTorch 초기화 오류 | OS guard와 최소 GUI 의존성 확인 이후 UI 시작 |
 
 ## `src/ai_cctv/ai_server/runtime/__init__.py`
 
@@ -303,8 +303,22 @@
 | `RuntimeRequirement` | 런타임 요구사항 데이터 클래스를 외부로 노출합니다. | 클래스 참조 | 없음 | `environment_check.py` 재노출 |
 | `RuntimeRequirementResult` | 런타임 요구사항 점검 결과 클래스를 외부로 노출합니다. | 클래스 참조 | 없음 | `environment_check.py` 재노출 |
 | `RuntimeReadinessReport` | 전체 런타임 준비 상태 보고 클래스를 외부로 노출합니다. | 클래스 참조 | 없음 | `environment_check.py` 재노출 |
+| `ensure_pyqt5_available` | PyQt5 bootstrap 확인 함수를 외부로 노출합니다. | 함수 참조 | 없음 | `bootstrap.py` 재노출 |
 | `ensure_windows_os` | Windows 전용 실행 검증 함수를 외부로 노출합니다. | 함수 참조 | 없음 | `os_guard.py` 재노출 |
 | `is_windows_os` | OS 판별 함수를 외부로 노출합니다. | 함수 참조 | 없음 | `os_guard.py` 재노출 |
+
+## `src/ai_cctv/ai_server/runtime/bootstrap.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `ensure_pyqt5_available` | 런타임 점검 창을 띄우기 전에 PyQt5 존재 여부를 확인하고 없으면 설치 여부를 묻습니다. | None | SystemExit(1), RuntimeError | tkinter 기반 bootstrap 창 사용 |
+| `_is_pyqt5_available` | 현재 Python 환경에서 PyQt5 import 경로를 찾을 수 있는지 확인합니다. | bool | 없음 | 내부 함수 |
+| `_ask_install_pyqt5_with_tkinter` | PyQt5가 없을 때 O/X 선택용 tkinter 창을 표시합니다. | bool | tkinter 사용 불가 시 False | PyQt5 없는 환경의 예외 경로 |
+| `_ask_install_pyqt5_with_tkinter.choose_install` | 사용자의 자동 설치 선택을 기록하고 창을 닫습니다. | None | 없음 | 내부 중첩 함수 |
+| `_ask_install_pyqt5_with_tkinter.choose_cancel` | 사용자의 설치 거부 선택을 기록하고 창을 닫습니다. | None | 없음 | 내부 중첩 함수 |
+| `_install_pyqt5` | 현재 Python 실행 파일을 사용해 PyQt5를 pip로 설치합니다. | None | RuntimeError | `python -m pip install PyQt5` |
+| `_show_bootstrap_error` | bootstrap 오류를 가능한 경우 tkinter 메시지 창으로 표시합니다. | None | 없음 | GUI 표시 실패 시 무시 |
+| `_print_bootstrap_error` | bootstrap 오류를 표준 오류 또는 지정 스트림에 출력합니다. | None | 없음 | 콘솔 fallback |
 
 ## `src/ai_cctv/ai_server/runtime/os_guard.py`
 
@@ -802,5 +816,6 @@
 | `ProjectStructureTest.test_edge_connection_info_prints_ai_server_settings` | Edge node 시작 정보가 AI server 설정값을 포함하는지 검증합니다. | None | AssertionError | SSH 실행 안내 출력 회귀 방지 |
 | `ProjectStructureTest.test_ai_server_parses_edge_startup_connection_text` | AI server 시작 UI가 Edge node 표준 출력값을 설정 객체로 해석하는지 검증합니다. | None | AssertionError | 연결 UI 붙여넣기 회귀 방지 |
 | `ProjectStructureTest.test_ai_server_os_guard_accepts_only_windows` | AI server OS guard가 Windows만 허용하고 Linux를 종료 처리하는지 검증합니다. | None | AssertionError | OS 분기 회귀 방지 |
+| `ProjectStructureTest.test_pyqt5_bootstrap_installs_only_when_user_accepts` | PyQt5 bootstrap이 사용자가 동의한 경우에만 설치 함수를 호출하는지 검증합니다. | None | AssertionError | GUI 점검 창 진입 전 최소 의존성 검증 |
 | `ProjectStructureTest.test_local_camera_connection_config_uses_camera_index` | 로컬 카메라 모드에서 영상 소스가 카메라 인덱스로 반환되는지 검증합니다. | None | AssertionError | Edge node 없는 테스트 경로 보장 |
 | `ProjectStructureTest.test_runtime_readiness_report_finds_missing_required_items` | 런타임 준비 보고서가 누락된 필수 요구사항을 찾는지 검증합니다. | None | AssertionError | 자동 설치 대상 산출 검증 |

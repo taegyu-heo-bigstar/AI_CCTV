@@ -32,6 +32,7 @@ from ai_cctv.ai_server.recovery.network_recovery_manager import (
     NetworkRecoveryConfig,
     NetworkRecoveryManager,
 )
+from ai_cctv.ai_server.runtime.bootstrap import ensure_pyqt5_available
 from ai_cctv.ai_server.runtime.environment_check import (
     RuntimeReadinessReport,
     RuntimeRequirement,
@@ -442,6 +443,7 @@ class ProjectStructureTest(unittest.TestCase):
         )
         self.assertTrue(Path("src/ai_cctv/ai_server/monitoring").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/runtime").is_dir())
+        self.assertTrue(Path("src/ai_cctv/ai_server/runtime/bootstrap.py").is_file())
         self.assertTrue(
             Path("src/ai_cctv/ai_server/runtime/os_guard.py").is_file()
         )
@@ -674,6 +676,33 @@ class ProjectStructureTest(unittest.TestCase):
         ensure_windows_os("Windows")
         with self.assertRaises(SystemExit):
             ensure_windows_os("Linux", stream=Mock())
+
+    def test_pyqt5_bootstrap_installs_only_when_user_accepts(self):
+        """PyQt5 bootstrap이 사용자가 동의한 경우에만 설치 함수를 호출하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        installer = Mock()
+        availability = [False, True]
+
+        ensure_pyqt5_available(
+            finder=lambda: availability.pop(0),
+            ask_user=lambda: True,
+            installer=installer,
+        )
+
+        installer.assert_called_once()
+        with self.assertRaises(SystemExit):
+            ensure_pyqt5_available(
+                finder=lambda: False,
+                ask_user=lambda: False,
+                installer=Mock(),
+                stream=Mock(),
+            )
 
     def test_local_camera_connection_config_uses_camera_index(self):
         """Windows 자체 카메라 분기 설정이 Edge node 값 대신 카메라 번호를 사용하는지 검증합니다.
