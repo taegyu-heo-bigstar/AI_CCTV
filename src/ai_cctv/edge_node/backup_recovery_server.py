@@ -268,11 +268,16 @@ def main():
     """
 
     import uvicorn
+    from .startup_info import print_edge_connection_info
 
     host = os.getenv("AI_CCTV_BACKUP_RECOVERY_HOST", "0.0.0.0")
     port = int(os.getenv("AI_CCTV_BACKUP_RECOVERY_PORT", "8002"))
     backup_dir = os.getenv("AI_CCTV_BACKUP_DIR", "~/backups")
     recovery_app = build_backup_recovery_app(backup_dir)
+    print_edge_connection_info(
+        backup_recovery_port=port,
+        backup_dir=backup_dir,
+    )
     uvicorn.run(recovery_app, host=host, port=port)
 
 

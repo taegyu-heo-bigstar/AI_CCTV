@@ -7,6 +7,7 @@ import subprocess
 
 from .local_backup import LocalBackupConfig
 from .mediamtx import MediaMtxConfig, MediaMtxInstaller, MediaMtxProcessManager
+from .startup_info import print_edge_connection_info
 from .streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
 
 
@@ -72,6 +73,7 @@ class EdgeNodeRuntime:
             GStreamer 프로세스 종료 코드를 반환합니다.
         """
 
+        print_edge_connection_info(backup_dir=str(self.backup_config.directory))
         self.backup_config.ensure_directory()
         self.mediamtx_installer.ensure_installed()
         self.mediamtx_process_manager.start()

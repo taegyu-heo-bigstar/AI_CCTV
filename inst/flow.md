@@ -15,6 +15,7 @@ AI_CCTV/
 |       |-- edge_node/              # Raspberry Pi Edge node 배포 단위
 |       |   |-- main.py             # Edge node 실행 진입점
 |       |   |-- runtime.py          # MediaMTX 준비와 GStreamer 실행 조율
+|       |   |-- startup_info.py     # SSH 실행 직후 AI server 설정용 연결 정보 출력
 |       |   |-- mediamtx.py         # MediaMTX 다운로드, 설치 확인, 프로세스 관리
 |       |   |-- streaming.py        # GStreamer 송출/로컬 백업 파이프라인 생성
 |       |   |-- local_backup.py     # 로컬 백업 세그먼트 파일명 정책
@@ -48,6 +49,7 @@ flowchart LR
     Camera["Camera Module"] --> Pi["Raspberry Pi 4B"]
     Pi --> EdgeMain["ai_cctv/edge_node/main.py"]
     EdgeMain --> EdgeRuntime["EdgeNodeRuntime"]
+    EdgeRuntime --> StartupInfo["EdgeConnectionInfo startup output"]
     EdgeMain -. "same Edge node" .-> MonitorPublisher["edge_node/monitoring/resource_monitor_publisher.py"]
     Pi --> UpsPlus["52Pi EP-0136 UPS Plus"]
     EdgeRuntime --> MediaMtxManager["MediaMtxInstaller / MediaMtxProcessManager"]
@@ -103,6 +105,10 @@ classDiagram
         +build_command_args()
         +run()
         +stop()
+    }
+
+    class EdgeConnectionInfo {
+        +to_terminal_text()
     }
 
     class MediaMtxInstaller {
@@ -251,6 +257,7 @@ classDiagram
     EdgeNodeRuntime --> MediaMtxProcessManager
     EdgeNodeRuntime --> LocalBackupConfig
     EdgeNodeRuntime --> MediaMtxGStreamerCommandBuilder
+    EdgeNodeRuntime --> EdgeConnectionInfo
     EdgeNodeRuntime --> EdgeNetworkFailoverPolicy
     BackupRecoveryService --> BackupSegmentFinder
     CCTVMainWindow --> SettingsWindow
@@ -300,6 +307,20 @@ AI server에서 복구 요청을 활성화하려면 다음 환경 변수를 지�
 $env:AI_CCTV_RECOVERY_SERVER_URL="http://192.168.137.2:8002/recover"
 ai-cctv-ai-server
 ```
+
+SSH로 Edge node에 접속해 실행하는 경우 각 Edge node 프로세스는 시작 직후 다음 표준 출력 블록을 표시합니다. AI server는 이 값 중 `RTSP_URL`을 UI 영상 입력 주소로 사용하고, PowerShell 환경 변수 블록을 적용한 뒤 실행합니다.
+
+```text
+[AI_CCTV Edge Node Connection]
+EDGE_HOST=192.168.137.2
+RTSP_URL=rtsp://192.168.137.2:8554/live
+MQTT_BROKER=192.168.137.1:1883
+MQTT_TOPIC=ai-cctv/edge-node/status
+BACKUP_RECOVERY_URL=http://192.168.137.2:8002/recover
+BACKUP_DIR=~/backups
+```
+
+자동 감지가 SSH 서버 IP, 지정 인터페이스 IP, UDP 라우팅 결과 순서로 실패하면 `127.0.0.1`이 출력될 수 있습니다. 이때는 Edge node에서 `AI_CCTV_EDGE_HOST`를 유선 IP로 지정한 뒤 다시 실행합니다.
 
 검증 명령은 다음과 같습니다.
 

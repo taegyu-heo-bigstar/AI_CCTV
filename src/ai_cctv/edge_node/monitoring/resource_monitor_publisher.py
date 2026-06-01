@@ -330,7 +330,14 @@ def main():
         정상적으로는 반환하지 않습니다.
     """
 
+    from ..startup_info import print_edge_connection_info
+
     publisher = build_resource_monitor_publisher()
+    print_edge_connection_info(
+        mqtt_host=publisher.config.broker_host,
+        mqtt_port=publisher.config.broker_port,
+        mqtt_topic=publisher.config.topic,
+    )
     try:
         publisher.run_forever()
     except KeyboardInterrupt:

@@ -92,3 +92,40 @@ src/
 python -m compileall src main.py tests
 $env:PYTHONPATH="src"; python -m unittest discover -s tests
 ```
+
+## SSH 유선 연결 실행 절차
+
+라즈베리 파이를 Windows AI server와 유선 Ethernet으로 연결하고 SSH 터미널에서 실행하면, Edge node 프로그램은 시작 직후 표준 출력으로 AI server에 입력할 값을 출력합니다. 자동 IP 감지가 틀리면 실행 전에 `AI_CCTV_EDGE_HOST`를 라즈베리 파이의 유선 IP로 지정합니다.
+
+```bash
+export AI_CCTV_EDGE_HOST=192.168.137.2
+export AI_CCTV_MQTT_HOST=192.168.137.1
+ai-cctv-edge
+```
+
+상태 모니터링과 누락 구간 복구까지 함께 쓰려면 별도 SSH 터미널에서 다음 프로세스도 실행합니다.
+
+```bash
+export AI_CCTV_EDGE_HOST=192.168.137.2
+export AI_CCTV_MQTT_HOST=192.168.137.1
+ai-cctv-edge-monitor
+```
+
+```bash
+export AI_CCTV_EDGE_HOST=192.168.137.2
+ai-cctv-edge-backup-recovery
+```
+
+출력 예시는 다음 형태입니다.
+
+```text
+[AI_CCTV Edge Node Connection]
+EDGE_HOST=192.168.137.2
+RTSP_URL=rtsp://192.168.137.2:8554/live
+MQTT_BROKER=192.168.137.1:1883
+MQTT_TOPIC=ai-cctv/edge-node/status
+BACKUP_RECOVERY_URL=http://192.168.137.2:8002/recover
+BACKUP_DIR=~/backups
+```
+
+Windows AI server에서는 위 출력의 PowerShell 블록을 적용한 뒤 `ai-cctv-ai-server` 또는 `python main.py`를 실행하고, UI 영상 입력 주소에 `RTSP_URL` 값을 넣습니다.

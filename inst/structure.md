@@ -614,11 +614,28 @@
 | `EdgeNodeRuntime` | Edge node 송출 프로세스의 실행 흐름을 조율합니다. | EdgeNodeRuntime 객체 | 없음 | 의존 객체 주입 가능 |
 | `EdgeNodeRuntime.__init__` | Edge node 런타임 의존 객체를 초기화합니다. | None | 없음 | 기본 MediaMTX 설정 생성 |
 | `EdgeNodeRuntime.build_command_args` | 현재 런타임 설정으로 GStreamer 실행 인자를 생성합니다. | list | 없음 | 테스트 가능 |
-| `EdgeNodeRuntime.run` | MediaMTX와 GStreamer를 순서대로 실행하고 종료 시 정리합니다. | 종료 코드 | 하위 프로세스 오류 | 실제 실행 진입점 |
+| `EdgeNodeRuntime.run` | 시작 연결 정보를 출력한 뒤 MediaMTX와 GStreamer를 순서대로 실행하고 종료 시 정리합니다. | 종료 코드 | 하위 프로세스 오류 | 실제 실행 진입점 |
 | `EdgeNodeRuntime.stop` | GStreamer와 MediaMTX 프로세스를 종료합니다. | None | 프로세스 종료 오류 | finally에서 호출 |
 | `EdgeNodeRuntime._install_signal_handlers` | 운영체제 종료 신호를 정리 동작에 연결합니다. | None | signal 등록 오류 | 내부 함수 |
 | `EdgeNodeRuntime._handle_stop_signal` | 종료 신호를 받으면 하위 프로세스를 정리합니다. | None | SystemExit | 내부 함수 |
 | `build_default_edge_runtime` | 기본 설정 Edge node 런타임을 생성합니다. | EdgeNodeRuntime 객체 | 없음 | main.py에서 사용 |
+
+## `src/ai_cctv/edge_node/startup_info.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `EdgeConnectionInfo` | AI server가 Edge node에 접속하기 위해 필요한 RTSP, MQTT, 백업 복구 주소를 보관합니다. | EdgeConnectionInfo 객체 | 없음 | dataclass |
+| `EdgeConnectionInfo.to_terminal_text` | 운영자가 복사할 수 있는 표준 연결 정보 블록을 생성합니다. | 문자열 | 없음 | PowerShell 설정 예시 포함 |
+| `build_edge_connection_info` | 환경 변수와 호출 인자를 합쳐 Edge node 연결 정보를 생성합니다. | EdgeConnectionInfo 객체 | 잘못된 정수 환경 변수 | MQTT, RTSP, 백업 복구 설정 통합 |
+| `print_edge_connection_info` | Edge node 연결 정보를 표준 출력 또는 지정 스트림에 즉시 출력합니다. | EdgeConnectionInfo 객체 | 출력 스트림 오류 | flush=True 사용 |
+| `resolve_edge_host` | AI server가 접속할 Edge node 호스트 값을 결정합니다. | IP 또는 호스트 문자열 | 없음 | 명시값, SSH, 인터페이스, UDP 라우팅 순서 |
+| `_build_rtsp_url` | MediaMTX 기본 RTSP 주소를 생성합니다. | RTSP URL 문자열 | 잘못된 포트 환경 변수 | 내부 함수 |
+| `_resolve_int` | 명시값 또는 환경 변수를 정수로 해석합니다. | int | ValueError | 내부 함수 |
+| `_read_ssh_server_host` | SSH_CONNECTION 환경 변수에서 서버 측 IP를 읽습니다. | IP 문자열 또는 None | 없음 | SSH 접속 실행에 우선 사용 |
+| `_read_interface_host` | 지정한 Linux 네트워크 인터페이스의 IPv4 주소를 조회합니다. | IP 문자열 또는 None | ip 명령 실행 오류는 None 처리 | AI_CCTV_EDGE_INTERFACE 지원 |
+| `_detect_host_by_udp_probe` | UDP 라우팅 결과로 로컬 IPv4 주소를 추정합니다. | IP 문자열 또는 None | 소켓 오류는 None 처리 | 패킷 전송 없이 라우팅만 확인 |
+| `_read_hostname_host` | 호스트 이름 해석 결과에서 외부 접속 가능한 IPv4 주소를 찾습니다. | IP 문자열 또는 None | 이름 해석 오류는 None 처리 | 마지막 자동 감지 후보 |
+| `_is_loopback_host` | 호스트 값이 loopback 주소인지 판단합니다. | bool | 없음 | localhost, 127.*, ::1 처리 |
 
 ## `src/ai_cctv/edge_node/streaming.py`
 
@@ -677,3 +694,4 @@
 | `ProjectStructureTest.test_network_recovery_manager_skips_when_url_missing` | 복구 서버 URL이 없을 때 네트워크 요청 없이 실패 사유를 반환하는지 검증합니다. | None | AssertionError | 외부 네트워크 불필요 |
 | `ProjectStructureTest.test_backup_recovery_service_archives_overlapping_segments` | 요청 시간대와 겹치는 TS 백업 파일을 ZIP으로 묶는지 검증합니다. | None | AssertionError | 임시 파일 기반 |
 | `ProjectStructureTest.test_resource_monitor_mqtt_defaults_match_between_nodes` | Edge node와 AI server의 기본 MQTT 접속 설정이 일치하는지 검증합니다. | None | AssertionError | 상태 topic 불일치 방지 |
+| `ProjectStructureTest.test_edge_connection_info_prints_ai_server_settings` | Edge node 시작 정보가 AI server 설정값을 포함하는지 검증합니다. | None | AssertionError | SSH 실행 안내 출력 회귀 방지 |

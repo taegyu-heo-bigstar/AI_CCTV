@@ -39,6 +39,7 @@ from ai_cctv.edge_node.monitoring.power_status import UpsPlusPowerReader
 from ai_cctv.edge_node.monitoring.resource_monitor_publisher import (
     MqttResourceMonitorConfig,
 )
+from ai_cctv.edge_node.startup_info import build_edge_connection_info
 from ai_cctv.edge_node.streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
 
 
@@ -407,6 +408,7 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(Path("src/ai_cctv/edge_node/local_backup.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/mediamtx.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/runtime.py").is_file())
+        self.assertTrue(Path("src/ai_cctv/edge_node/startup_info.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/backup_recovery_server.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/monitoring").is_dir())
         self.assertTrue(
@@ -565,6 +567,37 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertEqual(ai_server_config.broker_host, edge_config.broker_host)
         self.assertEqual(ai_server_config.broker_port, edge_config.broker_port)
         self.assertEqual(ai_server_config.topic, edge_config.topic)
+
+    def test_edge_connection_info_prints_ai_server_settings(self):
+        """Edge node 시작 정보가 AI server 설정값을 포함하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        connection_info = build_edge_connection_info(
+            edge_host="192.168.137.2",
+            mqtt_host="192.168.137.1",
+            mqtt_port=1883,
+            mqtt_topic="ai-cctv/edge-node/status",
+            backup_recovery_port=8002,
+            backup_dir="/home/phoenix/backups",
+        )
+        terminal_text = connection_info.to_terminal_text()
+
+        self.assertEqual(connection_info.rtsp_url, "rtsp://192.168.137.2:8554/live")
+        self.assertEqual(
+            connection_info.backup_recovery_url,
+            "http://192.168.137.2:8002/recover",
+        )
+        self.assertIn("EDGE_HOST=192.168.137.2", terminal_text)
+        self.assertIn("MQTT_BROKER=192.168.137.1:1883", terminal_text)
+        self.assertIn(
+            '$env:AI_CCTV_RECOVERY_SERVER_URL="http://192.168.137.2:8002/recover"',
+            terminal_text,
+        )
 
 
 if __name__ == "__main__":
