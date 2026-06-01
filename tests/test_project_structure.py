@@ -9,6 +9,7 @@ import tomllib
 import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
+from unittest.mock import Mock
 
 from ai_cctv.ai_server.alerts.dispatcher import (
     NotificationChannel,
@@ -22,7 +23,7 @@ from ai_cctv.ai_server.analysis.anomaly.detector import (
 from ai_cctv.ai_server.monitoring.resource_monitor_client import (
     MqttResourceMonitorConfig as MqttResourceSubscriberConfig,
 )
-from ai_cctv.ai_server.analysis.rtsp_receiver import is_rtsp_source
+from ai_cctv.ai_server.analysis.rtsp_receiver import RtspFrameReceiver, is_rtsp_source
 from ai_cctv.ai_server.recovery.network_recovery_manager import (
     NetworkRecoveryConfig,
     NetworkRecoveryManager,
@@ -475,6 +476,25 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(is_rtsp_source("rtsp://192.168.137.2:8554/live"))
         self.assertFalse(is_rtsp_source(0))
         self.assertFalse(is_rtsp_source("http://127.0.0.1/video"))
+
+    def test_rtsp_receiver_watchdog_releases_active_capture(self):
+        """RTSP watchdog이 활성 VideoCapture를 강제 해제하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        receiver = RtspFrameReceiver("rtsp://192.168.137.2:8554/live")
+        fake_capture = Mock()
+
+        receiver._set_active_capture(fake_capture)
+        released = receiver._release_active_capture("test watchdog")
+
+        self.assertTrue(released)
+        self.assertFalse(receiver._is_active_capture(fake_capture))
+        fake_capture.release.assert_called_once()
 
     def test_network_recovery_manager_skips_when_url_missing(self):
         """복구 서버 URL이 없을 때 네트워크 요청 없이 실패 사유를 반환하는지 검증합니다.

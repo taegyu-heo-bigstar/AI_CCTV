@@ -164,6 +164,8 @@ classDiagram
         +start()
         +read_new_frame(last_sequence)
         +stop()
+        -_watchdog_loop()
+        -_release_active_capture(reason)
     }
 
     class NetworkRecoveryManager {

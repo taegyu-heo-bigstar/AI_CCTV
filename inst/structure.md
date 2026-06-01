@@ -207,12 +207,18 @@
 | `is_rtsp_source` | 입력 소스가 RTSP URL인지 확인합니다. | bool | 없음 | `rtsp://` 문자열 판정 |
 | `check_rtsp_port_open` | RTSP URL의 TCP 포트가 열려 있는지 빠르게 확인합니다. | bool | False | socket timeout 사용 |
 | `RtspFrameReceiver` | RTSP 프레임을 백그라운드에서 수신하고 재연결을 관리합니다. | RtspFrameReceiver 객체 | 없음 | OpenCV 장기 대기 완화 |
-| `RtspFrameReceiver.__init__` | RTSP 수신 thread 상태와 동기화 객체를 초기화합니다. | None | 없음 | 조건 변수 사용 |
-| `RtspFrameReceiver.start` | RTSP 수신 thread를 시작합니다. | None | thread 시작 오류 | FFmpeg TCP timeout 설정 |
+| `RtspFrameReceiver.__init__` | RTSP 수신 thread, watchdog, 동기화 객체를 초기화합니다. | None | 없음 | 조건 변수와 capture lock 사용 |
+| `RtspFrameReceiver.start` | RTSP 수신 thread와 watchdog thread를 시작합니다. | None | thread 시작 오류 | FFmpeg TCP timeout 설정 |
 | `RtspFrameReceiver.read_new_frame` | 이전 순번 이후의 최신 프레임을 반환합니다. | RtspFrameSnapshot | 프레임 없음 snapshot | sequence 기반 중복 방지 |
-| `RtspFrameReceiver.stop` | RTSP 수신 thread를 중지합니다. | None | 없음 | 최대 3초 join |
+| `RtspFrameReceiver.stop` | RTSP 수신 thread와 watchdog thread를 중지합니다. | None | 없음 | 활성 capture 강제 해제 |
+| `RtspFrameReceiver._watchdog_loop` | 프레임 정체가 길어지면 활성 VideoCapture를 강제로 해제합니다. | None | release 오류 | 5초 기본 timeout |
 | `RtspFrameReceiver._receive_loop` | RTSP 연결과 프레임 수신을 반복합니다. | None | 연결 실패 메시지 | 내부 재연결 루프 |
 | `RtspFrameReceiver._read_capture_until_failure` | 열려 있는 VideoCapture에서 프레임을 읽고 실패 시 루프를 종료합니다. | None | 없음 | 연속 실패 80회 기준 |
+| `RtspFrameReceiver._set_active_capture` | watchdog이 감시할 현재 VideoCapture 객체를 등록합니다. | None | 없음 | capture lock 사용 |
+| `RtspFrameReceiver._clear_active_capture` | 현재 VideoCapture 객체가 감시 대상이면 등록을 해제합니다. | None | 없음 | 중복 release 방지 |
+| `RtspFrameReceiver._has_active_capture` | watchdog이 해제할 수 있는 활성 VideoCapture가 있는지 반환합니다. | bool | 없음 | 내부 상태 확인 |
+| `RtspFrameReceiver._is_active_capture` | 전달된 VideoCapture가 현재 감시 대상인지 확인합니다. | bool | 없음 | read 실패 후 즉시 종료 판단 |
+| `RtspFrameReceiver._release_active_capture` | watchdog 또는 종료 요청이 활성 VideoCapture를 강제로 해제합니다. | bool | release 오류 | OpenCV read hang 완화 |
 | `RtspFrameReceiver._store_frame` | 수신한 최신 프레임을 thread-safe하게 저장합니다. | None | 없음 | frame copy 저장 |
 | `RtspFrameReceiver._set_connection_state` | RTSP 연결 상태와 마지막 오류 메시지를 갱신합니다. | None | 없음 | 대기 중인 read 호출 알림 |
 | `RtspFrameReceiver._update_capture_metadata` | VideoCapture에서 FPS와 프레임 크기 정보를 읽어 저장합니다. | None | 없음 | 기본값 보정 |
@@ -667,6 +673,7 @@
 | `ProjectStructureTest.test_ups_plus_power_reader_reports_unavailable_on_i2c_error` | UPS Plus I2C 접근 실패가 사용 불가 스냅샷으로 변환되는지 검증합니다. | None | AssertionError | 실패 리더 사용 |
 | `ProjectStructureTest.test_console_scripts_are_split_by_deployment_bundle` | Edge node와 AI server 실행 진입점이 분리되어 있는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `ProjectStructureTest.test_rtsp_source_detection` | RTSP URL과 일반 카메라 번호를 구분하는지 검증합니다. | None | AssertionError | RTSP receiver 보조 함수 검증 |
+| `ProjectStructureTest.test_rtsp_receiver_watchdog_releases_active_capture` | RTSP watchdog이 활성 VideoCapture를 강제 해제하는지 검증합니다. | None | AssertionError | Mock capture 사용 |
 | `ProjectStructureTest.test_network_recovery_manager_skips_when_url_missing` | 복구 서버 URL이 없을 때 네트워크 요청 없이 실패 사유를 반환하는지 검증합니다. | None | AssertionError | 외부 네트워크 불필요 |
 | `ProjectStructureTest.test_backup_recovery_service_archives_overlapping_segments` | 요청 시간대와 겹치는 TS 백업 파일을 ZIP으로 묶는지 검증합니다. | None | AssertionError | 임시 파일 기반 |
 | `ProjectStructureTest.test_resource_monitor_mqtt_defaults_match_between_nodes` | Edge node와 AI server의 기본 MQTT 접속 설정이 일치하는지 검증합니다. | None | AssertionError | 상태 topic 불일치 방지 |
