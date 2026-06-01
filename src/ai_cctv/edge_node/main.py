@@ -4,6 +4,7 @@
 
 import argparse
 
+from .os_guard import ensure_supported_edge_os
 from .runtime import build_default_edge_runtime
 
 
@@ -46,6 +47,7 @@ def main(argv=None):
         없음.
     """
 
+    ensure_supported_edge_os()
     args = build_argument_parser().parse_args(argv)
     runtime = build_default_edge_runtime()
     if args.print_command:

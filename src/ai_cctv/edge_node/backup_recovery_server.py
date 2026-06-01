@@ -268,8 +268,10 @@ def main():
     """
 
     import uvicorn
+    from .os_guard import ensure_supported_edge_os
     from .startup_info import print_edge_connection_info
 
+    ensure_supported_edge_os()
     host = os.getenv("AI_CCTV_BACKUP_RECOVERY_HOST", "0.0.0.0")
     port = int(os.getenv("AI_CCTV_BACKUP_RECOVERY_PORT", "8002"))
     backup_dir = os.getenv("AI_CCTV_BACKUP_DIR", "~/backups")

@@ -46,6 +46,7 @@ from ai_cctv.edge_node.backup_recovery_server import (
 from ai_cctv.edge_node.failover import EdgeNetworkFailoverPolicy
 from ai_cctv.edge_node.local_backup import LocalBackupConfig
 from ai_cctv.edge_node.mediamtx import MediaMtxConfig, MediaMtxReleaseResolver
+from ai_cctv.edge_node.os_guard import ensure_supported_edge_os, is_supported_edge_os
 from ai_cctv.edge_node.monitoring.power_status import UpsPlusPowerReader
 from ai_cctv.edge_node.monitoring.resource_monitor_publisher import (
     MqttResourceMonitorConfig,
@@ -420,6 +421,7 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(Path("src/ai_cctv/edge_node").is_dir())
         self.assertTrue(Path("src/ai_cctv/edge_node/local_backup.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/mediamtx.py").is_file())
+        self.assertTrue(Path("src/ai_cctv/edge_node/os_guard.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/runtime.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/startup_info.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/backup_recovery_server.py").is_file())
@@ -629,6 +631,31 @@ class ProjectStructureTest(unittest.TestCase):
             '$env:AI_CCTV_RECOVERY_SERVER_URL="http://192.168.137.2:8002/recover"',
             terminal_text,
         )
+
+    def test_edge_node_os_guard_accepts_linux_debian_family(self):
+        """Edge node OS guard가 Linux Debian 계열만 허용하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        self.assertTrue(
+            is_supported_edge_os("Linux", {"ID": "debian", "ID_LIKE": ""})
+        )
+        self.assertTrue(
+            is_supported_edge_os("Linux", {"ID": "ubuntu", "ID_LIKE": "debian"})
+        )
+        self.assertTrue(
+            is_supported_edge_os("Linux", {"ID": "raspbian", "ID_LIKE": "debian"})
+        )
+        self.assertTrue(is_supported_edge_os("Linux", {}))
+        self.assertFalse(is_supported_edge_os("Windows", {"ID": "ubuntu"}))
+        self.assertFalse(is_supported_edge_os("Linux", {"ID": "fedora"}))
+        ensure_supported_edge_os("Linux", {"ID": "debian"})
+        with self.assertRaises(SystemExit):
+            ensure_supported_edge_os("Windows", {"ID": "windows"}, stream=Mock())
 
     def test_ai_server_parses_edge_startup_connection_text(self):
         """AI server 시작 UI가 Edge node 표준 출력값을 설정 객체로 해석하는지 검증합니다.

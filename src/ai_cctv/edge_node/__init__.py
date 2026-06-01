@@ -5,6 +5,7 @@
 from .failover import EdgeFailoverDecision, EdgeNetworkFailoverPolicy
 from .local_backup import LocalBackupConfig
 from .mediamtx import MediaMtxConfig, MediaMtxInstaller, MediaMtxProcessManager
+from .os_guard import ensure_supported_edge_os, is_supported_edge_os
 from .runtime import EdgeNodeRuntime
 from .streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
 from .backup_recovery_server import BackupRecoveryService, BackupSegmentFinder
@@ -21,4 +22,6 @@ __all__ = [
     "MediaMtxConfig",
     "MediaMtxInstaller",
     "MediaMtxProcessManager",
+    "ensure_supported_edge_os",
+    "is_supported_edge_os",
 ]

@@ -449,7 +449,7 @@
 | `_create_mqtt_client` | paho-mqtt 버전에 맞는 MQTT 클라이언트를 생성합니다. | MQTT Client | ImportError | Callback API v1/v2 호환 |
 | `_load_psutil_module` | 설치된 psutil 모듈을 실제 수집 시점에 불러옵니다. | psutil 모듈 | ImportError | 테스트 import와 런타임 의존 분리 |
 | `_read_bool_env` | 환경 변수 문자열을 bool 값으로 변환합니다. | bool | 없음 | retain 설정 처리 |
-| `main` | Edge node 자원 상태 MQTT 발행 루프를 실행합니다. | 반환 없음 | MQTT 연결/발행 오류 | `python -m` 실행 진입점 |
+| `main` | OS guard를 통과한 뒤 Edge node 자원 상태 MQTT 발행 루프를 실행합니다. | 반환 없음 | SystemExit, MQTT 연결/발행 오류 | `ai-cctv-edge-monitor` 진입점 |
 
 ## `src/ai_cctv/edge_node/monitoring/power_status.py`
 
@@ -665,6 +665,19 @@
 | `EdgeNetworkFailoverPolicy.__init__` | 장애 대응 정책을 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
 | `EdgeNetworkFailoverPolicy.decide_for_network` | 네트워크 상태에 맞는 Edge node 동작을 결정합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
 
+## `src/ai_cctv/edge_node/os_guard.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `DEBIAN_FAMILY_IDS` | Edge node에서 허용하는 Debian 계열 배포판 ID 집합입니다. | frozenset | 없음 | debian, raspbian, ubuntu |
+| `read_os_release` | os-release 파일을 읽어 배포판 정보를 딕셔너리로 반환합니다. | dict | 파일 읽기 실패 시 빈 dict | 기본 `/etc/os-release` |
+| `is_supported_edge_os` | 현재 또는 전달받은 OS 정보가 Edge node 지원 대상인지 판단합니다. | bool | 없음 | Linux와 Debian 계열 확인 |
+| `ensure_supported_edge_os` | Edge node 실행 대상 OS가 아니면 오류를 출력하고 종료합니다. | None | SystemExit(1) | 모든 Edge node console script 진입점에서 호출 |
+| `_parse_os_release_text` | os-release 파일 원문을 key/value 딕셔너리로 변환합니다. | dict | 없음 | 내부 함수 |
+| `_resolve_os_release_paths` | 읽을 os-release 후보 경로 목록을 생성합니다. | Path 목록 | 없음 | `/etc/os-release`, `/usr/lib/os-release` 순서 |
+| `_strip_os_release_quotes` | os-release 값의 양끝 따옴표를 제거합니다. | 문자열 | 없음 | 내부 함수 |
+| `_collect_distribution_tokens` | ID와 ID_LIKE에서 배포판 계열 판정용 토큰을 수집합니다. | set | 없음 | 내부 함수 |
+
 ## `src/ai_cctv/edge_node/backup_recovery_server.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
@@ -683,7 +696,7 @@
 | `create_backup_recovery_app` | BackupRecoveryService를 사용하는 FastAPI 앱을 생성합니다. | FastAPI app | ImportError | `/recover` endpoint 등록 |
 | `create_backup_recovery_app.recover_backups` | 요청 시간대와 겹치는 백업 TS 파일을 ZIP으로 반환합니다. | FileResponse | HTTPException | start/end query 사용 |
 | `build_backup_recovery_app` | 환경 설정을 반영한 FastAPI 백업 복구 앱을 생성합니다. | FastAPI app | ImportError | backup_dir 주입 |
-| `main` | 환경 변수 기준으로 Edge node 백업 복구 FastAPI 서버를 실행합니다. | 반환 없음 | uvicorn 실행 오류 | `ai-cctv-edge-backup-recovery` 진입점 |
+| `main` | OS guard를 통과한 뒤 환경 변수 기준으로 Edge node 백업 복구 FastAPI 서버를 실행합니다. | 반환 없음 | SystemExit, uvicorn 실행 오류 | `ai-cctv-edge-backup-recovery` 진입점 |
 
 ## `src/ai_cctv/edge_node/main.py`
 
@@ -691,7 +704,7 @@
 |---|---|---|---|---|
 | `build_default_edge_stream_command` | 기본 Edge node 송출 명령 문자열을 생성합니다. | 문자열 | 런타임 구성 오류 | 명령 확인용 보조 함수 |
 | `build_argument_parser` | Edge node 실행 옵션 파서를 생성합니다. | ArgumentParser | 없음 | `--print-command` 옵션 제공 |
-| `main` | Edge node 런타임을 실행합니다. | None | 하위 프로세스 실행 오류 | 기본 동작은 실제 송출 실행 |
+| `main` | OS guard를 통과한 뒤 Edge node 런타임을 실행합니다. | None | SystemExit, 하위 프로세스 실행 오류 | `ai-cctv-edge` 진입점 |
 
 ## `src/ai_cctv/edge_node/local_backup.py`
 
@@ -814,6 +827,7 @@
 | `ProjectStructureTest.test_backup_recovery_service_archives_overlapping_segments` | 요청 시간대와 겹치는 TS 백업 파일을 ZIP으로 묶는지 검증합니다. | None | AssertionError | 임시 파일 기반 |
 | `ProjectStructureTest.test_resource_monitor_mqtt_defaults_match_between_nodes` | Edge node와 AI server의 기본 MQTT 접속 설정이 일치하는지 검증합니다. | None | AssertionError | 상태 topic 불일치 방지 |
 | `ProjectStructureTest.test_edge_connection_info_prints_ai_server_settings` | Edge node 시작 정보가 AI server 설정값을 포함하는지 검증합니다. | None | AssertionError | SSH 실행 안내 출력 회귀 방지 |
+| `ProjectStructureTest.test_edge_node_os_guard_accepts_linux_debian_family` | Edge node OS guard가 Linux Debian 계열을 허용하고 비지원 OS를 차단하는지 검증합니다. | None | AssertionError | Edge node 실행 환경 회귀 방지 |
 | `ProjectStructureTest.test_ai_server_parses_edge_startup_connection_text` | AI server 시작 UI가 Edge node 표준 출력값을 설정 객체로 해석하는지 검증합니다. | None | AssertionError | 연결 UI 붙여넣기 회귀 방지 |
 | `ProjectStructureTest.test_ai_server_os_guard_accepts_only_windows` | AI server OS guard가 Windows만 허용하고 Linux를 종료 처리하는지 검증합니다. | None | AssertionError | OS 분기 회귀 방지 |
 | `ProjectStructureTest.test_pyqt5_bootstrap_installs_only_when_user_accepts` | PyQt5 bootstrap이 사용자가 동의한 경우에만 설치 함수를 호출하는지 검증합니다. | None | AssertionError | GUI 점검 창 진입 전 최소 의존성 검증 |

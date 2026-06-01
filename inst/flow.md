@@ -14,6 +14,7 @@ AI_CCTV/
 |   `-- ai_cctv/
 |       |-- edge_node/              # Raspberry Pi Edge node 배포 단위
 |       |   |-- main.py             # Edge node 실행 진입점
+|       |   |-- os_guard.py         # Linux/Debian 계열 실행 환경 확인
 |       |   |-- runtime.py          # MediaMTX 준비와 GStreamer 실행 조율
 |       |   |-- startup_info.py     # SSH 실행 직후 AI server 설정용 연결 정보 출력
 |       |   |-- mediamtx.py         # MediaMTX 다운로드, 설치 확인, 프로세스 관리
@@ -50,7 +51,8 @@ AI_CCTV/
 flowchart LR
     Camera["Camera Module"] --> Pi["Raspberry Pi 4B"]
     Pi --> EdgeMain["ai_cctv/edge_node/main.py"]
-    EdgeMain --> EdgeRuntime["EdgeNodeRuntime"]
+    EdgeMain --> EdgeOsGuard["ensure_supported_edge_os"]
+    EdgeOsGuard --> EdgeRuntime["EdgeNodeRuntime"]
     EdgeRuntime --> StartupInfo["EdgeConnectionInfo startup output"]
     EdgeMain -. "same Edge node" .-> MonitorPublisher["edge_node/monitoring/resource_monitor_publisher.py"]
     Pi --> UpsPlus["52Pi EP-0136 UPS Plus"]
@@ -118,6 +120,11 @@ classDiagram
         +build_command_args()
         +run()
         +stop()
+    }
+
+    class EdgeOsGuard {
+        +ensure_supported_edge_os()
+        +is_supported_edge_os()
     }
 
     class EdgeConnectionInfo {
@@ -298,6 +305,7 @@ classDiagram
         +append_sample(resource_usage)
     }
 
+    EdgeOsGuard --> EdgeNodeRuntime
     EdgeNodeRuntime --> MediaMtxInstaller
     EdgeNodeRuntime --> MediaMtxProcessManager
     EdgeNodeRuntime --> LocalBackupConfig
@@ -371,6 +379,8 @@ BACKUP_DIR=~/backups
 ```
 
 자동 감지가 SSH 서버 IP, 지정 인터페이스 IP, UDP 라우팅 결과 순서로 실패하면 `127.0.0.1`이 출력될 수 있습니다. 이때는 Edge node에서 `AI_CCTV_EDGE_HOST`를 유선 IP로 지정한 뒤 다시 실행합니다.
+
+Edge node의 `ai-cctv-edge`, `ai-cctv-edge-monitor`, `ai-cctv-edge-backup-recovery` 진입점은 실행 직후 `ensure_supported_edge_os`를 호출합니다. Windows나 macOS는 즉시 종료되며, `/etc/os-release`에서 배포판을 확인할 수 있는 Linux 환경은 Debian, Raspbian, Ubuntu 계열만 허용합니다. 배포판 정보를 읽을 수 없는 최소 Linux 환경은 Linux 커널 실행 환경으로 보고 허용합니다.
 
 AI server는 `server_run.main` 진입 직후 Windows OS 여부를 확인합니다. Windows가 아니면 한국어 오류 메시지를 표준 오류로 출력하고 종료합니다. Windows에서는 먼저 PyQt5가 있는지 확인하고, 없으면 표준 라이브러리 tkinter 창으로 PyQt5 설치 여부를 묻습니다. PyQt5가 준비되면 `RuntimeEnvironmentChecker`가 PyTorch, PyQt5, OpenCV, Ultralytics, Transformers, Accelerate, bitsandbytes, HuggingFace Hub, Qwen 관련 패키지, Discord 알림 패키지, 얼굴 식별 패키지, MQTT/복구용 패키지, YOLO 모델 파일, Qwen 모델 캐시를 점검합니다. 누락 항목이 있으면 `RuntimeReadinessDialog`가 표시되고, 사용자가 `O - 자동 설치`를 누른 경우에만 `RuntimeInstaller`가 pip 설치와 모델 다운로드를 시도합니다. `X - 설치하지 않음`을 누르거나 설치 후에도 준비가 끝나지 않으면 메인 창은 생성되지 않습니다.
 
