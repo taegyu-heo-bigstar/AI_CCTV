@@ -184,7 +184,7 @@
 
 ## `src/ai_cctv/ai_server/analysis/video_stream.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
 | `VideoStream` | 웹캠 또는 RTSP 영상 입력을 공통 인터페이스로 감쌉니다. | VideoStream 객체 | 없음 | RTSP 입력은 별도 수신 thread 사용 |
 | `VideoStream.__init__` | 입력 소스와 RTSP 수신 상태를 초기화합니다. | None | 없음 | 복구 URL이 있으면 복구 관리자 생성 |
@@ -289,10 +289,56 @@
 
 ## `src/ai_cctv/ai_server/server_run.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
 | `preload_ai_runtime_libraries` | PyQt 로딩 전에 AI 런타임 네이티브 라이브러리를 초기화합니다. | None | PyTorch 초기화 오류 | torch DLL 로딩 순서 안정화 |
-| `main` | 연결 설정 UI를 먼저 실행하고 성공 후 AI server 관제 GUI 애플리케이션을 실행합니다. | None | PyTorch 초기화 오류, 연결 UI 종료 | 메인 창 표시 전 연결 검증 |
+| `main` | Windows OS 여부를 먼저 확인한 뒤 AI server 관제 GUI 애플리케이션을 실행합니다. | None | 비 Windows 환경 SystemExit, PyTorch 초기화 오류 | OS guard 이후 UI 시작 |
+
+## `src/ai_cctv/ai_server/runtime/__init__.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `RuntimeEnvironmentChecker` | AI server 실행에 필요한 패키지와 모델 점검 클래스를 외부로 노출합니다. | 클래스 참조 | 없음 | `environment_check.py` 재노출 |
+| `RuntimeInstaller` | 누락된 패키지와 모델을 설치하는 클래스를 외부로 노출합니다. | 클래스 참조 | 없음 | `environment_check.py` 재노출 |
+| `RuntimeRequirement` | 런타임 요구사항 데이터 클래스를 외부로 노출합니다. | 클래스 참조 | 없음 | `environment_check.py` 재노출 |
+| `RuntimeRequirementResult` | 런타임 요구사항 점검 결과 클래스를 외부로 노출합니다. | 클래스 참조 | 없음 | `environment_check.py` 재노출 |
+| `RuntimeReadinessReport` | 전체 런타임 준비 상태 보고 클래스를 외부로 노출합니다. | 클래스 참조 | 없음 | `environment_check.py` 재노출 |
+| `ensure_windows_os` | Windows 전용 실행 검증 함수를 외부로 노출합니다. | 함수 참조 | 없음 | `os_guard.py` 재노출 |
+| `is_windows_os` | OS 판별 함수를 외부로 노출합니다. | 함수 참조 | 없음 | `os_guard.py` 재노출 |
+
+## `src/ai_cctv/ai_server/runtime/os_guard.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `is_windows_os` | 현재 또는 전달받은 OS 이름이 Windows인지 판별합니다. | bool | 없음 | 테스트에서 OS 이름 주입 가능 |
+| `ensure_windows_os` | AI server가 Windows에서 실행 중인지 확인하고 아니면 오류를 출력한 뒤 종료합니다. | None | SystemExit(1) | `server_run.main`의 첫 관문 |
+
+## `src/ai_cctv/ai_server/runtime/environment_check.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `RuntimeRequirement` | 패키지 또는 모델 요구사항의 이름, 종류, 설치 식별자를 보관합니다. | RuntimeRequirement 객체 | 없음 | dataclass, package/model 공통 표현 |
+| `RuntimeRequirementResult` | 단일 요구사항의 설치 여부와 상세 메시지를 보관합니다. | RuntimeRequirementResult 객체 | 없음 | dataclass |
+| `RuntimeReadinessReport` | 전체 런타임 요구사항 점검 결과를 보관합니다. | RuntimeReadinessReport 객체 | 없음 | dataclass |
+| `RuntimeReadinessReport.missing_required` | 누락된 필수 요구사항 목록을 반환합니다. | RuntimeRequirementResult 목록 | 없음 | 설치 대상 추출 |
+| `RuntimeReadinessReport.is_ready` | 필수 요구사항이 모두 준비됐는지 반환합니다. | bool | 없음 | UI 분기 조건 |
+| `RuntimeReadinessReport.to_text` | 점검 결과를 여러 줄 문자열로 변환합니다. | 문자열 | 없음 | 설치 확인 창 표시용 |
+| `RuntimeEnvironmentChecker` | AI server의 패키지와 모델 캐시 상태를 점검합니다. | RuntimeEnvironmentChecker 객체 | 없음 | 프로젝트 루트 주입 가능 |
+| `RuntimeEnvironmentChecker.__init__` | 점검할 요구사항과 프로젝트 루트 경로를 초기화합니다. | None | 없음 | 테스트용 요구사항 주입 가능 |
+| `RuntimeEnvironmentChecker.check` | 모든 요구사항을 점검해 준비 상태 보고서를 반환합니다. | RuntimeReadinessReport | 없음 | 시작 시 자동 호출 |
+| `RuntimeEnvironmentChecker._check_requirement` | 요구사항 종류에 맞는 점검 함수를 호출합니다. | RuntimeRequirementResult | 알 수 없는 종류 결과 | 내부 함수 |
+| `RuntimeEnvironmentChecker._check_package` | Python 패키지 import 가능 여부와 버전을 확인합니다. | RuntimeRequirementResult | 패키지 누락 결과 | `importlib.util.find_spec` 사용 |
+| `RuntimeEnvironmentChecker._check_yolo_model` | YOLO 모델 파일 존재 여부를 확인합니다. | RuntimeRequirementResult | 모델 파일 누락 결과 | `AI_CCTV_YOLO_MODEL_PATH` 반영 |
+| `RuntimeEnvironmentChecker._check_qwen_model` | Qwen 모델 config가 HuggingFace 캐시에 있는지 확인합니다. | RuntimeRequirementResult | 캐시 누락 결과 | 네트워크 없이 local cache 확인 |
+| `RuntimeInstaller` | 누락된 패키지 설치와 모델 다운로드를 수행합니다. | RuntimeInstaller 객체 | 없음 | UI에서 O 선택 시 사용 |
+| `RuntimeInstaller.__init__` | 설치 명령에 사용할 Python 실행 파일을 초기화합니다. | None | 없음 | 기본값은 현재 Python |
+| `RuntimeInstaller.install_missing` | 누락된 요구사항을 순서대로 설치하거나 다운로드합니다. | 설치 로그 목록 | RuntimeError | package, YOLO, Qwen 종류별 분기 |
+| `RuntimeInstaller._install_package` | pip로 Python 패키지를 설치합니다. | 로그 문자열 | RuntimeError | subprocess 기반 |
+| `RuntimeInstaller._download_yolo_model` | Ultralytics를 통해 YOLO 모델 준비를 시도합니다. | 로그 문자열 | RuntimeError | 별도 Python 프로세스 사용 |
+| `RuntimeInstaller._download_qwen_model` | HuggingFace Hub에서 Qwen 모델 캐시를 다운로드합니다. | 로그 문자열 | RuntimeError | 모델을 메모리에 로드하지 않음 |
+| `RuntimeInstaller._run_python_script` | 별도 Python 프로세스로 설치 보조 스크립트를 실행합니다. | None | RuntimeError | stdout/stderr 포함 |
+| `build_default_requirements` | AI server 기본 실행 요구사항 목록을 생성합니다. | RuntimeRequirement 목록 | 없음 | 환경 변수로 모델 식별자 변경 가능 |
+| `_read_distribution_version` | 설치 식별자에서 패키지 버전을 조회합니다. | 버전 문자열 또는 빈 문자열 | 없음 | 내부 함수 |
 
 ## `src/ai_cctv/ai_server/connection/__init__.py`
 
@@ -310,11 +356,13 @@
 | `EdgeConnectionConfig` | AI server가 Edge node에 접속하는 데 필요한 RTSP, MQTT, 백업 복구 설정을 보관합니다. | EdgeConnectionConfig 객체 | 없음 | dataclass |
 | `EdgeConnectionConfig.from_environment` | 환경 변수에서 AI server 연결 설정을 생성합니다. | EdgeConnectionConfig 객체 | 잘못된 포트 값 | 기존 환경 변수 호환 |
 | `EdgeConnectionConfig.apply_environment` | 현재 연결 설정을 기존 AI server 코드가 읽는 환경 변수에 반영합니다. | None | 환경 변수 설정 오류 | MQTT/복구/RTSP 값 반영 |
+| `EdgeConnectionConfig.video_source` | Edge node 모드에서는 RTSP URL을, Windows 로컬 카메라 모드에서는 카메라 인덱스를 반환합니다. | RTSP URL 또는 정수 인덱스 | 없음 | `VideoWorker` 입력 소스 분기 |
 | `EdgeConnectionValidationResult` | Edge node 연결 검증 결과를 표현합니다. | EdgeConnectionValidationResult 객체 | 없음 | dataclass |
 | `EdgeConnectionValidationResult.message` | 검증 결과를 화면 표시용 문자열로 변환합니다. | 문자열 | 없음 | 실패 사유 줄바꿈 |
 | `EdgeConnectionValidator` | RTSP, MQTT, 백업 복구 API의 접속 가능 여부를 검증합니다. | EdgeConnectionValidator 객체 | 없음 | UI와 검증 책임 분리 |
 | `EdgeConnectionValidator.__init__` | 연결 검증 제한 시간을 초기화합니다. | None | 없음 | 테스트 시 timeout 주입 가능 |
 | `EdgeConnectionValidator.validate` | Edge node 연결 설정의 필수 접속 가능 여부를 검증합니다. | EdgeConnectionValidationResult | 네트워크 실패 결과 | 메인 창 시작 조건 |
+| `EdgeConnectionValidator._validate_local_camera` | Windows 로컬 카메라 인덱스를 OpenCV로 열 수 있는지 검증합니다. | 오류 목록 | 없음 | 로컬 카메라 모드 전용 |
 | `EdgeConnectionValidator._validate_rtsp` | RTSP URL 형식과 TCP 포트 접근 가능 여부를 검증합니다. | 오류 목록 | 없음 | 내부 함수 |
 | `EdgeConnectionValidator._validate_mqtt` | MQTT broker TCP 포트 접근 가능 여부를 검증합니다. | 오류 목록 | 없음 | 내부 함수 |
 | `EdgeConnectionValidator._validate_backup_recovery` | 백업 복구 HTTP endpoint 접근 가능 여부를 검증합니다. | 오류 목록 | 없음 | HTTP 4xx는 연결 성공으로 판단 |
@@ -462,7 +510,7 @@
 
 ## `src/ai_cctv/ai_server/ui/event_presenter.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
 | `EventDisplay` | 이벤트 표시 정보를 담는 값 객체입니다. | EventDisplay ???? | ??? ?? ?? ?? | ?? ?? ?? |
 | `EventPresenter` | 이벤트 딕셔너리를 UI 표시 정보로 변환합니다. | EventPresenter ???? | ??? ?? ?? ?? | ?? ?? ?? |
@@ -521,7 +569,7 @@
 | `CCTVMainWindow.stop_video` | 영상 처리 작업자를 중지하고 카메라 상태를 갱신합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `CCTVMainWindow.open_settings` | 설정 창을 열고 적용된 값을 메인 창 상태에 반영합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `CCTVMainWindow.open_edge_status` | Edge node 상태 조회 창을 열고 모니터링 요청을 시작합니다. | None | 모니터링 창 생성 오류 | 헤더 버튼에서 호출 |
-| `CCTVMainWindow._resolve_initial_video_source` | 시작 전 검증된 Edge node 연결 설정에서 초기 영상 입력 소스를 결정합니다. | RTSP URL 또는 0 | 없음 | 연결 UI 결과 반영 |
+| `CCTVMainWindow._resolve_initial_video_source` | 시작 전 검증된 연결 설정에서 RTSP URL 또는 Windows 로컬 카메라 인덱스를 결정합니다. | RTSP URL 또는 정수 인덱스 | 없음 | Edge node/로컬 카메라 분기 |
 | `CCTVMainWindow.update_frame` | OpenCV 프레임을 PyQt 이미지로 변환해 화면에 표시합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `CCTVMainWindow.show_loading_screen` | 영상 영역에 현재 준비 단계 로딩 문구를 표시합니다. | None | 없음 | VideoWorker loading_ready 신호 수신 |
 | `CCTVMainWindow.show_idle_screen` | 영상 영역을 실행 전 기본 대기 화면으로 되돌립니다. | None | 없음 | STOP 또는 시작 실패 시 호출 |
@@ -533,7 +581,7 @@
 | `CCTVMainWindow._handle_worker_finished` | 영상 작업자가 예기치 않게 종료된 경우 UI 상태를 정리합니다. | None | 없음 | 스트림 열기 실패 후 상태 정리 |
 | `CCTVMainWindow._build_storage_label` | 저장 경로 패널에 표시할 문자열을 생성합니다. | 'Storage path\nNo storage path selected.\n\nSelect a location in Settings > Storage.' | ??? ?? ?? ?? | ?? ?? |
 | `CCTVMainWindow._trim_event_list` | 이벤트 타임라인의 최대 표시 개수를 제한합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `main` | Edge node 연결 설정 UI를 먼저 표시하고 성공 후 AI CCTV PyQt 애플리케이션을 실행합니다. | None | 연결 검증 실패, AI 런타임 초기화 오류 | 메인 창 생성 전 연결 강제 |
+| `main` | 런타임 준비 상태 확인 UI와 연결 입력 UI를 순서대로 표시한 뒤 AI CCTV PyQt 애플리케이션을 실행합니다. | None | 설치 거부, 연결 검증 실패, AI 런타임 초기화 오류 | 메인 창 생성 전 필수 조건 검증 |
 
 ## `src/ai_cctv/ai_server/ui/edge_connection_dialog.py`
 
@@ -545,9 +593,22 @@
 | `EdgeConnectionDialog._create_button` | 대화상자에서 사용할 공통 버튼을 생성합니다. | QPushButton | 없음 | 공통 스타일 |
 | `EdgeConnectionDialog.apply_startup_text` | 붙여넣은 Edge node 표준 출력값을 입력 필드에 반영합니다. | None | ValueError | 출력값 적용 버튼 |
 | `EdgeConnectionDialog.validate_and_accept` | 입력된 연결값을 검증하고 성공하면 대화상자를 종료합니다. | None | 연결 검증 실패 | 성공 시 환경 변수 반영 |
+| `EdgeConnectionDialog.update_input_mode` | Edge node RTSP 모드와 Windows 로컬 카메라 모드에 맞게 입력 필드를 활성화합니다. | None | 없음 | 로컬 카메라 선택 시 Edge 값 입력 비활성화 |
 | `EdgeConnectionDialog._set_pending_state` | 연결 검증 진행 중 UI 상태를 표시합니다. | None | 없음 | 중복 클릭 방지 |
 | `EdgeConnectionDialog._read_form_config` | 현재 입력 필드 값을 EdgeConnectionConfig로 변환합니다. | EdgeConnectionConfig 객체 | ValueError | MQTT 포트 정수 검증 |
 | `EdgeConnectionDialog._populate_fields` | 연결 설정 객체의 값을 입력 필드에 표시합니다. | None | 없음 | 표준 출력 파싱 결과 반영 |
+
+## `src/ai_cctv/ai_server/ui/runtime_readiness_dialog.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `RuntimeReadinessDialog` | AI server 실행 전 누락된 패키지와 모델을 보여주고 자동 설치 여부를 묻습니다. | RuntimeReadinessDialog 객체 | 없음 | QDialog |
+| `RuntimeReadinessDialog.__init__` | 런타임 점검 보고서, 점검기, 설치기와 UI 상태를 초기화합니다. | None | 없음 | 설치 재시도 후 재점검 가능 |
+| `RuntimeReadinessDialog._build_ui` | 누락 항목 설명, 점검 결과, O/X 버튼 UI를 구성합니다. | None | PyQt 위젯 생성 오류 | 설치 동의 흐름 담당 |
+| `RuntimeReadinessDialog._create_button` | 런타임 준비 대화상자의 버튼을 생성합니다. | QPushButton | 없음 | 공통 버튼 스타일 |
+| `RuntimeReadinessDialog.install_and_recheck` | 누락 항목을 설치한 뒤 다시 점검하고 준비 완료 시 대화상자를 닫습니다. | None | 설치 RuntimeError | O 버튼 동작 |
+| `RuntimeReadinessDialog._build_report_text` | 런타임 준비 상태 보고서를 표시 문자열로 변환합니다. | 문자열 | 없음 | 상세 점검 결과 표시 |
+| `ensure_runtime_readiness` | 런타임 요구사항을 점검하고 누락 시 설치 확인 대화상자를 실행합니다. | bool | 설치 실패 또는 사용자 거부 | `main_window.main`에서 호출 |
 
 ## `src/ai_cctv/ai_server/ui/settings_window.py`
 
@@ -740,3 +801,6 @@
 | `ProjectStructureTest.test_resource_monitor_mqtt_defaults_match_between_nodes` | Edge node와 AI server의 기본 MQTT 접속 설정이 일치하는지 검증합니다. | None | AssertionError | 상태 topic 불일치 방지 |
 | `ProjectStructureTest.test_edge_connection_info_prints_ai_server_settings` | Edge node 시작 정보가 AI server 설정값을 포함하는지 검증합니다. | None | AssertionError | SSH 실행 안내 출력 회귀 방지 |
 | `ProjectStructureTest.test_ai_server_parses_edge_startup_connection_text` | AI server 시작 UI가 Edge node 표준 출력값을 설정 객체로 해석하는지 검증합니다. | None | AssertionError | 연결 UI 붙여넣기 회귀 방지 |
+| `ProjectStructureTest.test_ai_server_os_guard_accepts_only_windows` | AI server OS guard가 Windows만 허용하고 Linux를 종료 처리하는지 검증합니다. | None | AssertionError | OS 분기 회귀 방지 |
+| `ProjectStructureTest.test_local_camera_connection_config_uses_camera_index` | 로컬 카메라 모드에서 영상 소스가 카메라 인덱스로 반환되는지 검증합니다. | None | AssertionError | Edge node 없는 테스트 경로 보장 |
+| `ProjectStructureTest.test_runtime_readiness_report_finds_missing_required_items` | 런타임 준비 보고서가 누락된 필수 요구사항을 찾는지 검증합니다. | None | AssertionError | 자동 설치 대상 산출 검증 |

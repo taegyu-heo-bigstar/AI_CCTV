@@ -120,6 +120,12 @@ class CCTVMainWindow(QMainWindow):
 
         self.btn_edge_status = self._create_button("엣지 노드 상태 조회", "#0f766e")
         self.btn_edge_status.clicked.connect(self.open_edge_status)
+        if (
+            self.edge_connection_config is not None
+            and self.edge_connection_config.use_local_camera
+        ):
+            self.btn_edge_status.setEnabled(False)
+            self.btn_edge_status.setToolTip("Windows 자체 카메라 모드에서는 Edge node 상태 조회를 사용하지 않습니다.")
 
         header_layout.addWidget(title_label)
         header_layout.addStretch()
@@ -428,7 +434,7 @@ class CCTVMainWindow(QMainWindow):
         """
 
         if edge_connection_config is not None:
-            return edge_connection_config.rtsp_url
+            return edge_connection_config.video_source()
         return 0
 
     def update_frame(self, frame):
@@ -671,6 +677,11 @@ def main(pre_start_callback=None):
     """
 
     app = QApplication(sys.argv)
+    from .runtime_readiness_dialog import ensure_runtime_readiness
+
+    if not ensure_runtime_readiness():
+        sys.exit(1)
+
     from .edge_connection_dialog import EdgeConnectionDialog
 
     connection_dialog = EdgeConnectionDialog()

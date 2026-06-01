@@ -20,8 +20,10 @@ edge-node = [
     "smbus2",
 ]
 ai-server = [
+    "torch",
     "transformers>=4.51.0",
     "accelerate",
+    "huggingface-hub",
     "pillow",
     "qwen-vl-utils",
     "bitsandbytes",

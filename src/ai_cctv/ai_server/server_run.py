@@ -4,6 +4,8 @@
 
 """AI server 실행 진입점입니다."""
 
+from .runtime import ensure_windows_os
+
 
 def preload_ai_runtime_libraries():
     """PyQt 로딩 전에 AI 런타임 네이티브 라이브러리를 초기화합니다.
@@ -33,8 +35,9 @@ def main():
         없음.
     """
 
-    from .ui.main_window import main as run_main_window
+    ensure_windows_os()
 
+    from .ui.main_window import main as run_main_window
     run_main_window(pre_start_callback=preload_ai_runtime_libraries)
 
 

@@ -134,6 +134,8 @@ Windows AI server를 실행하면 메인 관제 창보다 먼저 Edge node 연�
 ai-cctv-ai-server
 ```
 
+AI server 진입점은 Windows가 아닌 OS를 감지하면 오류 메시지를 출력하고 즉시 종료합니다. Windows에서는 먼저 실행 환경을 검사하며 PyTorch, PyQt5, OpenCV, Ultralytics, Transformers, Accelerate, bitsandbytes, HuggingFace Hub, Qwen 관련 패키지, Discord 알림 패키지, 얼굴 식별 패키지, YOLO/Qwen 모델이 없으면 설치 확인 창을 표시합니다. `O - 자동 설치`를 누르면 누락 항목 설치를 시도하고, `X - 설치하지 않음`을 누르면 프로그램을 시작하지 않습니다.
+
 연결 설정 창에서 성공한 값은 자동으로 다음 항목에 반영됩니다.
 
 | 값 | 반영 위치 |
@@ -141,3 +143,5 @@ ai-cctv-ai-server
 | `RTSP_URL` | 메인 영상 입력 소스 |
 | `MQTT_BROKER`, `MQTT_TOPIC` | Edge node 상태 조회 MQTT 구독 설정 |
 | `BACKUP_RECOVERY_URL` | RTSP 장애 구간 백업 복구 요청 URL |
+
+Windows 데스크톱의 자체 카메라만 테스트하려면 연결 설정 창에서 `Windows 데스크톱 자체 카메라 사용`을 선택하고 카메라 번호를 입력합니다. 이 경우 RTSP, MQTT, 백업 복구 API 검증은 건너뛰고 OpenCV가 해당 카메라를 열 수 있는지만 확인합니다.

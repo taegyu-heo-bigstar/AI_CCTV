@@ -32,6 +32,12 @@ from ai_cctv.ai_server.recovery.network_recovery_manager import (
     NetworkRecoveryConfig,
     NetworkRecoveryManager,
 )
+from ai_cctv.ai_server.runtime.environment_check import (
+    RuntimeReadinessReport,
+    RuntimeRequirement,
+    RuntimeRequirementResult,
+)
+from ai_cctv.ai_server.runtime.os_guard import ensure_windows_os, is_windows_os
 from ai_cctv.edge_node.backup_recovery_server import (
     BackupRecoveryService,
     BackupSegmentFinder,
@@ -404,6 +410,8 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertIn("fastapi", extras["edge-node"])
         self.assertIn("uvicorn", extras["edge-node"])
         self.assertIn("requests", extras["ai-server"])
+        self.assertIn("torch", extras["ai-server"])
+        self.assertIn("huggingface-hub", extras["ai-server"])
         self.assertNotIn("edge-pi", extras)
         self.assertNotIn("windows-server", extras)
         self.assertNotIn("edge", extras)
@@ -433,6 +441,13 @@ class ProjectStructureTest(unittest.TestCase):
             Path("src/ai_cctv/ai_server/connection/edge_connection.py").is_file()
         )
         self.assertTrue(Path("src/ai_cctv/ai_server/monitoring").is_dir())
+        self.assertTrue(Path("src/ai_cctv/ai_server/runtime").is_dir())
+        self.assertTrue(
+            Path("src/ai_cctv/ai_server/runtime/os_guard.py").is_file()
+        )
+        self.assertTrue(
+            Path("src/ai_cctv/ai_server/runtime/environment_check.py").is_file()
+        )
         self.assertTrue(
             Path("src/ai_cctv/ai_server/monitoring/resource_monitor_client.py").is_file()
         )
@@ -442,6 +457,9 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(Path("src/ai_cctv/ai_server/ui").is_dir())
         self.assertTrue(
             Path("src/ai_cctv/ai_server/ui/edge_connection_dialog.py").is_file()
+        )
+        self.assertTrue(
+            Path("src/ai_cctv/ai_server/ui/runtime_readiness_dialog.py").is_file()
         )
         self.assertTrue(Path("src/ai_cctv/ai_server/ui/edge_status_window.py").is_file())
         self.assertTrue(Path("src/ai_cctv/ai_server/analysis").is_dir())
@@ -641,6 +659,56 @@ class ProjectStructureTest(unittest.TestCase):
             config.backup_recovery_url,
             "http://192.168.137.2:8002/recover",
         )
+
+    def test_ai_server_os_guard_accepts_only_windows(self):
+        """AI server OS guard가 Windows만 허용하고 다른 OS는 종료하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        self.assertTrue(is_windows_os("Windows"))
+        self.assertFalse(is_windows_os("Linux"))
+        ensure_windows_os("Windows")
+        with self.assertRaises(SystemExit):
+            ensure_windows_os("Linux", stream=Mock())
+
+    def test_local_camera_connection_config_uses_camera_index(self):
+        """Windows 자체 카메라 분기 설정이 Edge node 값 대신 카메라 번호를 사용하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        config = EdgeConnectionConfig(use_local_camera=True, local_camera_index=1)
+
+        self.assertEqual(config.video_source(), 1)
+
+    def test_runtime_readiness_report_finds_missing_required_items(self):
+        """런타임 준비 상태 결과가 누락된 필수 항목을 구분하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        requirement = RuntimeRequirement(
+            name="missing",
+            kind="package",
+            import_name="missing_package",
+            install_spec="missing-package",
+        )
+        report = RuntimeReadinessReport(
+            results=(RuntimeRequirementResult(requirement, False, "없음"),)
+        )
+
+        self.assertFalse(report.is_ready())
+        self.assertEqual(report.missing_required()[0].requirement.name, "missing")
 
 
 if __name__ == "__main__":

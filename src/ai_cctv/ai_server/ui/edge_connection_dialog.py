@@ -6,6 +6,7 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QApplication,
+    QButtonGroup,
     QDialog,
     QFormLayout,
     QHBoxLayout,
@@ -13,6 +14,7 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QRadioButton,
     QTextEdit,
     QVBoxLayout,
 )
@@ -85,6 +87,28 @@ class EdgeConnectionDialog(QDialog):
         guide_label.setStyleSheet("color: #94a3b8;")
         layout.addWidget(guide_label)
 
+        self.edge_mode_radio = QRadioButton("Edge node RTSP 사용")
+        self.local_camera_radio = QRadioButton("Windows 데스크톱 자체 카메라 사용")
+        self.edge_mode_radio.setChecked(True)
+        radio_style = "QRadioButton { font-size: 15px; color: #f8fafc; spacing: 8px; }"
+        self.edge_mode_radio.setStyleSheet(radio_style)
+        self.local_camera_radio.setStyleSheet(radio_style)
+        self.input_mode_group = QButtonGroup(self)
+        self.input_mode_group.addButton(self.edge_mode_radio)
+        self.input_mode_group.addButton(self.local_camera_radio)
+        self.edge_mode_radio.toggled.connect(self.update_input_mode)
+        self.local_camera_radio.toggled.connect(self.update_input_mode)
+        layout.addWidget(self.edge_mode_radio)
+        layout.addWidget(self.local_camera_radio)
+
+        self.local_camera_index_input = QLineEdit()
+        self.local_camera_index_input.setPlaceholderText("예: 0")
+        self.local_camera_index_input.setText("0")
+        local_form_layout = QFormLayout()
+        local_form_layout.setLabelAlignment(Qt.AlignRight)
+        local_form_layout.addRow("LOCAL_CAMERA_INDEX", self.local_camera_index_input)
+        layout.addLayout(local_form_layout)
+
         self.startup_text_edit = QTextEdit()
         self.startup_text_edit.setPlaceholderText("Edge node 표준 출력 블록을 여기에 붙여넣기")
         self.startup_text_edit.setFixedHeight(120)
@@ -107,6 +131,7 @@ class EdgeConnectionDialog(QDialog):
         form_layout.addRow("MQTT_TOPIC", self.mqtt_topic_input)
         form_layout.addRow("BACKUP_RECOVERY_URL", self.backup_recovery_url_input)
         layout.addLayout(form_layout)
+        self.update_input_mode()
 
         self.status_label = QLabel("연결 확인 전입니다.")
         self.status_label.setStyleSheet("color: #facc15; font-weight: bold;")
@@ -158,6 +183,8 @@ class EdgeConnectionDialog(QDialog):
             return
 
         self._populate_fields(config)
+        self.edge_mode_radio.setChecked(True)
+        self.update_input_mode()
         self.status_label.setText("출력값을 입력 필드에 반영했습니다.")
         self.status_label.setStyleSheet("color: #38bdf8; font-weight: bold;")
 
@@ -215,6 +242,16 @@ class EdgeConnectionDialog(QDialog):
             EdgeConnectionConfig 인스턴스를 반환합니다.
         """
 
+        if self.local_camera_radio.isChecked():
+            try:
+                local_camera_index = int(self.local_camera_index_input.text().strip())
+            except ValueError as error:
+                raise ValueError("LOCAL_CAMERA_INDEX는 정수여야 합니다.") from error
+            return EdgeConnectionConfig(
+                use_local_camera=True,
+                local_camera_index=local_camera_index,
+            )
+
         try:
             mqtt_port = int(self.mqtt_port_input.text().strip())
         except ValueError as error:
@@ -226,6 +263,7 @@ class EdgeConnectionDialog(QDialog):
             mqtt_port=mqtt_port,
             mqtt_topic=self.mqtt_topic_input.text().strip(),
             backup_recovery_url=self.backup_recovery_url_input.text().strip(),
+            use_local_camera=False,
         )
 
     def _populate_fields(self, config):
@@ -242,3 +280,22 @@ class EdgeConnectionDialog(QDialog):
         self.mqtt_port_input.setText(str(config.mqtt_port))
         self.mqtt_topic_input.setText(config.mqtt_topic)
         self.backup_recovery_url_input.setText(config.backup_recovery_url)
+        self.local_camera_index_input.setText(str(config.local_camera_index))
+
+    def update_input_mode(self):
+        """선택한 입력 방식에 맞춰 Edge node 필드와 자체 카메라 필드를 전환합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        edge_mode = self.edge_mode_radio.isChecked()
+        self.startup_text_edit.setEnabled(edge_mode)
+        self.rtsp_url_input.setEnabled(edge_mode)
+        self.mqtt_host_input.setEnabled(edge_mode)
+        self.mqtt_port_input.setEnabled(edge_mode)
+        self.mqtt_topic_input.setEnabled(edge_mode)
+        self.backup_recovery_url_input.setEnabled(edge_mode)
+        self.local_camera_index_input.setEnabled(not edge_mode)

@@ -32,6 +32,8 @@ class EdgeConnectionConfig:
         mqtt_port: MQTT broker 포트입니다.
         mqtt_topic: Edge node 상태 JSON을 구독할 MQTT topic입니다.
         backup_recovery_url: 누락 구간 복구 요청을 보낼 Edge node HTTP URL입니다.
+        use_local_camera: Windows 데스크톱 자체 카메라 사용 여부입니다.
+        local_camera_index: 자체 카메라를 사용할 때의 OpenCV 카메라 번호입니다.
     반환값:
         EdgeConnectionConfig 인스턴스를 반환합니다.
     """
@@ -41,6 +43,8 @@ class EdgeConnectionConfig:
     mqtt_port: int = DEFAULT_MQTT_PORT
     mqtt_topic: str = DEFAULT_MQTT_TOPIC
     backup_recovery_url: str = DEFAULT_BACKUP_RECOVERY_URL
+    use_local_camera: bool = False
+    local_camera_index: int = 0
 
     @classmethod
     def from_environment(cls):
@@ -77,6 +81,19 @@ class EdgeConnectionConfig:
         os.environ["AI_CCTV_MQTT_PORT"] = str(self.mqtt_port)
         os.environ["AI_CCTV_MQTT_STATUS_TOPIC"] = self.mqtt_topic
         os.environ["AI_CCTV_RECOVERY_SERVER_URL"] = self.backup_recovery_url
+
+    def video_source(self):
+        """메인 영상 입력에 사용할 OpenCV 소스 값을 반환합니다.
+
+        인자:
+            없음.
+        반환값:
+            자체 카메라 번호 또는 RTSP URL 문자열을 반환합니다.
+        """
+
+        if self.use_local_camera:
+            return self.local_camera_index
+        return self.rtsp_url
 
 
 @dataclass(frozen=True)
@@ -147,6 +164,13 @@ class EdgeConnectionValidator:
             EdgeConnectionValidationResult 인스턴스를 반환합니다.
         """
 
+        if config.use_local_camera:
+            errors = self._validate_local_camera(config.local_camera_index)
+            return EdgeConnectionValidationResult(
+                success=not errors,
+                errors=tuple(errors),
+            )
+
         errors = []
         errors.extend(self._validate_rtsp(config.rtsp_url))
         errors.extend(self._validate_mqtt(config.mqtt_host, config.mqtt_port))
@@ -171,6 +195,28 @@ class EdgeConnectionValidator:
         if check_rtsp_port_open(rtsp_url, timeout_seconds=self.rtsp_timeout_seconds):
             return []
         return [f"RTSP 포트에 연결할 수 없습니다: {rtsp_url}"]
+
+    def _validate_local_camera(self, camera_index):
+        """Windows 데스크톱 자체 카메라를 OpenCV로 열 수 있는지 검증합니다.
+
+        인자:
+            camera_index: 확인할 OpenCV 카메라 번호입니다.
+        반환값:
+            오류 메시지 목록을 반환합니다.
+        """
+
+        try:
+            import cv2
+        except Exception as error:
+            return [f"OpenCV를 불러올 수 없습니다: {error}"]
+
+        capture = cv2.VideoCapture(int(camera_index))
+        try:
+            if capture.isOpened():
+                return []
+            return [f"Windows 자체 카메라를 열 수 없습니다: index {camera_index}"]
+        finally:
+            capture.release()
 
     def _validate_mqtt(self, mqtt_host, mqtt_port):
         """MQTT broker TCP 포트 접근 가능 여부를 검증합니다.
@@ -250,6 +296,8 @@ def parse_edge_startup_text(text, base_config=None):
             "BACKUP_RECOVERY_URL",
             values.get("AI_CCTV_RECOVERY_SERVER_URL", fallback.backup_recovery_url),
         ),
+        use_local_camera=fallback.use_local_camera,
+        local_camera_index=fallback.local_camera_index,
     )
 
 
