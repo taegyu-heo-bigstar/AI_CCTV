@@ -4,7 +4,6 @@
 
 import os
 import platform
-import shutil
 import stat
 import subprocess
 import tarfile
@@ -29,7 +28,7 @@ class MediaMtxConfig:
     """
 
     version: str = "v1.9.0"
-    work_dir: str = "."
+    work_dir: str = "~/.ai_cctv/mediamtx"
     binary_name: str = "mediamtx"
     config_name: str = "mediamtx.yml"
     log_name: str = "mediamtx.log"
@@ -44,7 +43,7 @@ class MediaMtxConfig:
             pathlib.Path 작업 폴더 객체를 반환합니다.
         """
 
-        return Path(self.work_dir)
+        return Path(self.work_dir).expanduser()
 
     @property
     def binary_path(self):
@@ -246,20 +245,7 @@ class MediaMtxProcessManager:
             실행 중이면 True, 아니면 False를 반환합니다.
         """
 
-        if self.process is not None and self.process.poll() is None:
-            return True
-
-        pgrep_path = shutil.which("pgrep")
-        if pgrep_path is None:
-            return False
-
-        result = subprocess.run(
-            [pgrep_path, "-x", self.config.binary_name],
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        return result.returncode == 0
+        return self.process is not None and self.process.poll() is None
 
     def start(self):
         """MediaMTX를 백그라운드 프로세스로 실행합니다.
@@ -281,6 +267,8 @@ class MediaMtxProcessManager:
             stderr=subprocess.STDOUT,
         )
         time.sleep(2)
+        if self.process.poll() is not None:
+            raise RuntimeError(f"MediaMTX 실행 직후 종료됐습니다. 로그를 확인하세요: {self.config.log_path}")
         return self.process
 
     def stop(self):

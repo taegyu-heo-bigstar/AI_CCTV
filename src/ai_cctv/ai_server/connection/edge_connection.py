@@ -76,6 +76,18 @@ class EdgeConnectionConfig:
             없음.
         """
 
+        if self.use_local_camera:
+            os.environ["AI_CCTV_USE_LOCAL_CAMERA"] = "1"
+            os.environ["AI_CCTV_LOCAL_CAMERA_INDEX"] = str(self.local_camera_index)
+            os.environ.pop("AI_CCTV_RTSP_URL", None)
+            os.environ.pop("AI_CCTV_MQTT_HOST", None)
+            os.environ.pop("AI_CCTV_MQTT_PORT", None)
+            os.environ.pop("AI_CCTV_MQTT_STATUS_TOPIC", None)
+            os.environ.pop("AI_CCTV_RECOVERY_SERVER_URL", None)
+            return
+
+        os.environ["AI_CCTV_USE_LOCAL_CAMERA"] = "0"
+        os.environ.pop("AI_CCTV_LOCAL_CAMERA_INDEX", None)
         os.environ["AI_CCTV_RTSP_URL"] = self.rtsp_url
         os.environ["AI_CCTV_MQTT_HOST"] = self.mqtt_host
         os.environ["AI_CCTV_MQTT_PORT"] = str(self.mqtt_port)

@@ -6,7 +6,7 @@ Raspberry Pi 기반 Edge node와 Windows 기반 AI server를 분리해 구성하
 
 | 묶음 | 역할 | 실행 명령 |
 |---|---|---|
-| Edge node | 카메라 영상 송출, MediaMTX 실행, GStreamer 송출/로컬 백업, MQTT 상태 발행, 백업 복구 ZIP 제공, 네트워크 장애 대응 정책 | `ai-cctv-edge`, `ai-cctv-edge-monitor`, `ai-cctv-edge-backup-recovery` |
+| Edge node | 카메라 영상 송출, MediaMTX 실행, GStreamer 송출/로컬 백업, MQTT 상태 발행, 백업 복구 ZIP 제공, 네트워크 장애 대응 정책 | `ai-cctv-edge` |
 | AI server | RTSP 수신/재연결, OpenCV/YOLO 분석, MQTT 상태 구독, 이상 상황 판정, Discord 알림, GUI, 누락 구간 복구 요청 | `ai-cctv-ai-server` |
 
 ## 설치
@@ -18,10 +18,20 @@ pip install -e ".[edge-node]"
 ai-cctv-edge
 ```
 
+`ai-cctv-edge`는 기본적으로 MediaMTX, GStreamer 송출, MQTT 상태 발행, 백업 복구 API를 같은 생명주기로 실행합니다. MQTT broker는 별도 실행 중이어야 하며, broker가 Windows AI server에 있으면 `AI_CCTV_MQTT_HOST`를 Windows 유선 IP로 지정합니다.
+
+Edge node Python 의존성에는 Python GStreamer 바인딩을 포함하지 않습니다. 실제 송출은 `gst-launch-1.0` 외부 명령을 사용하므로 라즈베리 파이에는 `gstreamer1.0-tools`, libcamera/rpicam 관련 시스템 패키지가 별도로 설치되어 있어야 합니다.
+
 GStreamer 명령만 확인하려면 다음 옵션을 사용할 수 있습니다.
 
 ```bash
 ai-cctv-edge --print-command
+```
+
+RTSP 송출만 단독 점검하려면 보조 프로세스를 끌 수 있습니다.
+
+```bash
+ai-cctv-edge --no-support-services
 ```
 
 AI server 실행 환경:
@@ -31,14 +41,14 @@ pip install -e ".[ai-server]"
 ai-cctv-ai-server
 ```
 
-Edge node 상태 정보는 MQTT broker를 기준으로 주고받습니다. 기본 broker는 `127.0.0.1:1883`, 기본 topic은 `ai-cctv/edge-node/status`입니다.
+Edge node 상태 정보는 MQTT broker를 기준으로 주고받습니다. 기본 broker는 `127.0.0.1:1883`, 기본 topic은 `ai-cctv/edge-node/status`입니다. 통합 실행을 쓰지 않고 개별 프로세스를 점검할 때는 다음 명령을 직접 실행할 수 있습니다.
 
 ```bash
 ai-cctv-edge-monitor
 python -m ai_cctv.ai_server.monitoring.resource_monitor_client
 ```
 
-네트워크 단절 후 누락 구간 영상을 복구하려면 Edge node에서 FastAPI 기반 백업 복구 서버를 함께 실행합니다. AI server는 `requests`로 해당 API를 호출하므로 `AI_CCTV_RECOVERY_SERVER_URL`을 지정합니다.
+네트워크 단절 후 누락 구간 영상을 복구하려면 Edge node에서 FastAPI 기반 백업 복구 서버를 실행합니다. 통합 실행에서는 자동으로 실행되며, 개별 점검 시에는 다음 명령을 직접 사용할 수 있습니다.
 
 ```bash
 ai-cctv-edge-backup-recovery
@@ -72,6 +82,7 @@ src/
     |   |-- runtime.py  # MediaMTX 준비와 GStreamer 실행 조율
     |   |-- mediamtx.py # MediaMTX 다운로드/프로세스 관리
     |   |-- streaming.py # GStreamer 송출/백업 파이프라인 생성
+    |   |-- support_processes.py # MQTT/복구 보조 프로세스 관리
     |   |-- backup_recovery_server.py # 누락 구간 백업 ZIP 제공
     |   |-- monitoring/ # MQTT 자원/전원 상태 발행
     |   `-- local_backup.py # 백업 세그먼트 경로 정책
@@ -105,7 +116,7 @@ export AI_CCTV_MQTT_HOST=192.168.137.1
 ai-cctv-edge
 ```
 
-상태 모니터링과 누락 구간 복구까지 함께 쓰려면 별도 SSH 터미널에서 다음 프로세스도 실행합니다.
+상태 모니터링과 누락 구간 복구는 기본 `ai-cctv-edge` 실행에서 함께 시작됩니다. 보조 프로세스를 별도 터미널에서 직접 점검해야 할 때만 다음 명령을 사용합니다.
 
 ```bash
 export AI_CCTV_EDGE_HOST=192.168.137.2
@@ -136,7 +147,7 @@ Windows AI server를 실행하면 메인 관제 창보다 먼저 Edge node 연�
 ai-cctv-ai-server
 ```
 
-AI server 진입점은 Windows가 아닌 OS를 감지하면 오류 메시지를 출력하고 즉시 종료합니다. Windows에서는 먼저 PyQt5를 확인하고, PyQt5가 없으면 표준 라이브러리 tkinter 창으로 설치 여부를 묻습니다. 이후 실행 환경을 검사하며 PyTorch, PyQt5, OpenCV, Ultralytics, Transformers, Accelerate, bitsandbytes, HuggingFace Hub, Qwen 관련 패키지, Discord 알림 패키지, 얼굴 식별 패키지, YOLO/Qwen 모델이 없으면 설치 확인 창을 표시합니다. `O - 자동 설치`를 누르면 누락 항목 설치를 시도하고, `X - 설치하지 않음`을 누르면 프로그램을 시작하지 않습니다.
+AI server 진입점은 Windows가 아닌 OS를 감지하면 오류 메시지를 출력하고 즉시 종료합니다. Windows에서는 먼저 PyQt5를 확인하고, PyQt5가 없으면 표준 라이브러리 tkinter 창으로 설치 여부를 묻습니다. 이후 연결 모드를 선택한 뒤 필요한 최소 패키지만 검사합니다. Edge node 모드는 OpenCV, NumPy, MQTT, 백업 복구 요청 패키지를 확인하고, Windows 자체 카메라 모드는 영상 입력에 필요한 항목만 확인합니다. YOLO나 VLM 분석 패키지와 모델은 사용자가 영상 시작을 누를 때 선택된 분석 옵션에 맞춰 검사합니다.
 
 연결 설정 창에서 성공한 값은 자동으로 다음 항목에 반영됩니다.
 

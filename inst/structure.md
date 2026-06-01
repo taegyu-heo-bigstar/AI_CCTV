@@ -1,186 +1,186 @@
 # AI CCTV Structure
 
-? ??? ?? ?? ??? ??? ???? ??? AST ???? ??? ????.
+이 문서는 소스 코드별 클래스와 함수의 역할을 AST 기준으로 정리합니다.
 
 ## `src/ai_cctv/ai_server/alerts/chat_bot/chat_bot.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `send_msg` | VLM 분석 결과를 Discord 알림 큐에 등록합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `stop` | 알림 worker thread를 종료합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `_ensure_worker_started` | 알림 worker thread를 lazy-start 방식으로 시작합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `_worker_loop` | 큐에서 메시지를 하나씩 꺼내 Discord 전송 함수로 넘깁니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `_normalize_message` | VLM 결과를 Discord에 보낼 수 있는 문자열로 변환합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `_send_to_discord` | Discord 전송 모듈을 지연 import하여 메시지를 전송합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `_close_discord_sender` | Discord 전송 모듈을 지연 import하여 연결을 정리합니다. | None | ??? ?? ?? ?? | ?? ?? |
+| `send_msg` | VLM 분석 결과를 Discord 알림 큐에 등록합니다. | None | 없음 | 일반 동작 |
+| `stop` | 알림 worker thread를 종료합니다. | None | 없음 | 일반 동작 |
+| `_ensure_worker_started` | 알림 worker thread를 lazy-start 방식으로 시작합니다. | None | 없음 | 일반 동작 |
+| `_worker_loop` | 큐에서 메시지를 하나씩 꺼내 Discord 전송 함수로 넘깁니다. | None | 없음 | 일반 동작 |
+| `_normalize_message` | VLM 결과를 Discord에 보낼 수 있는 문자열로 변환합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `_send_to_discord` | Discord 전송 모듈을 지연 import하여 메시지를 전송합니다. | None | 없음 | 일반 동작 |
+| `_close_discord_sender` | Discord 전송 모듈을 지연 import하여 연결을 정리합니다. | None | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/alerts/chat_bot/discord_bot.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `_read_proj_env_value` | 루트의 .proj_env 파일에서 지정한 값을 읽습니다. | '' | ??? ?? ?? ?? | ?? ?? |
-| `DiscordBotSender` | Discord 봇 로그인과 메시지 전송을 담당하는 클래스입니다. | DiscordBotSender ???? | RuntimeError, TimeoutError | ?? ?? |
-| `DiscordBotSender.__init__` | Discord 전송 객체를 초기화합니다. | None | RuntimeError | ?? ?? |
-| `DiscordBotSender.start` | Discord client를 시작하고 준비 완료까지 기다립니다. | None | RuntimeError, TimeoutError | ?? ?? ?? |
-| `DiscordBotSender.send_message` | Discord 채널로 메시지를 전송합니다. | None | RuntimeError | ?? ?? ?? |
-| `DiscordBotSender._send_message_async` | Discord event loop 안에서 실제 메시지를 전송합니다. | None | RuntimeError | ?? ??, ??? ?? |
-| `DiscordBotSender.close` | Discord client와 event loop thread를 종료합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `DiscordBotSender._run_event_loop` | 별도 thread에서 Discord client용 asyncio event loop를 실행합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `send_message` | 기본 Discord sender를 사용해 메시지를 보냅니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `close` | 기본 Discord sender를 종료합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `_split_message` | Discord 전송용으로 긴 문자열을 여러 조각으로 나눕니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
+| `_read_proj_env_value` | 루트의 .proj_env 파일에서 지정한 값을 읽습니다. | '' | 없음 | 일반 동작 |
+| `DiscordBotSender` | Discord 봇 로그인과 메시지 전송을 담당하는 클래스입니다. | DiscordBotSender 인스턴스 | RuntimeError, TimeoutError | 일반 동작 |
+| `DiscordBotSender.__init__` | Discord 전송 객체를 초기화합니다. | None | RuntimeError | 일반 동작 |
+| `DiscordBotSender.start` | Discord client를 시작하고 준비 완료까지 기다립니다. | None | RuntimeError, TimeoutError | 일반 동작 |
+| `DiscordBotSender.send_message` | Discord 채널로 메시지를 전송합니다. | None | RuntimeError | 일반 동작 |
+| `DiscordBotSender._send_message_async` | Discord event loop 안에서 실제 메시지를 전송합니다. | None | RuntimeError | 일반 동작, 없음 |
+| `DiscordBotSender.close` | Discord client와 event loop thread를 종료합니다. | None | 없음 | 일반 동작 |
+| `DiscordBotSender._run_event_loop` | 별도 thread에서 Discord client용 asyncio event loop를 실행합니다. | None | 없음 | 일반 동작 |
+| `send_message` | 기본 Discord sender를 사용해 메시지를 보냅니다. | None | 없음 | 일반 동작 |
+| `close` | 기본 Discord sender를 종료합니다. | None | 없음 | 일반 동작 |
+| `_split_message` | Discord 전송용으로 긴 문자열을 여러 조각으로 나눕니다. | 일반 동작 | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/alerts/dispatcher.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `NotificationChannel` | 알림 채널 구현체의 공통 인터페이스입니다. | NotificationChannel ???? | NotImplementedError | ?? ?? ?? |
-| `NotificationChannel.send` | 알림 메시지를 채널로 전송합니다. | None | NotImplementedError | ?? ?? ?? |
-| `DiscordNotificationChannel` | 기존 Discord 챗봇 모듈을 알림 채널로 감쌉니다. | DiscordNotificationChannel ???? | ??? ?? ?? ?? | ??: NotificationChannel, ?? ?? |
-| `DiscordNotificationChannel.__init__` | Discord 알림 채널을 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `DiscordNotificationChannel.send` | Discord 챗봇으로 알림 메시지를 전송합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `NotificationDispatcher` | 알림 메시지를 등록된 채널로 전달합니다. | NotificationDispatcher ???? | ??? ?? ?? ?? | ?? ?? |
-| `NotificationDispatcher.__init__` | 알림 채널 목록을 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `NotificationDispatcher.add_channel` | 알림 채널을 추가합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `NotificationDispatcher.dispatch_anomaly_event` | 이상 상황 이벤트를 알림 메시지로 변환해 전송합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `NotificationDispatcher.dispatch` | 알림 메시지를 전체 채널로 전송합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
+| `NotificationChannel` | 알림 채널 구현체의 공통 인터페이스입니다. | NotificationChannel 인스턴스 | NotImplementedError | 일반 동작 |
+| `NotificationChannel.send` | 알림 메시지를 채널로 전송합니다. | None | NotImplementedError | 일반 동작 |
+| `DiscordNotificationChannel` | 기존 Discord 챗봇 모듈을 알림 채널로 감쌉니다. | DiscordNotificationChannel 인스턴스 | 없음 | 상속: NotificationChannel, 일반 동작 |
+| `DiscordNotificationChannel.__init__` | Discord 알림 채널을 초기화합니다. | None | 없음 | 일반 동작 |
+| `DiscordNotificationChannel.send` | Discord 챗봇으로 알림 메시지를 전송합니다. | None | 없음 | 일반 동작 |
+| `NotificationDispatcher` | 알림 메시지를 등록된 채널로 전달합니다. | NotificationDispatcher 인스턴스 | 없음 | 일반 동작 |
+| `NotificationDispatcher.__init__` | 알림 채널 목록을 초기화합니다. | None | 없음 | 일반 동작 |
+| `NotificationDispatcher.add_channel` | 알림 채널을 추가합니다. | None | 없음 | 일반 동작 |
+| `NotificationDispatcher.dispatch_anomaly_event` | 이상 상황 이벤트를 알림 메시지로 변환해 전송합니다. | 처리 결과 | 없음 | 일반 동작 |
+| `NotificationDispatcher.dispatch` | 알림 메시지를 전체 채널로 전송합니다. | 처리 결과 | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/alerts/message.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `NotificationMessage` | 사용자 알림 메시지를 표현합니다. | NotificationMessage ???? | ??? ?? ?? ?? | ?? ?? ?? |
-| `NotificationMessage.from_anomaly_event` | 이상 상황 이벤트에서 알림 메시지를 생성합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ??? ??? |
-| `NotificationMessage.to_text` | 채팅 채널로 보낼 텍스트 메시지를 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
+| `NotificationMessage` | 사용자 알림 메시지를 표현합니다. | NotificationMessage 인스턴스 | 없음 | 일반 동작 |
+| `NotificationMessage.from_anomaly_event` | 이상 상황 이벤트에서 알림 메시지를 생성합니다. | 처리 결과 | 없음 | 생성 함수 |
+| `NotificationMessage.to_text` | 채팅 채널로 보낼 텍스트 메시지를 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/analysis/anomaly/detector.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `AnomalyDetectionRule` | 이상 상황 판정 규칙의 공통 인터페이스입니다. | AnomalyDetectionRule ???? | NotImplementedError | ?? ?? ?? |
-| `AnomalyDetectionRule.evaluate_detections` | 감지 결과를 평가하여 이상 상황 이벤트를 반환합니다. | None | NotImplementedError | ?? ?? ?? |
-| `ObjectAppearanceRule` | 새로운 대상 객체가 등장하면 이상 상황으로 판단합니다. | ObjectAppearanceRule ???? | ??? ?? ?? ?? | ??: AnomalyDetectionRule, ?? ?? |
-| `ObjectAppearanceRule.__init__` | 객체 등장 규칙을 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `ObjectAppearanceRule.evaluate_detections` | 아직 보고하지 않은 추적 객체를 이상 상황 이벤트로 변환합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `ObjectAppearanceRule._build_object_key` | 객체 중복 보고를 막기 위한 식별자를 생성합니다. | tuple | ??? ?? ?? ?? | ?? ?? |
-| `ObjectAppearanceRule._build_event` | 감지 결과 하나를 이상 상황 이벤트로 변환합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `DwellTimeAnomalyRule` | 객체가 일정 시간 이상 감지되면 이상 상황으로 판단합니다. | DwellTimeAnomalyRule ???? | ??? ?? ?? ?? | ??: AnomalyDetectionRule, ?? ?? |
-| `DwellTimeAnomalyRule.__init__` | 체류 시간 판정 규칙을 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `DwellTimeAnomalyRule.evaluate_detections` | 객체별 체류 시간을 계산하여 기준 초과 이벤트를 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `DwellTimeAnomalyRule._resolve_object_key` | 체류 시간을 추적할 객체 식별자를 결정합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `DwellTimeAnomalyRule._build_event` | 체류 시간 초과 감지 결과를 이상 상황 이벤트로 변환합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `DwellTimeAnomalyRule._forget_missing_objects` | 현재 프레임에서 사라진 객체의 체류 상태를 정리합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `AnomalyRuleEngine` | 여러 이상 상황 판정 규칙을 순서대로 실행합니다. | AnomalyRuleEngine ???? | ??? ?? ?? ?? | ?? ?? |
-| `AnomalyRuleEngine.__init__` | 이상 상황 판정 규칙 목록을 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `AnomalyRuleEngine.evaluate_detections` | 감지 결과를 전체 규칙으로 평가합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
+| `AnomalyDetectionRule` | 이상 상황 판정 규칙의 공통 인터페이스입니다. | AnomalyDetectionRule 인스턴스 | NotImplementedError | 일반 동작 |
+| `AnomalyDetectionRule.evaluate_detections` | 감지 결과를 평가하여 이상 상황 이벤트를 반환합니다. | None | NotImplementedError | 일반 동작 |
+| `ObjectAppearanceRule` | 새로운 대상 객체가 등장하면 이상 상황으로 판단합니다. | ObjectAppearanceRule 인스턴스 | 없음 | 상속: AnomalyDetectionRule, 일반 동작 |
+| `ObjectAppearanceRule.__init__` | 객체 등장 규칙을 초기화합니다. | None | 없음 | 일반 동작 |
+| `ObjectAppearanceRule.evaluate_detections` | 아직 보고하지 않은 추적 객체를 이상 상황 이벤트로 변환합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `ObjectAppearanceRule._build_object_key` | 객체 중복 보고를 막기 위한 식별자를 생성합니다. | tuple | 없음 | 일반 동작 |
+| `ObjectAppearanceRule._build_event` | 감지 결과 하나를 이상 상황 이벤트로 변환합니다. | 처리 결과 | 없음 | 일반 동작 |
+| `DwellTimeAnomalyRule` | 객체가 일정 시간 이상 감지되면 이상 상황으로 판단합니다. | DwellTimeAnomalyRule 인스턴스 | 없음 | 상속: AnomalyDetectionRule, 일반 동작 |
+| `DwellTimeAnomalyRule.__init__` | 체류 시간 판정 규칙을 초기화합니다. | None | 없음 | 일반 동작 |
+| `DwellTimeAnomalyRule.evaluate_detections` | 객체별 체류 시간을 계산하여 기준 초과 이벤트를 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `DwellTimeAnomalyRule._resolve_object_key` | 체류 시간을 추적할 객체 식별자를 결정합니다. | 처리 결과 | 없음 | 일반 동작 |
+| `DwellTimeAnomalyRule._build_event` | 체류 시간 초과 감지 결과를 이상 상황 이벤트로 변환합니다. | 처리 결과 | 없음 | 일반 동작 |
+| `DwellTimeAnomalyRule._forget_missing_objects` | 현재 프레임에서 사라진 객체의 체류 상태를 정리합니다. | None | 없음 | 일반 동작 |
+| `AnomalyRuleEngine` | 여러 이상 상황 판정 규칙을 순서대로 실행합니다. | AnomalyRuleEngine 인스턴스 | 없음 | 일반 동작 |
+| `AnomalyRuleEngine.__init__` | 이상 상황 판정 규칙 목록을 초기화합니다. | None | 없음 | 일반 동작 |
+| `AnomalyRuleEngine.evaluate_detections` | 감지 결과를 전체 규칙으로 평가합니다. | 일반 동작 | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/analysis/anomaly/events.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `AnomalyEvent` | 이상 상황 이벤트 정보를 표현합니다. | AnomalyEvent ???? | ??? ?? ?? ?? | ?? ?? ?? |
-| `AnomalyEvent.to_worker_event` | PyQt VideoWorker 신호로 전달할 이벤트 딕셔너리를 생성합니다. | dict | ??? ?? ?? ?? | ?? ?? ?? |
+| `AnomalyEvent` | 이상 상황 이벤트 정보를 표현합니다. | AnomalyEvent 인스턴스 | 없음 | 일반 동작 |
+| `AnomalyEvent.to_worker_event` | PyQt VideoWorker 신호로 전달할 이벤트 딕셔너리를 생성합니다. | dict | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/analysis/crop_manager.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `CropManager` | CropManager 클래스의 주요 책임을 수행합니다. | CropManager ???? | ??? ?? ?? ?? | ?? ?? |
-| `CropManager.__init__` | __init__ 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `CropManager.crop_person` | crop_person 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `CropManager.save_crop` | save_crop 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `CropManager.save_crop_once` | save_crop_once 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
+| `CropManager` | CropManager 클래스의 주요 책임을 수행합니다. | CropManager 인스턴스 | 없음 | 일반 동작 |
+| `CropManager.__init__` | __init__ 함수의 주요 기능을 수행합니다. | None | 없음 | 일반 동작 |
+| `CropManager.crop_person` | crop_person 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `CropManager.save_crop` | save_crop 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `CropManager.save_crop_once` | save_crop_once 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/analysis/example_face_identifier.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `main` | main 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `main` | main 함수의 주요 기능을 수행합니다. | None | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/analysis/face_identifier.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `FaceIdentifier` | FaceIdentifier 클래스의 주요 책임을 수행합니다. | FaceIdentifier ???? | RuntimeError, ValueError | ?? ?? |
-| `FaceIdentifier.__init__` | __init__ 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `FaceIdentifier.identify_from_path` | identify_from_path 함수의 주요 기능을 수행합니다. | ?? ?? ?? ?? | ValueError | ?? ?? ?? |
-| `FaceIdentifier.identify_from_crop` | identify_from_crop 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `FaceIdentifier._load_known_faces` | _load_known_faces 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `FaceIdentifier._recognize_face` | _recognize_face 함수의 주요 기능을 수행합니다. | dict | ??? ?? ?? ?? | ?? ?? |
-| `FaceIdentifier._crop_face_region` | _crop_face_region 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `FaceIdentifier._save_face_crop` | _save_face_crop 함수의 주요 기능을 수행합니다. | ?? ?? | RuntimeError | ?? ?? |
-| `FaceIdentifier._get_largest_face` | _get_largest_face 함수의 주요 기능을 수행합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `FaceIdentifier._ensure_bgr_image` | _ensure_bgr_image 함수의 주요 기능을 수행합니다. | None | ValueError | ?? ?? |
-| `FaceIdentifier._normalize_embedding` | _normalize_embedding 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `FaceIdentifier._cosine_similarity` | _cosine_similarity 함수의 주요 기능을 수행합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `FaceIdentifier._no_face_result` | _no_face_result 함수의 주요 기능을 수행합니다. | dict | ??? ?? ?? ?? | ?? ?? |
-| `FaceIdentifier._no_registered_faces_result` | _no_registered_faces_result 함수의 주요 기능을 수행합니다. | dict | ??? ?? ?? ?? | ?? ?? |
-| `FaceIdentifier._error_result` | _error_result 함수의 주요 기능을 수행합니다. | dict | ??? ?? ?? ?? | ?? ?? |
+| `FaceIdentifier` | FaceIdentifier 클래스의 주요 책임을 수행합니다. | FaceIdentifier 인스턴스 | RuntimeError, ValueError | 일반 동작 |
+| `FaceIdentifier.__init__` | __init__ 함수의 주요 기능을 수행합니다. | None | 없음 | 일반 동작 |
+| `FaceIdentifier.identify_from_path` | identify_from_path 함수의 주요 기능을 수행합니다. | 처리 결과 | ValueError | 일반 동작 |
+| `FaceIdentifier.identify_from_crop` | identify_from_crop 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `FaceIdentifier._load_known_faces` | _load_known_faces 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `FaceIdentifier._recognize_face` | _recognize_face 함수의 주요 기능을 수행합니다. | dict | 없음 | 일반 동작 |
+| `FaceIdentifier._crop_face_region` | _crop_face_region 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `FaceIdentifier._save_face_crop` | _save_face_crop 함수의 주요 기능을 수행합니다. | 일반 동작 | RuntimeError | 일반 동작 |
+| `FaceIdentifier._get_largest_face` | _get_largest_face 함수의 주요 기능을 수행합니다. | 처리 결과 | 없음 | 일반 동작 |
+| `FaceIdentifier._ensure_bgr_image` | _ensure_bgr_image 함수의 주요 기능을 수행합니다. | None | ValueError | 일반 동작 |
+| `FaceIdentifier._normalize_embedding` | _normalize_embedding 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `FaceIdentifier._cosine_similarity` | _cosine_similarity 함수의 주요 기능을 수행합니다. | 처리 결과 | 없음 | 일반 동작 |
+| `FaceIdentifier._no_face_result` | _no_face_result 함수의 주요 기능을 수행합니다. | dict | 없음 | 일반 동작 |
+| `FaceIdentifier._no_registered_faces_result` | _no_registered_faces_result 함수의 주요 기능을 수행합니다. | dict | 없음 | 일반 동작 |
+| `FaceIdentifier._error_result` | _error_result 함수의 주요 기능을 수행합니다. | dict | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/analysis/face_recognition.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `get_yolo_model` | YOLO 모델을 지연 로딩하여 반환합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `get_face_app` | InsightFace 분석 객체를 지연 로딩하여 반환합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `normalize_embedding` | 얼굴 임베딩 벡터를 정규화합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `cosine_similarity` | 두 정규화 임베딩 사이의 코사인 유사도를 계산합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `get_largest_face` | 검출된 얼굴 목록에서 가장 큰 얼굴을 선택합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `expand_box` | 바운딩 박스를 지정 비율만큼 확장하고 이미지 경계 안으로 보정합니다. | tuple | ??? ?? ?? ?? | ?? ?? ?? |
-| `load_known_faces` | 등록 얼굴 폴더에서 인물별 얼굴 임베딩 DB를 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `recognize_face` | 얼굴 crop 이미지를 등록 얼굴 DB와 비교합니다. | tuple | ??? ?? ?? ?? | ?? ?? ?? |
-| `detect_face_with_tasks` | MediaPipe FaceDetector로 ROI 안의 가장 큰 얼굴 박스를 찾습니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `run_demo` | YOLO와 얼굴 인식을 함께 실행하는 데모 루프를 시작합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `_draw_detection_result` | 데모 프레임에 객체 및 얼굴 인식 결과를 그립니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `_build_person_face_label` | 사람 객체의 얼굴 인식 라벨과 표시 색상을 생성합니다. | tuple | ??? ?? ?? ?? | ?? ?? |
-| `main` | 얼굴 인식 데모 실행 진입점입니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `get_yolo_model` | YOLO 모델을 지연 로딩하여 반환합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `get_face_app` | InsightFace 분석 객체를 지연 로딩하여 반환합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `normalize_embedding` | 얼굴 임베딩 벡터를 정규화합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `cosine_similarity` | 두 정규화 임베딩 사이의 코사인 유사도를 계산합니다. | 처리 결과 | 없음 | 일반 동작 |
+| `get_largest_face` | 검출된 얼굴 목록에서 가장 큰 얼굴을 선택합니다. | 처리 결과 | 없음 | 일반 동작 |
+| `expand_box` | 바운딩 박스를 지정 비율만큼 확장하고 이미지 경계 안으로 보정합니다. | tuple | 없음 | 일반 동작 |
+| `load_known_faces` | 등록 얼굴 폴더에서 인물별 얼굴 임베딩 DB를 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `recognize_face` | 얼굴 crop 이미지를 등록 얼굴 DB와 비교합니다. | tuple | 없음 | 일반 동작 |
+| `detect_face_with_tasks` | MediaPipe FaceDetector로 ROI 안의 가장 큰 얼굴 박스를 찾습니다. | 일반 동작 | 없음 | 일반 동작 |
+| `run_demo` | YOLO와 얼굴 인식을 함께 실행하는 데모 루프를 시작합니다. | None | 없음 | 일반 동작 |
+| `_draw_detection_result` | 데모 프레임에 객체 및 얼굴 인식 결과를 그립니다. | None | 없음 | 일반 동작 |
+| `_build_person_face_label` | 사람 객체의 얼굴 인식 라벨과 표시 색상을 생성합니다. | tuple | 없음 | 일반 동작 |
+| `main` | 얼굴 인식 데모 실행 진입점입니다. | None | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/analysis/full_body_checker.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `FullBodyChecker` | FullBodyChecker 클래스의 주요 책임을 수행합니다. | FullBodyChecker ???? | ??? ?? ?? ?? | ?? ?? |
-| `FullBodyChecker.__init__` | min_body_height_ratio: | None | ??? ?? ?? ?? | ?? ?? |
-| `FullBodyChecker.is_full_body_visible` | bbox: | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `FullBodyChecker.get_status_text` | 화면 표시용 상태 텍스트 | 'PARTIAL' | ??? ?? ?? ?? | ?? ?? ?? |
+| `FullBodyChecker` | FullBodyChecker 클래스의 주요 책임을 수행합니다. | FullBodyChecker 인스턴스 | 없음 | 일반 동작 |
+| `FullBodyChecker.__init__` | min_body_height_ratio: | None | 없음 | 일반 동작 |
+| `FullBodyChecker.is_full_body_visible` | bbox: | 일반 동작 | 없음 | 일반 동작 |
+| `FullBodyChecker.get_status_text` | 화면 표시용 상태 텍스트 | 'PARTIAL' | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/analysis/person_state_manager.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `PersonStateManager` | PersonStateManager 클래스의 주요 책임을 수행합니다. | PersonStateManager ???? | ??? ?? ?? ?? | ?? ?? |
-| `PersonStateManager.__init__` | __init__ 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `PersonStateManager.create_person_state` | create_person_state 함수의 주요 기능을 수행합니다. | dict | ??? ?? ?? ?? | ?? ?? ?? |
-| `PersonStateManager.update_person` | update_person 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `PersonStateManager.mark_crop_saved` | mark_crop_saved 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `PersonStateManager.mark_recording_started` | mark_recording_started 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `PersonStateManager.mark_recording_stopped` | mark_recording_stopped 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `PersonStateManager.mark_vlm_done` | VLM 분석 완료 상태 기록 | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `PersonStateManager.get_state` | get_state 함수의 주요 기능을 수행합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `PersonStateManager.has_crop_saved` | has_crop_saved 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `PersonStateManager.is_recording` | is_recording 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `PersonStateManager.is_vlm_done` | is_vlm_done 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `PersonStateManager.remove_disappeared_persons` | remove_disappeared_persons 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
+| `PersonStateManager` | PersonStateManager 클래스의 주요 책임을 수행합니다. | PersonStateManager 인스턴스 | 없음 | 일반 동작 |
+| `PersonStateManager.__init__` | __init__ 함수의 주요 기능을 수행합니다. | None | 없음 | 일반 동작 |
+| `PersonStateManager.create_person_state` | create_person_state 함수의 주요 기능을 수행합니다. | dict | 없음 | 일반 동작 |
+| `PersonStateManager.update_person` | update_person 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `PersonStateManager.mark_crop_saved` | mark_crop_saved 함수의 주요 기능을 수행합니다. | None | 없음 | 일반 동작 |
+| `PersonStateManager.mark_recording_started` | mark_recording_started 함수의 주요 기능을 수행합니다. | None | 없음 | 일반 동작 |
+| `PersonStateManager.mark_recording_stopped` | mark_recording_stopped 함수의 주요 기능을 수행합니다. | None | 없음 | 일반 동작 |
+| `PersonStateManager.mark_vlm_done` | VLM 분석 완료 상태 기록 | None | 없음 | 일반 동작 |
+| `PersonStateManager.get_state` | get_state 함수의 주요 기능을 수행합니다. | 처리 결과 | 없음 | 일반 동작 |
+| `PersonStateManager.has_crop_saved` | has_crop_saved 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `PersonStateManager.is_recording` | is_recording 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `PersonStateManager.is_vlm_done` | is_vlm_done 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `PersonStateManager.remove_disappeared_persons` | remove_disappeared_persons 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/analysis/person_tracker.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `PersonTracker` | YOLO와 ByteTrack으로 대상 객체를 추적합니다. | PersonTracker ???? | ??? ?? ?? ?? | ?? ?? |
+| `PersonTracker` | YOLO와 ByteTrack으로 대상 객체를 추적합니다. | PersonTracker 인스턴스 | 없음 | 일반 동작 |
 | `PersonTracker.__init__` | 객체 추적 모델과 대상 클래스 설정을 초기화합니다. | None | YOLO 모델 로딩 오류 | 기본 신뢰도 임계값 0.7, YOLO 지연 import |
-| `PersonTracker.track` | 프레임에서 대상 객체를 탐지하고 추적합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
+| `PersonTracker.track` | 프레임에서 대상 객체를 탐지하고 추적합니다. | 일반 동작 | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/analysis/pipeline/person_frame_processor.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `PersonFrameProcessor` | 추적된 인물 하나에 대한 프레임 처리 책임을 담당합니다. | PersonFrameProcessor ???? | ??? ?? ?? ?? | ?? ?? |
-| `PersonFrameProcessor.__init__` | 인물 처리에 필요한 협력 객체를 주입합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `PersonFrameProcessor.process` | 추적 인물 상태를 갱신하고 필요한 화면 주석을 그립니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `PersonFrameProcessor._should_queue_vlm` | VLM 분석 큐 등록 가능 여부를 판단합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `PersonFrameProcessor._queue_vlm` | 전신 crop을 저장하고 VLM 작업 큐에 등록합니다. | list | ??? ?? ?? ?? | ?? ?? |
-| `PersonFrameProcessor._draw_annotation` | 프레임 위에 추적 박스와 라벨을 그립니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `PersonFrameProcessor._build_event` | 인물 이벤트 딕셔너리를 생성합니다. | dict | ??? ?? ?? ?? | ?? ?? |
+| `PersonFrameProcessor` | 추적된 인물 하나에 대한 프레임 처리 책임을 담당합니다. | PersonFrameProcessor 인스턴스 | 없음 | 일반 동작 |
+| `PersonFrameProcessor.__init__` | 인물 처리에 필요한 협력 객체를 주입합니다. | None | 없음 | 일반 동작 |
+| `PersonFrameProcessor.process` | 추적 인물 상태를 갱신하고 필요한 화면 주석을 그립니다. | 일반 동작 | 없음 | 일반 동작 |
+| `PersonFrameProcessor._should_queue_vlm` | VLM 분석 큐 등록 가능 여부를 판단합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `PersonFrameProcessor._queue_vlm` | 전신 crop을 저장하고 VLM 작업 큐에 등록합니다. | list | 없음 | 일반 동작 |
+| `PersonFrameProcessor._draw_annotation` | 프레임 위에 추적 박스와 라벨을 그립니다. | None | 없음 | 일반 동작 |
+| `PersonFrameProcessor._build_event` | 인물 이벤트 딕셔너리를 생성합니다. | dict | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/analysis/video_stream.py`
 
@@ -225,11 +225,11 @@
 
 ## `src/ai_cctv/ai_server/analysis/video_worker.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `VideoWorker` | 영상 캡처, 추적, 녹화, 선택적 VLM 분석을 조정합니다. | VideoWorker ???? | ??? ?? ?? ?? | ??: QThread, ?? ?? |
-| `VideoWorker.__init__` | 영상 처리 스레드와 협력 객체를 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `VideoWorker.run` | 스레드 메인 루프에서 프레임 처리와 신호 발행을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `VideoWorker` | 영상 캡처, 추적, 녹화, 선택적 VLM 분석을 조정합니다. | VideoWorker 인스턴스 | 없음 | 상속: QThread, 일반 동작 |
+| `VideoWorker.__init__` | 영상 처리 스레드와 협력 객체를 초기화합니다. | None | 없음 | 일반 동작 |
+| `VideoWorker.run` | 스레드 메인 루프에서 프레임 처리와 신호 발행을 수행합니다. | None | 없음 | 일반 동작 |
 | `VideoWorker._start_tracker_loading` | YOLO 추적 모델을 별도 thread에서 비동기로 로드합니다. | None | 없음 | 프리뷰 우선 표시 |
 | `VideoWorker._load_tracker` | YOLO 추적 모델을 로드하고 준비되면 분석 루프에 연결합니다. | None | 모델 로딩 오류 | loader thread에서 실행 |
 | `VideoWorker._disable_ai_pipeline` | AI 분석 파이프라인을 끄고 CCTV 프리뷰 모드로 전환합니다. | None | 없음 | YOLO/VLM 실패 시 사용 |
@@ -240,40 +240,40 @@
 | `VideoWorker._emit_preview_frame` | AI 모델 준비 전 프리뷰 프레임과 기본 지표를 발행합니다. | None | 없음 | 영상 우선 출력 |
 | `VideoWorker._emit_stream_wait_status` | RTSP 스트림 복구 대기 상태를 과도하지 않게 UI에 알립니다. | None | 없음 | 5초 간격 제한 |
 | `VideoWorker._emit_recovery_result_if_needed` | RTSP 복구 후 백업 ZIP 요청 결과가 있으면 UI 이벤트로 표시합니다. | None | 없음 | 성공/실패 메시지 표시 |
-| `VideoWorker.stop` | 영상 처리 루프를 중지하고 스레드 종료를 기다립니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `VideoWorker._cleanup` | 사용 중인 분석 작업자, 녹화기, 영상 스트림을 정리합니다. | None | ??? ?? ?? ?? | ?? ?? |
+| `VideoWorker.stop` | 영상 처리 루프를 중지하고 스레드 종료를 기다립니다. | None | 없음 | 일반 동작 |
+| `VideoWorker._cleanup` | 사용 중인 분석 작업자, 녹화기, 영상 스트림을 정리합니다. | None | 없음 | 일반 동작 |
 | `VideoWorker._join_loader_threads` | 모델 로더 thread가 짧은 시간 안에 끝나면 정리합니다. | None | 없음 | 종료 대기 최소화 |
-| `VideoWorker._create_default_notification_dispatcher` | 기본 Discord 이상 상황 알림 디스패처를 생성합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? |
+| `VideoWorker._create_default_notification_dispatcher` | 기본 Discord 이상 상황 알림 디스패처를 생성합니다. | 처리 결과 | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/analysis/vlm_person_analyzer.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `PersonAnalyzer` | 운영 코드에서 사용할 인물 이미지 VLM 분석기입니다. | PersonAnalyzer ???? | ??? ?? ?? ?? | ??: QwenPersonAnalyzer |
+| `PersonAnalyzer` | 운영 코드에서 사용할 인물 이미지 VLM 분석기입니다. | PersonAnalyzer 인스턴스 | 없음 | 상속: QwenPersonAnalyzer |
 
 ## `src/ai_cctv/ai_server/analysis/vlm_person_analyzer_qwen.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `PersonAnalyzer` | PersonAnalyzer 클래스의 주요 책임을 수행합니다. | PersonAnalyzer ???? | ??? ?? ?? ?? | ?? ?? |
-| `PersonAnalyzer.__init__` | __init__ 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `PersonAnalyzer._build_messages` | _build_messages 함수의 주요 기능을 수행합니다. | list | ??? ?? ?? ?? | ?? ?? |
-| `PersonAnalyzer.analyze` | analyze 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `PersonAnalyzer._clean_result` | _clean_result 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
+| `PersonAnalyzer` | PersonAnalyzer 클래스의 주요 책임을 수행합니다. | PersonAnalyzer 인스턴스 | 없음 | 일반 동작 |
+| `PersonAnalyzer.__init__` | __init__ 함수의 주요 기능을 수행합니다. | None | 없음 | 일반 동작 |
+| `PersonAnalyzer._build_messages` | _build_messages 함수의 주요 기능을 수행합니다. | list | 없음 | 일반 동작 |
+| `PersonAnalyzer.analyze` | analyze 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `PersonAnalyzer._clean_result` | _clean_result 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/analysis/vlm_person_analyzer_qwen_test.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `PersonAnalyzer` | PersonAnalyzer 클래스의 주요 책임을 수행합니다. | PersonAnalyzer ???? | ??? ?? ?? ?? | ?? ?? |
-| `PersonAnalyzer.__init__` | __init__ 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `PersonAnalyzer._build_messages` | _build_messages 함수의 주요 기능을 수행합니다. | list | ??? ?? ?? ?? | ?? ?? |
-| `PersonAnalyzer.analyze` | analyze 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `PersonAnalyzer._clean_result` | _clean_result 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
+| `PersonAnalyzer` | PersonAnalyzer 클래스의 주요 책임을 수행합니다. | PersonAnalyzer 인스턴스 | 없음 | 일반 동작 |
+| `PersonAnalyzer.__init__` | __init__ 함수의 주요 기능을 수행합니다. | None | 없음 | 일반 동작 |
+| `PersonAnalyzer._build_messages` | _build_messages 함수의 주요 기능을 수행합니다. | list | 없음 | 일반 동작 |
+| `PersonAnalyzer.analyze` | analyze 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `PersonAnalyzer._clean_result` | _clean_result 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/analysis/vlm_worker.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
 | `VLMWorker` | VLM 모델 로딩과 crop 이미지 분석 작업을 관리합니다. | VLMWorker 객체 | 없음 | 준비/실패 이벤트 제공 |
 | `VLMWorker.__init__` | VLM 작업 큐, 준비 상태 이벤트, 결과 콜백을 초기화합니다. | None | 없음 | ready/failed event 보유 |
@@ -292,7 +292,7 @@
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
 | `preload_ai_runtime_libraries` | PyQt 로딩 전에 AI 런타임 네이티브 라이브러리를 초기화합니다. | None | PyTorch 초기화 오류 | torch DLL 로딩 순서 안정화 |
-| `main` | Windows OS와 PyQt5 bootstrap을 먼저 확인한 뒤 AI server 관제 GUI 애플리케이션을 실행합니다. | None | 비 Windows 환경 SystemExit, PyQt5 설치 거부, PyTorch 초기화 오류 | OS guard와 최소 GUI 의존성 확인 이후 UI 시작 |
+| `main` | Windows OS와 PyQt5 bootstrap을 먼저 확인한 뒤 AI server 관제 GUI 애플리케이션을 실행합니다. | None | 비 Windows 환경 SystemExit, PyQt5 설치 거부 | OS guard와 최소 GUI 의존성 확인 이후 UI 시작 |
 
 ## `src/ai_cctv/ai_server/runtime/__init__.py`
 
@@ -303,6 +303,8 @@
 | `RuntimeRequirement` | 런타임 요구사항 데이터 클래스를 외부로 노출합니다. | 클래스 참조 | 없음 | `environment_check.py` 재노출 |
 | `RuntimeRequirementResult` | 런타임 요구사항 점검 결과 클래스를 외부로 노출합니다. | 클래스 참조 | 없음 | `environment_check.py` 재노출 |
 | `RuntimeReadinessReport` | 전체 런타임 준비 상태 보고 클래스를 외부로 노출합니다. | 클래스 참조 | 없음 | `environment_check.py` 재노출 |
+| `build_startup_requirements` | 시작 최소 요구사항 생성 함수를 외부로 노출합니다. | 함수 참조 | 없음 | 모드별 준비 검사 |
+| `build_analysis_requirements` | 분석 기능 요구사항 생성 함수를 외부로 노출합니다. | 함수 참조 | 없음 | 영상 시작 전 준비 검사 |
 | `ensure_pyqt5_available` | PyQt5 bootstrap 확인 함수를 외부로 노출합니다. | 함수 참조 | 없음 | `bootstrap.py` 재노출 |
 | `ensure_windows_os` | Windows 전용 실행 검증 함수를 외부로 노출합니다. | 함수 참조 | 없음 | `os_guard.py` 재노출 |
 | `is_windows_os` | OS 판별 함수를 외부로 노출합니다. | 함수 참조 | 없음 | `os_guard.py` 재노출 |
@@ -351,7 +353,10 @@
 | `RuntimeInstaller._download_yolo_model` | Ultralytics를 통해 YOLO 모델 준비를 시도합니다. | 로그 문자열 | RuntimeError | 별도 Python 프로세스 사용 |
 | `RuntimeInstaller._download_qwen_model` | HuggingFace Hub에서 Qwen 모델 캐시를 다운로드합니다. | 로그 문자열 | RuntimeError | 모델을 메모리에 로드하지 않음 |
 | `RuntimeInstaller._run_python_script` | 별도 Python 프로세스로 설치 보조 스크립트를 실행합니다. | None | RuntimeError | stdout/stderr 포함 |
-| `build_default_requirements` | AI server 기본 실행 요구사항 목록을 생성합니다. | RuntimeRequirement 목록 | 없음 | 환경 변수로 모델 식별자 변경 가능 |
+| `build_startup_requirements` | 연결 모드별 AI server 시작 최소 요구사항 목록을 생성합니다. | RuntimeRequirement 목록 | 없음 | Edge node/로컬 카메라 모드 분리 |
+| `build_analysis_requirements` | 선택한 YOLO/VLM/알림/얼굴 식별 기능의 요구사항 목록을 생성합니다. | RuntimeRequirement 목록 | 없음 | 영상 시작 시 선택 기능 기준 검사 |
+| `build_default_requirements` | AI server 기본 실행 요구사항 목록을 생성합니다. | RuntimeRequirement 목록 | 없음 | 시작 요구사항과 기본 YOLO 요구사항 조합 |
+| `_deduplicate_requirements` | 중복된 RuntimeRequirement 항목을 제거합니다. | RuntimeRequirement 목록 | 없음 | 내부 함수 |
 | `_read_distribution_version` | 설치 식별자에서 패키지 버전을 조회합니다. | 버전 문자열 또는 빈 문자열 | 없음 | 내부 함수 |
 
 ## `src/ai_cctv/ai_server/connection/__init__.py`
@@ -369,7 +374,7 @@
 |---|---|---|---|---|
 | `EdgeConnectionConfig` | AI server가 Edge node에 접속하는 데 필요한 RTSP, MQTT, 백업 복구 설정을 보관합니다. | EdgeConnectionConfig 객체 | 없음 | dataclass |
 | `EdgeConnectionConfig.from_environment` | 환경 변수에서 AI server 연결 설정을 생성합니다. | EdgeConnectionConfig 객체 | 잘못된 포트 값 | 기존 환경 변수 호환 |
-| `EdgeConnectionConfig.apply_environment` | 현재 연결 설정을 기존 AI server 코드가 읽는 환경 변수에 반영합니다. | None | 환경 변수 설정 오류 | MQTT/복구/RTSP 값 반영 |
+| `EdgeConnectionConfig.apply_environment` | 현재 연결 설정을 기존 AI server 코드가 읽는 환경 변수에 반영합니다. | None | 환경 변수 설정 오류 | 로컬 카메라 모드는 Edge 관련 환경 변수 제거 |
 | `EdgeConnectionConfig.video_source` | Edge node 모드에서는 RTSP URL을, Windows 로컬 카메라 모드에서는 카메라 인덱스를 반환합니다. | RTSP URL 또는 정수 인덱스 | 없음 | `VideoWorker` 입력 소스 분기 |
 | `EdgeConnectionValidationResult` | Edge node 연결 검증 결과를 표현합니다. | EdgeConnectionValidationResult 객체 | 없음 | dataclass |
 | `EdgeConnectionValidationResult.message` | 검증 결과를 화면 표시용 문자열로 변환합니다. | 문자열 | 없음 | 실패 사유 줄바꿈 |
@@ -492,44 +497,44 @@
 
 ## `src/ai_cctv/ai_server/storage/path_manager.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `StoragePaths` | 저장소 경로 묶음을 표현합니다. | StoragePaths ???? | ??? ?? ?? ?? | ?? ?? ?? |
-| `StoragePathManager` | AI CCTV 저장 폴더 구조를 생성합니다. | StoragePathManager ???? | ??? ?? ?? ?? | ?? ?? |
-| `StoragePathManager.__init__` | 저장 경로 규칙을 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `StoragePathManager.build_paths` | 루트 경로 기준의 표준 저장 경로를 계산합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `StoragePathManager.ensure_paths` | 표준 저장 폴더를 만들고 경로 묶음을 반환합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
+| `StoragePaths` | 저장소 경로 묶음을 표현합니다. | StoragePaths 인스턴스 | 없음 | 일반 동작 |
+| `StoragePathManager` | AI CCTV 저장 폴더 구조를 생성합니다. | StoragePathManager 인스턴스 | 없음 | 일반 동작 |
+| `StoragePathManager.__init__` | 저장 경로 규칙을 초기화합니다. | None | 없음 | 일반 동작 |
+| `StoragePathManager.build_paths` | 루트 경로 기준의 표준 저장 경로를 계산합니다. | 처리 결과 | 없음 | 일반 동작 |
+| `StoragePathManager.ensure_paths` | 표준 저장 폴더를 만들고 경로 묶음을 반환합니다. | 일반 동작 | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/storage/recording_manager.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `RecordingManager` | 원본 영상 프레임을 시간 단위 MP4 파일로 저장합니다. | RecordingManager ???? | ??? ?? ?? ?? | ?? ?? |
-| `RecordingManager.__init__` | 녹화 저장 상태와 기본 경로를 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `RecordingManager.start_recording` | 새 MP4 녹화 파일을 시작합니다. | True | ??? ?? ?? ?? | ?? ?? ?? |
-| `RecordingManager.write_frame` | 프레임을 현재 녹화 파일에 기록합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `RecordingManager.stop_recording` | 현재 녹화 파일을 닫고 최종 파일명으로 변경합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `RecordingManager` | 원본 영상 프레임을 시간 단위 MP4 파일로 저장합니다. | RecordingManager 인스턴스 | 없음 | 일반 동작 |
+| `RecordingManager.__init__` | 녹화 저장 상태와 기본 경로를 초기화합니다. | None | 없음 | 일반 동작 |
+| `RecordingManager.start_recording` | 새 MP4 녹화 파일을 시작합니다. | True | 없음 | 일반 동작 |
+| `RecordingManager.write_frame` | 프레임을 현재 녹화 파일에 기록합니다. | None | 없음 | 일반 동작 |
+| `RecordingManager.stop_recording` | 현재 녹화 파일을 닫고 최종 파일명으로 변경합니다. | None | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/stream_receiver.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `RtspPreviewSession` | RTSP 스트림을 OpenCV 창으로 미리보기하는 세션입니다. | RtspPreviewSession ???? | ??? ?? ?? ?? | ?? ?? |
-| `RtspPreviewSession.__init__` | RTSP 미리보기 세션을 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `RtspPreviewSession.run` | RTSP 스트림을 수신하여 OpenCV 창에 표시합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `RtspPreviewSession._configure_low_latency_capture` | OpenCV FFMPEG 수신 옵션을 낮은 지연 설정으로 구성합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `RtspPreviewSession._show_frames` | VideoCapture에서 프레임을 읽어 미리보기 창에 표시합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `preview_rtsp_stream` | RTSP 미리보기 세션을 생성해 실행합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `main` | 기본 RTSP URL로 수신 미리보기를 실행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `RtspPreviewSession` | RTSP 스트림을 OpenCV 창으로 미리보기하는 세션입니다. | RtspPreviewSession 인스턴스 | 없음 | 일반 동작 |
+| `RtspPreviewSession.__init__` | RTSP 미리보기 세션을 초기화합니다. | None | 없음 | 일반 동작 |
+| `RtspPreviewSession.run` | RTSP 스트림을 수신하여 OpenCV 창에 표시합니다. | None | 없음 | 일반 동작 |
+| `RtspPreviewSession._configure_low_latency_capture` | OpenCV FFMPEG 수신 옵션을 낮은 지연 설정으로 구성합니다. | None | 없음 | 일반 동작 |
+| `RtspPreviewSession._show_frames` | VideoCapture에서 프레임을 읽어 미리보기 창에 표시합니다. | None | 없음 | 일반 동작 |
+| `preview_rtsp_stream` | RTSP 미리보기 세션을 생성해 실행합니다. | 처리 결과 | 없음 | 일반 동작 |
+| `main` | 기본 RTSP URL로 수신 미리보기를 실행합니다. | None | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/ui/event_presenter.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `EventDisplay` | 이벤트 표시 정보를 담는 값 객체입니다. | EventDisplay ???? | ??? ?? ?? ?? | ?? ?? ?? |
-| `EventPresenter` | 이벤트 딕셔너리를 UI 표시 정보로 변환합니다. | EventPresenter ???? | ??? ?? ?? ?? | ?? ?? ?? |
-| `EventPresenter.build_display` | 이벤트 유형별 설명과 색상을 생성합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | `vlm_done` 결과 표시 지원 |
-| `EventPresenter.get_time_text` | 이벤트 시간 문자열을 가져오거나 현재 시각으로 대체합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
+| `EventDisplay` | 이벤트 표시 정보를 담는 값 객체입니다. | EventDisplay 인스턴스 | 없음 | 일반 동작 |
+| `EventPresenter` | 이벤트 딕셔너리를 UI 표시 정보로 변환합니다. | EventPresenter 인스턴스 | 없음 | 일반 동작 |
+| `EventPresenter.build_display` | 이벤트 유형별 설명과 색상을 생성합니다. | 처리 결과 | 없음 | `vlm_done` 결과 표시 지원 |
+| `EventPresenter.get_time_text` | 이벤트 시간 문자열을 가져오거나 현재 시각으로 대체합니다. | 처리 결과 | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/ai_server/ui/edge_status_window.py`
 
@@ -566,36 +571,36 @@
 
 ## `src/ai_cctv/ai_server/ui/main_window.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `CCTVMainWindow` | AI CCTV 클라이언트의 메인 제어 창입니다. | CCTVMainWindow ???? | ??? ?? ?? ?? | ??: QMainWindow, ?? ?? |
-| `CCTVMainWindow.__init__` | 메인 창 상태와 UI를 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `CCTVMainWindow.init_ui` | 메인 화면의 전체 레이아웃을 구성합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `CCTVMainWindow._create_header_layout` | 상단 제목과 제어 버튼 레이아웃을 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `CCTVMainWindow._create_button` | 표준 스타일의 버튼을 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
+| `CCTVMainWindow` | AI CCTV 클라이언트의 메인 제어 창입니다. | CCTVMainWindow 인스턴스 | 없음 | 상속: QMainWindow, 일반 동작 |
+| `CCTVMainWindow.__init__` | 메인 창 상태와 UI를 초기화합니다. | None | 없음 | 일반 동작 |
+| `CCTVMainWindow.init_ui` | 메인 화면의 전체 레이아웃을 구성합니다. | None | 없음 | 일반 동작 |
+| `CCTVMainWindow._create_header_layout` | 상단 제목과 제어 버튼 레이아웃을 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `CCTVMainWindow._create_button` | 표준 스타일의 버튼을 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
 | `CCTVMainWindow._set_run_button_state` | 영상 실행 상태에 맞춰 START와 STOP 버튼을 하이라이팅합니다. | None | 없음 | 실행/정지 상태 표시 |
 | `CCTVMainWindow._build_run_button_style` | 실행 상태 버튼의 활성/비활성 스타일을 생성합니다. | 문자열 | 없음 | 상태별 버튼 스타일 |
-| `CCTVMainWindow._create_left_panel` | 카메라 입력 상태 패널을 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `CCTVMainWindow._create_center_panel` | 실시간 영상과 지표 패널을 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `CCTVMainWindow._create_right_panel` | 이벤트 타임라인과 저장 경로 패널을 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `CCTVMainWindow.create_metric_box` | 지표 숫자와 라벨을 담는 UI 박스를 생성합니다. | dict | ??? ?? ?? ?? | ?? ?? ?? |
-| `CCTVMainWindow.start_video` | 영상 처리 작업자를 시작하고 신호를 연결합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `CCTVMainWindow.stop_video` | 영상 처리 작업자를 중지하고 카메라 상태를 갱신합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `CCTVMainWindow.open_settings` | 설정 창을 열고 적용된 값을 메인 창 상태에 반영합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `CCTVMainWindow._create_left_panel` | 카메라 입력 상태 패널을 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `CCTVMainWindow._create_center_panel` | 실시간 영상과 지표 패널을 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `CCTVMainWindow._create_right_panel` | 이벤트 타임라인과 저장 경로 패널을 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `CCTVMainWindow.create_metric_box` | 지표 숫자와 라벨을 담는 UI 박스를 생성합니다. | dict | 없음 | 일반 동작 |
+| `CCTVMainWindow.start_video` | 영상 처리 작업자를 시작하고 신호를 연결합니다. | None | 없음 | 일반 동작 |
+| `CCTVMainWindow.stop_video` | 영상 처리 작업자를 중지하고 카메라 상태를 갱신합니다. | None | 없음 | 일반 동작 |
+| `CCTVMainWindow.open_settings` | 설정 창을 열고 적용된 값을 메인 창 상태에 반영합니다. | None | 없음 | 일반 동작 |
 | `CCTVMainWindow.open_edge_status` | Edge node 상태 조회 창을 열고 모니터링 요청을 시작합니다. | None | 모니터링 창 생성 오류 | 헤더 버튼에서 호출 |
 | `CCTVMainWindow._resolve_initial_video_source` | 시작 전 검증된 연결 설정에서 RTSP URL 또는 Windows 로컬 카메라 인덱스를 결정합니다. | RTSP URL 또는 정수 인덱스 | 없음 | Edge node/로컬 카메라 분기 |
-| `CCTVMainWindow.update_frame` | OpenCV 프레임을 PyQt 이미지로 변환해 화면에 표시합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `CCTVMainWindow.update_frame` | OpenCV 프레임을 PyQt 이미지로 변환해 화면에 표시합니다. | None | 없음 | 일반 동작 |
 | `CCTVMainWindow.show_loading_screen` | 영상 영역에 현재 준비 단계 로딩 문구를 표시합니다. | None | 없음 | VideoWorker loading_ready 신호 수신 |
 | `CCTVMainWindow.show_idle_screen` | 영상 영역을 실행 전 기본 대기 화면으로 되돌립니다. | None | 없음 | STOP 또는 시작 실패 시 호출 |
-| `CCTVMainWindow.update_metrics` | 영상 처리 지표를 화면에 반영합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `CCTVMainWindow.add_event` | 이벤트 타임라인에 새 이벤트 항목을 추가합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `CCTVMainWindow.closeEvent` | 창 닫힘 이벤트에서 작업자를 정리합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `CCTVMainWindow._set_camera_status_style` | 카메라 상태 라벨의 색상을 설정합니다. | None | ??? ?? ?? ?? | ?? ?? |
+| `CCTVMainWindow.update_metrics` | 영상 처리 지표를 화면에 반영합니다. | None | 없음 | 일반 동작 |
+| `CCTVMainWindow.add_event` | 이벤트 타임라인에 새 이벤트 항목을 추가합니다. | None | 없음 | 일반 동작 |
+| `CCTVMainWindow.closeEvent` | 창 닫힘 이벤트에서 작업자를 정리합니다. | None | 없음 | 일반 동작 |
+| `CCTVMainWindow._set_camera_status_style` | 카메라 상태 라벨의 색상을 설정합니다. | None | 없음 | 일반 동작 |
 | `CCTVMainWindow._handle_video_start_failure` | 영상 처리 작업자 시작 실패를 화면 상태와 이벤트로 표시합니다. | None | 없음 | UI 프로세스 종료 방지 |
 | `CCTVMainWindow._handle_worker_finished` | 영상 작업자가 예기치 않게 종료된 경우 UI 상태를 정리합니다. | None | 없음 | 스트림 열기 실패 후 상태 정리 |
-| `CCTVMainWindow._build_storage_label` | 저장 경로 패널에 표시할 문자열을 생성합니다. | 'Storage path\nNo storage path selected.\n\nSelect a location in Settings > Storage.' | ??? ?? ?? ?? | ?? ?? |
-| `CCTVMainWindow._trim_event_list` | 이벤트 타임라인의 최대 표시 개수를 제한합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `main` | 런타임 준비 상태 확인 UI와 연결 입력 UI를 순서대로 표시한 뒤 AI CCTV PyQt 애플리케이션을 실행합니다. | None | 설치 거부, 연결 검증 실패, AI 런타임 초기화 오류 | 메인 창 생성 전 필수 조건 검증 |
+| `CCTVMainWindow._build_storage_label` | 저장 경로 패널에 표시할 문자열을 생성합니다. | 'Storage path\nNo storage path selected.\n\nSelect a location in Settings > Storage.' | 없음 | 일반 동작 |
+| `CCTVMainWindow._trim_event_list` | 이벤트 타임라인의 최대 표시 개수를 제한합니다. | None | 없음 | 일반 동작 |
+| `main` | 연결 입력 UI를 먼저 표시하고 선택 모드의 런타임 준비 상태를 확인한 뒤 AI CCTV PyQt 애플리케이션을 실행합니다. | None | 설치 거부, 연결 검증 실패, AI 런타임 초기화 오류 | 모드별 필수 조건 검증 |
 
 ## `src/ai_cctv/ai_server/ui/edge_connection_dialog.py`
 
@@ -607,6 +612,7 @@
 | `EdgeConnectionDialog._create_button` | 대화상자에서 사용할 공통 버튼을 생성합니다. | QPushButton | 없음 | 공통 스타일 |
 | `EdgeConnectionDialog.apply_startup_text` | 붙여넣은 Edge node 표준 출력값을 입력 필드에 반영합니다. | None | ValueError | 출력값 적용 버튼 |
 | `EdgeConnectionDialog.validate_and_accept` | 입력된 연결값을 검증하고 성공하면 대화상자를 종료합니다. | None | 연결 검증 실패 | 성공 시 환경 변수 반영 |
+| `EdgeConnectionDialog._ensure_local_camera_runtime_ready` | 로컬 카메라 검증 전에 영상 입력 패키지 준비 여부를 확인합니다. | bool | 설치 거부 | OpenCV 누락 시 설치 창 표시 |
 | `EdgeConnectionDialog.update_input_mode` | Edge node RTSP 모드와 Windows 로컬 카메라 모드에 맞게 입력 필드를 활성화합니다. | None | 없음 | 로컬 카메라 선택 시 Edge 값 입력 비활성화 |
 | `EdgeConnectionDialog._set_pending_state` | 연결 검증 진행 중 UI 상태를 표시합니다. | None | 없음 | 중복 클릭 방지 |
 | `EdgeConnectionDialog._read_form_config` | 현재 입력 필드 값을 EdgeConnectionConfig로 변환합니다. | EdgeConnectionConfig 객체 | ValueError | MQTT 포트 정수 검증 |
@@ -626,44 +632,44 @@
 
 ## `src/ai_cctv/ai_server/ui/settings_window.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `SettingsWindow` | AI CCTV 실행 설정을 입력받는 PyQt 대화상자입니다. | SettingsWindow ???? | ??? ?? ?? ?? | ??: QDialog, ?? ?? |
-| `SettingsWindow.__init__` | 설정 창의 초기 상태를 구성합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `SettingsWindow.init_ui` | 설정 창의 좌측 메뉴와 우측 페이지 영역을 구성합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `SettingsWindow._create_menu_panel` | 설정 페이지 전환 메뉴 패널을 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `SettingsWindow.create_menu_button` | 설정 메뉴 버튼을 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
+| `SettingsWindow` | AI CCTV 실행 설정을 입력받는 PyQt 대화상자입니다. | SettingsWindow 인스턴스 | 없음 | 상속: QDialog, 일반 동작 |
+| `SettingsWindow.__init__` | 설정 창의 초기 상태를 구성합니다. | None | 없음 | 일반 동작 |
+| `SettingsWindow.init_ui` | 설정 창의 좌측 메뉴와 우측 페이지 영역을 구성합니다. | None | 없음 | 일반 동작 |
+| `SettingsWindow._create_menu_panel` | 설정 페이지 전환 메뉴 패널을 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `SettingsWindow.create_menu_button` | 설정 메뉴 버튼을 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
 | `SettingsWindow.select_page` | 설정 페이지를 전환하고 좌측 메뉴 선택 상태를 갱신합니다. | None | 없음 | sidebar 하이라이트 갱신 |
 | `SettingsWindow._update_menu_highlight` | 현재 선택된 설정 메뉴 버튼을 하이라이팅합니다. | None | 없음 | 선택 버튼 스타일 적용 |
 | `SettingsWindow._build_menu_button_style` | 설정 메뉴 버튼의 선택 여부에 따른 스타일 문자열을 생성합니다. | 문자열 | 없음 | 선택/비선택 스타일 분리 |
-| `SettingsWindow.create_basic_page` | 영상 입력과 AI 분석 사용 여부 설정 페이지를 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `SettingsWindow._add_input_controls` | 기본 설정 페이지에 영상 입력 컨트롤을 추가합니다. | None | ??? ?? ?? ?? | ?? ?? |
+| `SettingsWindow.create_basic_page` | 영상 입력과 AI 분석 사용 여부 설정 페이지를 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `SettingsWindow._add_input_controls` | 기본 설정 페이지에 영상 입력 컨트롤을 추가합니다. | None | 없음 | 일반 동작 |
 | `SettingsWindow._add_ai_controls` | 기본 설정 페이지에 YOLO와 VLM 사용 여부 컨트롤을 추가합니다. | None | 없음 | YOLO off 시 VLM 비활성화 |
-| `SettingsWindow._create_label` | 설정 폼 라벨을 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `SettingsWindow._create_line_edit` | 표준 스타일의 입력 필드를 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `SettingsWindow._create_basic_save_row` | 기본 설정 저장 버튼 행을 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `SettingsWindow.update_input_mode` | 선택된 입력 방식에 맞춰 입력 필드를 활성화합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `SettingsWindow._create_label` | 설정 폼 라벨을 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `SettingsWindow._create_line_edit` | 표준 스타일의 입력 필드를 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `SettingsWindow._create_basic_save_row` | 기본 설정 저장 버튼 행을 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `SettingsWindow.update_input_mode` | 선택된 입력 방식에 맞춰 입력 필드를 활성화합니다. | None | 없음 | 일반 동작 |
 | `SettingsWindow.update_ai_mode` | YOLO 사용 여부에 맞춰 VLM 옵션 활성 상태를 동기화합니다. | None | 없음 | VLM 종속 옵션 처리 |
-| `SettingsWindow.save_basic_settings` | 기본 설정 값을 검증하고 대화상자 상태에 반영합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `SettingsWindow._parse_camera_index` | 웹캠 번호 입력값을 정수로 변환합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `SettingsWindow._show_basic_error` | 기본 설정 페이지에 오류 메시지를 표시합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `SettingsWindow.create_empty_page` | 빈 안내 페이지를 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `SettingsWindow.create_storage_page` | 저장 경로, 원본 녹화 분할, 이벤트 클립 분할 설정 페이지를 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `SettingsWindow._add_storage_path_controls` | 저장 경로 선택 컨트롤을 추가합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `SettingsWindow._add_original_segment_controls` | 원본 녹화 분할 시간 라디오 버튼을 추가합니다. | None | ??? ?? ?? ?? | ?? ?? |
+| `SettingsWindow.save_basic_settings` | 기본 설정 값을 검증하고 대화상자 상태에 반영합니다. | None | 없음 | 일반 동작 |
+| `SettingsWindow._parse_camera_index` | 웹캠 번호 입력값을 정수로 변환합니다. | None | 없음 | 일반 동작 |
+| `SettingsWindow._show_basic_error` | 기본 설정 페이지에 오류 메시지를 표시합니다. | None | 없음 | 일반 동작 |
+| `SettingsWindow.create_empty_page` | 빈 안내 페이지를 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `SettingsWindow.create_storage_page` | 저장 경로, 원본 녹화 분할, 이벤트 클립 분할 설정 페이지를 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `SettingsWindow._add_storage_path_controls` | 저장 경로 선택 컨트롤을 추가합니다. | None | 없음 | 일반 동작 |
+| `SettingsWindow._add_original_segment_controls` | 원본 녹화 분할 시간 라디오 버튼을 추가합니다. | None | 없음 | 일반 동작 |
 | `SettingsWindow._add_clip_segment_controls` | 이벤트 클립 분할 시간 라디오 버튼을 추가합니다. | None | 없음 | 10초/30초/전체 이벤트 |
-| `SettingsWindow._create_storage_save_row` | 저장 설정 저장 버튼 행을 생성합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? |
-| `SettingsWindow.select_storage_path` | 사용자에게 저장 루트 경로를 선택받고 표준 폴더를 생성합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `SettingsWindow.save_storage_settings` | 저장소 설정 값을 검증하고 대화상자를 완료합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `SettingsWindow._create_storage_save_row` | 저장 설정 저장 버튼 행을 생성합니다. | 일반 동작 | 없음 | 일반 동작 |
+| `SettingsWindow.select_storage_path` | 사용자에게 저장 루트 경로를 선택받고 표준 폴더를 생성합니다. | None | 없음 | 일반 동작 |
+| `SettingsWindow.save_storage_settings` | 저장소 설정 값을 검증하고 대화상자를 완료합니다. | None | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/edge_node/failover.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `EdgeFailoverDecision` | 네트워크 상태에 따른 Edge node 동작 결정을 표현합니다. | EdgeFailoverDecision ???? | ??? ?? ?? ?? | ?? ?? ?? |
-| `EdgeNetworkFailoverPolicy` | Edge node 네트워크 장애 대응 동작을 결정합니다. | EdgeNetworkFailoverPolicy ???? | ??? ?? ?? ?? | ?? ?? |
-| `EdgeNetworkFailoverPolicy.__init__` | 장애 대응 정책을 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `EdgeNetworkFailoverPolicy.decide_for_network` | 네트워크 상태에 맞는 Edge node 동작을 결정합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
+| `EdgeFailoverDecision` | 네트워크 상태에 따른 Edge node 동작 결정을 표현합니다. | EdgeFailoverDecision 인스턴스 | 없음 | 일반 동작 |
+| `EdgeNetworkFailoverPolicy` | Edge node 네트워크 장애 대응 동작을 결정합니다. | EdgeNetworkFailoverPolicy 인스턴스 | 없음 | 일반 동작 |
+| `EdgeNetworkFailoverPolicy.__init__` | 장애 대응 정책을 초기화합니다. | None | 없음 | 일반 동작 |
+| `EdgeNetworkFailoverPolicy.decide_for_network` | 네트워크 상태에 맞는 Edge node 동작을 결정합니다. | 처리 결과 | 없음 | 일반 동작 |
 
 ## `src/ai_cctv/edge_node/os_guard.py`
 
@@ -703,8 +709,8 @@
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
 | `build_default_edge_stream_command` | 기본 Edge node 송출 명령 문자열을 생성합니다. | 문자열 | 런타임 구성 오류 | 명령 확인용 보조 함수 |
-| `build_argument_parser` | Edge node 실행 옵션 파서를 생성합니다. | ArgumentParser | 없음 | `--print-command` 옵션 제공 |
-| `main` | OS guard를 통과한 뒤 Edge node 런타임을 실행합니다. | None | SystemExit, 하위 프로세스 실행 오류 | `ai-cctv-edge` 진입점 |
+| `build_argument_parser` | Edge node 실행 옵션 파서를 생성합니다. | ArgumentParser | 없음 | `--print-command`, `--no-support-services` 제공 |
+| `main` | OS guard를 통과한 뒤 Edge node 런타임을 실행합니다. | None | SystemExit, 하위 프로세스 실행 오류 | 기본적으로 보조 서비스 함께 실행 |
 
 ## `src/ai_cctv/edge_node/local_backup.py`
 
@@ -720,7 +726,7 @@
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
 | `MediaMtxConfig` | MediaMTX 설치와 실행 경로 설정을 표현합니다. | MediaMtxConfig 객체 | 없음 | dataclass |
-| `MediaMtxConfig.work_path` | MediaMTX 작업 폴더 경로를 반환합니다. | Path | 없음 | property |
+| `MediaMtxConfig.work_path` | MediaMTX 작업 폴더 경로를 반환합니다. | Path | 없음 | `~/.ai_cctv/mediamtx` 기본 경로 확장 |
 | `MediaMtxConfig.binary_path` | MediaMTX 실행 파일 경로를 반환합니다. | Path | 없음 | property |
 | `MediaMtxConfig.config_path` | MediaMTX 설정 파일 경로를 반환합니다. | Path | 없음 | property |
 | `MediaMtxConfig.log_path` | MediaMTX 로그 파일 경로를 반환합니다. | Path | 없음 | property |
@@ -735,7 +741,7 @@
 | `MediaMtxInstaller._make_binary_executable` | MediaMTX 실행 파일에 실행 권한을 부여합니다. | None | 권한 오류 | Linux에서만 동작 |
 | `MediaMtxProcessManager` | MediaMTX 프로세스의 실행 상태를 관리합니다. | MediaMtxProcessManager 객체 | 없음 | Popen 기반 |
 | `MediaMtxProcessManager.__init__` | MediaMTX 프로세스 관리 상태를 초기화합니다. | None | 없음 | 로그 핸들 보관 |
-| `MediaMtxProcessManager.is_running` | MediaMTX 프로세스가 이미 실행 중인지 확인합니다. | bool | 없음 | pgrep 사용 가능 |
+| `MediaMtxProcessManager.is_running` | 이 관리자가 실행한 MediaMTX 프로세스가 살아 있는지 확인합니다. | bool | 없음 | 외부 MediaMTX 오인 방지 |
 | `MediaMtxProcessManager.start` | MediaMTX를 백그라운드 프로세스로 실행합니다. | Popen 또는 None | 실행 파일 오류 | 이미 실행 중이면 None |
 | `MediaMtxProcessManager.stop` | 이 관리자가 실행한 MediaMTX 프로세스를 종료합니다. | None | 프로세스 종료 오류 | 로그 핸들 정리 |
 
@@ -746,11 +752,27 @@
 | `EdgeNodeRuntime` | Edge node 송출 프로세스의 실행 흐름을 조율합니다. | EdgeNodeRuntime 객체 | 없음 | 의존 객체 주입 가능 |
 | `EdgeNodeRuntime.__init__` | Edge node 런타임 의존 객체를 초기화합니다. | None | 없음 | 기본 MediaMTX 설정 생성 |
 | `EdgeNodeRuntime.build_command_args` | 현재 런타임 설정으로 GStreamer 실행 인자를 생성합니다. | list | 없음 | 테스트 가능 |
-| `EdgeNodeRuntime.run` | 시작 연결 정보를 출력한 뒤 MediaMTX와 GStreamer를 순서대로 실행하고 종료 시 정리합니다. | 종료 코드 | 하위 프로세스 오류 | 실제 실행 진입점 |
-| `EdgeNodeRuntime.stop` | GStreamer와 MediaMTX 프로세스를 종료합니다. | None | 프로세스 종료 오류 | finally에서 호출 |
+| `EdgeNodeRuntime.run` | 시작 연결 정보를 출력한 뒤 MediaMTX, 백업 복구 API, GStreamer, MQTT publisher를 실행합니다. | 종료 코드 | 하위 프로세스 오류 | 실제 실행 진입점 |
+| `EdgeNodeRuntime.stop` | GStreamer, 보조 프로세스, MediaMTX 프로세스를 종료합니다. | None | 프로세스 종료 오류 | finally에서 호출 |
 | `EdgeNodeRuntime._install_signal_handlers` | 운영체제 종료 신호를 정리 동작에 연결합니다. | None | signal 등록 오류 | 내부 함수 |
 | `EdgeNodeRuntime._handle_stop_signal` | 종료 신호를 받으면 하위 프로세스를 정리합니다. | None | SystemExit | 내부 함수 |
 | `build_default_edge_runtime` | 기본 설정 Edge node 런타임을 생성합니다. | EdgeNodeRuntime 객체 | 없음 | main.py에서 사용 |
+
+## `src/ai_cctv/edge_node/support_processes.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `EdgeSupportProcessConfig` | Edge node 보조 프로세스 실행 설정을 표현합니다. | EdgeSupportProcessConfig 객체 | 없음 | dataclass |
+| `EdgeSupportProcessManager` | MQTT 상태 publisher와 백업 복구 API 하위 프로세스를 관리합니다. | EdgeSupportProcessManager 객체 | 없음 | GStreamer와 같은 생명주기 |
+| `EdgeSupportProcessManager.__init__` | 보조 프로세스 관리자 상태를 초기화합니다. | None | 없음 | 설정 주입 가능 |
+| `EdgeSupportProcessManager.start_backup_recovery` | 백업 복구 FastAPI 서버를 하위 프로세스로 실행합니다. | Popen 또는 None | 실행 오류 | 백업 경로 환경 변수 전달 |
+| `EdgeSupportProcessManager.start_resource_monitor` | MQTT 자원 상태 publisher를 하위 프로세스로 실행합니다. | Popen 또는 None | 실행 오류 | GStreamer PID를 감시 대상으로 전달 |
+| `EdgeSupportProcessManager.stop` | 실행한 보조 프로세스를 종료합니다. | None | 프로세스 종료 오류 | terminate 후 kill fallback |
+| `EdgeSupportProcessManager._start_module` | Python 모듈을 python -m 하위 프로세스로 실행합니다. | Popen | 실행 오류 | 내부 함수 |
+| `EdgeSupportProcessManager._build_environment` | 보조 프로세스용 환경 변수를 생성합니다. | dict | 없음 | 중복 시작 정보 출력 억제 |
+| `build_support_process_config_from_environment` | 환경 변수 기준으로 보조 프로세스 실행 설정을 생성합니다. | EdgeSupportProcessConfig | 없음 | 서비스별 on/off 지원 |
+| `build_support_process_manager_from_environment` | 환경 변수 기준으로 보조 프로세스 관리자를 생성합니다. | EdgeSupportProcessManager | 없음 | 런타임 기본값 |
+| `_read_bool_env` | 환경 변수 문자열을 bool 값으로 변환합니다. | bool | 없음 | 내부 함수 |
 
 ## `src/ai_cctv/edge_node/startup_info.py`
 
@@ -759,10 +781,11 @@
 | `EdgeConnectionInfo` | AI server가 Edge node에 접속하기 위해 필요한 RTSP, MQTT, 백업 복구 주소를 보관합니다. | EdgeConnectionInfo 객체 | 없음 | dataclass |
 | `EdgeConnectionInfo.to_terminal_text` | 운영자가 복사할 수 있는 표준 연결 정보 블록을 생성합니다. | 문자열 | 없음 | PowerShell 설정 예시 포함 |
 | `build_edge_connection_info` | 환경 변수와 호출 인자를 합쳐 Edge node 연결 정보를 생성합니다. | EdgeConnectionInfo 객체 | 잘못된 정수 환경 변수 | MQTT, RTSP, 백업 복구 설정 통합 |
-| `print_edge_connection_info` | Edge node 연결 정보를 표준 출력 또는 지정 스트림에 즉시 출력합니다. | EdgeConnectionInfo 객체 | 출력 스트림 오류 | flush=True 사용 |
+| `print_edge_connection_info` | Edge node 연결 정보를 표준 출력 또는 지정 스트림에 즉시 출력합니다. | EdgeConnectionInfo 객체 | 출력 스트림 오류 | `AI_CCTV_PRINT_STARTUP_INFO=0`이면 출력 생략 |
 | `resolve_edge_host` | AI server가 접속할 Edge node 호스트 값을 결정합니다. | IP 또는 호스트 문자열 | 없음 | 명시값, SSH, 인터페이스, UDP 라우팅 순서 |
 | `_build_rtsp_url` | MediaMTX 기본 RTSP 주소를 생성합니다. | RTSP URL 문자열 | 잘못된 포트 환경 변수 | 내부 함수 |
 | `_resolve_int` | 명시값 또는 환경 변수를 정수로 해석합니다. | int | ValueError | 내부 함수 |
+| `_read_bool_env` | 환경 변수 문자열을 bool 값으로 변환합니다. | bool | 없음 | 내부 함수 |
 | `_read_ssh_server_host` | SSH_CONNECTION 환경 변수에서 서버 측 IP를 읽습니다. | IP 문자열 또는 None | 없음 | SSH 접속 실행에 우선 사용 |
 | `_read_interface_host` | 지정한 Linux 네트워크 인터페이스의 IPv4 주소를 조회합니다. | IP 문자열 또는 None | ip 명령 실행 오류는 None 처리 | AI_CCTV_EDGE_INTERFACE 지원 |
 | `_detect_host_by_udp_probe` | UDP 라우팅 결과로 로컬 IPv4 주소를 추정합니다. | IP 문자열 또는 None | 소켓 오류는 None 처리 | 패킷 전송 없이 라우팅만 확인 |
@@ -797,7 +820,7 @@
 
 ## `tests/test_project_structure.py`
 
-| ?? | ?? | ??? | ??? | ?? ?? |
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
 | `FakeSmbus` | UPS Plus 전원 리더 테스트용 가짜 SMBus입니다. | FakeSmbus 인스턴스 | 없음 | 하드웨어 없이 레지스터 값을 주입 |
 | `FakeSmbus.__init__` | 가짜 레지스터 저장소와 close 호출 여부를 초기화합니다. | None | 없음 | 테스트 전용 |
@@ -808,19 +831,19 @@
 | `FakeUpsPlusPowerReader._open_bus` | 테스트용 가짜 SMBus를 반환합니다. | FakeSmbus 인스턴스 | 없음 | 실제 I2C 접근 없음 |
 | `FailingUpsPlusPowerReader` | I2C 열기 실패를 재현하는 UPS Plus 전원 리더입니다. | FailingUpsPlusPowerReader 인스턴스 | 없음 | 실패 스냅샷 검증용 |
 | `FailingUpsPlusPowerReader._open_bus` | I2C 버스 열기 실패를 발생시킵니다. | 반환 없음 | RuntimeError | 테스트 전용 |
-| `MemoryNotificationChannel` | 테스트용 메모리 알림 채널입니다. | MemoryNotificationChannel ???? | ??? ?? ?? ?? | ??: NotificationChannel, ?? ?? |
-| `MemoryNotificationChannel.__init__` | 전송 메시지 저장 목록을 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `MemoryNotificationChannel.send` | 전송된 알림 메시지를 메모리에 저장합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `ProjectStructureTest` | 문서 기준 구조 보강 모듈을 검증합니다. | ProjectStructureTest ???? | ??? ?? ?? ?? | ??: TestCase |
-| `ProjectStructureTest.test_object_appearance_rule_emits_once_per_track` | 동일 추적 ID에 대한 객체 등장 이벤트가 한 번만 생성되는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `ProjectStructureTest.test_dwell_time_rule_emits_after_threshold` | 체류 시간 초과 규칙이 임계 시간 이후 이벤트를 생성하는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `ProjectStructureTest.test_notification_dispatcher_sends_anomaly_message` | 이상 상황 이벤트가 알림 메시지로 변환되어 채널로 전달되는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `ProjectStructureTest.test_edge_failover_policy_matches_project_document` | 네트워크 장애 시 로컬 저장과 최소 알림을 선택하는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `ProjectStructureTest.test_gstreamer_mediamtx_command_streams_and_records` | GStreamer 명령이 MediaMTX 송출과 로컬 백업을 함께 수행하는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
-| `ProjectStructureTest.test_mediamtx_release_resolver_selects_raspberry_pi_package` | Raspberry Pi 아키텍처에 맞는 MediaMTX 패키지 URL을 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `MemoryNotificationChannel` | 테스트용 메모리 알림 채널입니다. | MemoryNotificationChannel 인스턴스 | 없음 | `NotificationChannel` 상속 |
+| `MemoryNotificationChannel.__init__` | 전송 메시지 저장 목록을 초기화합니다. | None | 없음 | 테스트 전용 |
+| `MemoryNotificationChannel.send` | 전송된 알림 메시지를 메모리에 저장합니다. | None | 없음 | 테스트 전용 |
+| `ProjectStructureTest` | 문서 기준 구조 보강 모듈을 검증합니다. | ProjectStructureTest 인스턴스 | 없음 | `unittest.TestCase` 상속 |
+| `ProjectStructureTest.test_object_appearance_rule_emits_once_per_track` | 동일 추적 ID에 대한 객체 등장 이벤트가 한 번만 생성되는지 검증합니다. | None | 없음 | 일반 동작 |
+| `ProjectStructureTest.test_dwell_time_rule_emits_after_threshold` | 체류 시간 초과 규칙이 임계 시간 이후 이벤트를 생성하는지 검증합니다. | None | 없음 | 일반 동작 |
+| `ProjectStructureTest.test_notification_dispatcher_sends_anomaly_message` | 이상 상황 이벤트가 알림 메시지로 변환되어 채널로 전달되는지 검증합니다. | None | 없음 | 일반 동작 |
+| `ProjectStructureTest.test_edge_failover_policy_matches_project_document` | 네트워크 장애 시 로컬 저장과 최소 알림을 선택하는지 검증합니다. | None | 없음 | 일반 동작 |
+| `ProjectStructureTest.test_gstreamer_mediamtx_command_streams_and_records` | GStreamer 명령이 MediaMTX 송출과 로컬 백업을 함께 수행하는지 검증합니다. | None | 없음 | 일반 동작 |
+| `ProjectStructureTest.test_mediamtx_release_resolver_selects_raspberry_pi_package` | Raspberry Pi 아키텍처에 맞는 MediaMTX 패키지 URL을 검증합니다. | None | 없음 | 일반 동작 |
 | `ProjectStructureTest.test_ups_plus_power_reader_reads_battery_and_external_power` | UPS Plus 레지스터에서 배터리 잔량과 외부 전원 상태를 해석하는지 검증합니다. | None | AssertionError | 가짜 SMBus 사용 |
 | `ProjectStructureTest.test_ups_plus_power_reader_reports_unavailable_on_i2c_error` | UPS Plus I2C 접근 실패가 사용 불가 스냅샷으로 변환되는지 검증합니다. | None | AssertionError | 실패 리더 사용 |
-| `ProjectStructureTest.test_console_scripts_are_split_by_deployment_bundle` | Edge node와 AI server 실행 진입점이 분리되어 있는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `ProjectStructureTest.test_console_scripts_are_split_by_deployment_bundle` | Edge node와 AI server 실행 진입점이 분리되어 있는지 검증합니다. | None | 없음 | 일반 동작 |
 | `ProjectStructureTest.test_rtsp_source_detection` | RTSP URL과 일반 카메라 번호를 구분하는지 검증합니다. | None | AssertionError | RTSP receiver 보조 함수 검증 |
 | `ProjectStructureTest.test_rtsp_receiver_watchdog_releases_active_capture` | RTSP watchdog이 활성 VideoCapture를 강제 해제하는지 검증합니다. | None | AssertionError | Mock capture 사용 |
 | `ProjectStructureTest.test_network_recovery_manager_skips_when_url_missing` | 복구 서버 URL이 없을 때 네트워크 요청 없이 실패 사유를 반환하는지 검증합니다. | None | AssertionError | 외부 네트워크 불필요 |
@@ -832,4 +855,6 @@
 | `ProjectStructureTest.test_ai_server_os_guard_accepts_only_windows` | AI server OS guard가 Windows만 허용하고 Linux를 종료 처리하는지 검증합니다. | None | AssertionError | OS 분기 회귀 방지 |
 | `ProjectStructureTest.test_pyqt5_bootstrap_installs_only_when_user_accepts` | PyQt5 bootstrap이 사용자가 동의한 경우에만 설치 함수를 호출하는지 검증합니다. | None | AssertionError | GUI 점검 창 진입 전 최소 의존성 검증 |
 | `ProjectStructureTest.test_local_camera_connection_config_uses_camera_index` | 로컬 카메라 모드에서 영상 소스가 카메라 인덱스로 반환되는지 검증합니다. | None | AssertionError | Edge node 없는 테스트 경로 보장 |
+| `ProjectStructureTest.test_local_camera_connection_does_not_publish_edge_environment` | 로컬 카메라 모드가 Edge node 환경 변수를 남기지 않는지 검증합니다. | None | AssertionError | 로컬 테스트 분기 회귀 방지 |
 | `ProjectStructureTest.test_runtime_readiness_report_finds_missing_required_items` | 런타임 준비 보고서가 누락된 필수 요구사항을 찾는지 검증합니다. | None | AssertionError | 자동 설치 대상 산출 검증 |
+| `ProjectStructureTest.test_runtime_requirements_follow_selected_features` | 시작/분석 요구사항이 선택 기능에 맞게 분리되는지 검증합니다. | None | AssertionError | VLM/얼굴 식별 불필요 검사 방지 |

@@ -9,6 +9,7 @@ from .local_backup import LocalBackupConfig
 from .mediamtx import MediaMtxConfig, MediaMtxInstaller, MediaMtxProcessManager
 from .startup_info import print_edge_connection_info
 from .streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
+from .support_processes import build_support_process_manager_from_environment
 
 
 class EdgeNodeRuntime:
@@ -29,6 +30,7 @@ class EdgeNodeRuntime:
         mediamtx_installer=None,
         mediamtx_process_manager=None,
         command_builder=None,
+        support_process_manager=None,
     ):
         """Edge node 런타임 의존 객체를 초기화합니다.
 
@@ -37,6 +39,7 @@ class EdgeNodeRuntime:
             mediamtx_installer: MediaMTX 설치 보장 객체입니다.
             mediamtx_process_manager: MediaMTX 프로세스 관리 객체입니다.
             command_builder: GStreamer 명령 생성 객체입니다.
+            support_process_manager: MQTT/복구 보조 프로세스 관리 객체입니다.
         반환값:
             없음.
         """
@@ -50,6 +53,9 @@ class EdgeNodeRuntime:
         self.command_builder = command_builder or MediaMtxGStreamerCommandBuilder(
             EdgeStreamConfig(),
             self.backup_config,
+        )
+        self.support_process_manager = (
+            support_process_manager or build_support_process_manager_from_environment()
         )
         self.gstreamer_process = None
 
@@ -77,10 +83,16 @@ class EdgeNodeRuntime:
         self.backup_config.ensure_directory()
         self.mediamtx_installer.ensure_installed()
         self.mediamtx_process_manager.start()
+        self.support_process_manager.start_backup_recovery(
+            backup_dir=str(self.backup_config.directory)
+        )
         self._install_signal_handlers()
 
         try:
             self.gstreamer_process = subprocess.Popen(self.build_command_args())
+            self.support_process_manager.start_resource_monitor(
+                monitored_process_id=self.gstreamer_process.pid
+            )
             return self.gstreamer_process.wait()
         finally:
             self.stop()
@@ -102,6 +114,7 @@ class EdgeNodeRuntime:
                 self.gstreamer_process.kill()
                 self.gstreamer_process.wait(timeout=5)
 
+        self.support_process_manager.stop()
         self.mediamtx_process_manager.stop()
 
     def _install_signal_handlers(self):

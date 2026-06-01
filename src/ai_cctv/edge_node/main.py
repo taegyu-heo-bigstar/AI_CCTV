@@ -3,6 +3,7 @@
 # 운영자는 ai-cctv-edge 명령으로 Raspberry Pi 송출 노드를 시작합니다.
 
 import argparse
+import os
 
 from .os_guard import ensure_supported_edge_os
 from .runtime import build_default_edge_runtime
@@ -35,6 +36,11 @@ def build_argument_parser():
         action="store_true",
         help="실제 실행 대신 GStreamer 명령만 출력합니다.",
     )
+    parser.add_argument(
+        "--no-support-services",
+        action="store_true",
+        help="MQTT 상태 발행과 백업 복구 API 보조 프로세스를 실행하지 않습니다.",
+    )
     return parser
 
 
@@ -49,6 +55,9 @@ def main(argv=None):
 
     ensure_supported_edge_os()
     args = build_argument_parser().parse_args(argv)
+    if args.no_support_services:
+        os.environ["AI_CCTV_EDGE_ENABLE_SUPPORT_SERVICES"] = "0"
+
     runtime = build_default_edge_runtime()
     if args.print_command:
         print(runtime.command_builder.build_shell_command_text())

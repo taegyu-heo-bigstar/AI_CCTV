@@ -50,10 +50,17 @@ src/ai_cctv/edge_node/
   mediamtx.py      # MediaMTX 다운로드, 설치 확인, 프로세스 관리
   streaming.py     # GStreamer tee 기반 송출/백업 파이프라인 생성
   local_backup.py  # 백업 폴더와 10초 세그먼트 파일명 정책
+  support_processes.py # MQTT 상태 발행과 백업 복구 API 보조 프로세스 관리
   failover.py      # 네트워크 장애 시 동작 정책
 ```
 
-`ai-cctv-edge`는 실제 Raspberry Pi 런타임을 실행합니다. 명령만 확인해야 할 때는 `ai-cctv-edge --print-command`를 사용합니다.
+`ai-cctv-edge`는 실제 Raspberry Pi 런타임을 실행합니다. 이제 기본 실행만으로 MediaMTX, GStreamer, MQTT 상태 발행, 백업 복구 API가 같은 생명주기로 관리됩니다. 명령만 확인해야 할 때는 `ai-cctv-edge --print-command`를 사용하고, RTSP 송출만 단독 점검해야 할 때는 `ai-cctv-edge --no-support-services`를 사용합니다.
+
+## 2-2. 실행 준비 검사 변경
+
+AI server는 더 이상 시작 직후 모든 AI 모델과 선택 기능을 한꺼번에 검사하지 않습니다. 먼저 Windows와 PyQt5만 확인하고, Edge node 연결 또는 Windows 로컬 카메라 모드를 선택한 뒤 해당 모드에 필요한 최소 패키지를 검사합니다.
+
+영상 시작 버튼을 누르면 현재 설정된 YOLO/VLM 옵션에 맞춰 PyTorch, Ultralytics, YOLO 모델, Qwen 관련 패키지와 모델 캐시를 검사합니다. 이 구조는 로컬 카메라 단순 테스트나 VLM 미사용 실행이 불필요한 대형 모델 준비 때문에 막히지 않도록 하기 위한 변경입니다.
 
 ## 3. 실행 진입점 변경
 

@@ -9,6 +9,8 @@ from .environment_check import (
     RuntimeRequirement,
     RuntimeRequirementResult,
     RuntimeReadinessReport,
+    build_analysis_requirements,
+    build_startup_requirements,
 )
 from .os_guard import ensure_windows_os, is_windows_os
 
@@ -18,6 +20,8 @@ __all__ = [
     "RuntimeRequirement",
     "RuntimeRequirementResult",
     "RuntimeReadinessReport",
+    "build_analysis_requirements",
+    "build_startup_requirements",
     "ensure_pyqt5_available",
     "ensure_windows_os",
     "is_windows_os",

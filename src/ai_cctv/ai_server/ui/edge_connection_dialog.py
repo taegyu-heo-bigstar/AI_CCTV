@@ -203,6 +203,9 @@ class EdgeConnectionDialog(QDialog):
             QMessageBox.warning(self, "입력 오류", str(error))
             return
 
+        if config.use_local_camera and not self._ensure_local_camera_runtime_ready():
+            return
+
         self._set_pending_state()
         result = self.validator.validate(config)
         if not result.success:
@@ -218,6 +221,23 @@ class EdgeConnectionDialog(QDialog):
         self.status_label.setStyleSheet("color: #22c55e; font-weight: bold;")
         QApplication.processEvents()
         self.accept()
+
+    def _ensure_local_camera_runtime_ready(self):
+        """로컬 카메라 검증 전에 필요한 영상 입력 패키지를 확인합니다.
+
+        인자:
+            없음.
+        반환값:
+            준비가 완료되면 True, 사용자가 설치를 거부하면 False를 반환합니다.
+        """
+
+        from ..runtime import RuntimeEnvironmentChecker, build_startup_requirements
+        from .runtime_readiness_dialog import ensure_runtime_readiness
+
+        checker = RuntimeEnvironmentChecker(
+            requirements=build_startup_requirements(use_edge_node=False)
+        )
+        return ensure_runtime_readiness(parent=self, checker=checker)
 
     def _set_pending_state(self):
         """연결 검증 진행 중 UI 상태를 표시합니다.

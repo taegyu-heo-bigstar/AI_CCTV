@@ -37,6 +37,8 @@ from ai_cctv.ai_server.runtime.environment_check import (
     RuntimeReadinessReport,
     RuntimeRequirement,
     RuntimeRequirementResult,
+    build_analysis_requirements,
+    build_startup_requirements,
 )
 from ai_cctv.ai_server.runtime.os_guard import ensure_windows_os, is_windows_os
 from ai_cctv.edge_node.backup_recovery_server import (
@@ -411,6 +413,7 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertIn("paho-mqtt", extras["ai-server"])
         self.assertIn("fastapi", extras["edge-node"])
         self.assertIn("uvicorn", extras["edge-node"])
+        self.assertNotIn("pygobject", extras["edge-node"])
         self.assertIn("requests", extras["ai-server"])
         self.assertIn("torch", extras["ai-server"])
         self.assertIn("huggingface-hub", extras["ai-server"])
@@ -424,6 +427,7 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(Path("src/ai_cctv/edge_node/os_guard.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/runtime.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/startup_info.py").is_file())
+        self.assertTrue(Path("src/ai_cctv/edge_node/support_processes.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/backup_recovery_server.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/monitoring").is_dir())
         self.assertTrue(
@@ -744,6 +748,41 @@ class ProjectStructureTest(unittest.TestCase):
 
         self.assertEqual(config.video_source(), 1)
 
+    def test_local_camera_connection_does_not_publish_edge_environment(self):
+        """로컬 카메라 모드는 RTSP/MQTT/복구 환경 변수를 남기지 않는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        names = [
+            "AI_CCTV_RTSP_URL",
+            "AI_CCTV_MQTT_HOST",
+            "AI_CCTV_MQTT_PORT",
+            "AI_CCTV_MQTT_STATUS_TOPIC",
+            "AI_CCTV_RECOVERY_SERVER_URL",
+        ]
+        original = {name: os.environ.get(name) for name in names}
+        try:
+            for name in names:
+                os.environ[name] = "test"
+            EdgeConnectionConfig(use_local_camera=True, local_camera_index=2).apply_environment()
+
+            self.assertEqual(os.environ["AI_CCTV_USE_LOCAL_CAMERA"], "1")
+            self.assertEqual(os.environ["AI_CCTV_LOCAL_CAMERA_INDEX"], "2")
+            for name in names:
+                self.assertNotIn(name, os.environ)
+        finally:
+            for name, value in original.items():
+                if value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = value
+            os.environ.pop("AI_CCTV_USE_LOCAL_CAMERA", None)
+            os.environ.pop("AI_CCTV_LOCAL_CAMERA_INDEX", None)
+
     def test_runtime_readiness_report_finds_missing_required_items(self):
         """런타임 준비 상태 결과가 누락된 필수 항목을 구분하는지 검증합니다.
 
@@ -765,6 +804,30 @@ class ProjectStructureTest(unittest.TestCase):
 
         self.assertFalse(report.is_ready())
         self.assertEqual(report.missing_required()[0].requirement.name, "missing")
+
+    def test_runtime_requirements_follow_selected_features(self):
+        """시작/분석 요구사항이 선택한 기능에 맞게 분리되는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        local_startup_names = {
+            requirement.name
+            for requirement in build_startup_requirements(use_edge_node=False)
+        }
+        yolo_names = {
+            requirement.name
+            for requirement in build_analysis_requirements(use_yolo=True, use_vlm=False)
+        }
+
+        self.assertIn("OpenCV", local_startup_names)
+        self.assertNotIn("paho-mqtt", local_startup_names)
+        self.assertIn("YOLO 모델", yolo_names)
+        self.assertNotIn("Qwen VLM 모델", yolo_names)
+        self.assertNotIn("InsightFace", yolo_names)
 
 
 if __name__ == "__main__":

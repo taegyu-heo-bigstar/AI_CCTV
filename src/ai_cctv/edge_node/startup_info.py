@@ -146,6 +146,9 @@ def print_edge_connection_info(connection_info=None, stream=None, **overrides):
 
     output_stream = stream or sys.stdout
     info = connection_info or build_edge_connection_info(**overrides)
+    if not _read_bool_env("AI_CCTV_PRINT_STARTUP_INFO", True):
+        return info
+
     print(info.to_terminal_text(), file=output_stream, flush=True)
     return info
 
@@ -212,6 +215,22 @@ def _resolve_int(value, env_name, default):
     if value is not None:
         return int(value)
     return int(os.getenv(env_name, default))
+
+
+def _read_bool_env(name, default):
+    """환경 변수 문자열을 bool 값으로 변환합니다.
+
+    인자:
+        name: 읽을 환경 변수 이름입니다.
+        default: 환경 변수가 없을 때 사용할 기본값입니다.
+    반환값:
+        bool 값을 반환합니다.
+    """
+
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
 def _read_ssh_server_host():

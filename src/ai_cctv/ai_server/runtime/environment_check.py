@@ -129,7 +129,9 @@ class RuntimeEnvironmentChecker:
             없음.
         """
 
-        self.requirements = tuple(requirements or build_default_requirements())
+        self.requirements = tuple(
+            requirements if requirements is not None else build_default_requirements()
+        )
         self.project_root = Path(project_root or Path.cwd())
 
     def check(self):
@@ -330,6 +332,80 @@ class RuntimeInstaller:
             raise RuntimeError(f"{failure_message}\n{completed.stderr or completed.stdout}")
 
 
+def build_startup_requirements(use_edge_node=True):
+    """AI server 창을 여는 데 필요한 최소 요구사항 목록을 생성합니다.
+
+    인자:
+        use_edge_node: Edge node 연결 기능을 사용할지 여부입니다.
+    반환값:
+        RuntimeRequirement 목록을 반환합니다.
+    """
+
+    requirements = [
+        RuntimeRequirement("PyQt5", "package", "PyQt5", "PyQt5", "GUI 실행"),
+        RuntimeRequirement("OpenCV", "package", "cv2", "opencv-python", "영상 입력 처리"),
+        RuntimeRequirement("NumPy", "package", "numpy", "numpy", "영상 배열 처리"),
+    ]
+    if use_edge_node:
+        requirements.extend([
+            RuntimeRequirement("requests", "package", "requests", "requests", "백업 복구 요청"),
+            RuntimeRequirement("paho-mqtt", "package", "paho.mqtt.client", "paho-mqtt", "Edge 상태 MQTT"),
+            RuntimeRequirement("psutil", "package", "psutil", "psutil", "자원 상태 처리"),
+        ])
+    return requirements
+
+
+def build_analysis_requirements(
+    use_yolo=True,
+    use_vlm=False,
+    include_discord=True,
+    include_face=False,
+):
+    """선택한 AI 분석 기능 실행에 필요한 요구사항 목록을 생성합니다.
+
+    인자:
+        use_yolo: YOLO 사람 탐지와 추적을 사용할지 여부입니다.
+        use_vlm: Qwen VLM 분석을 사용할지 여부입니다.
+        include_discord: Discord 이상 상황 알림 패키지를 포함할지 여부입니다.
+        include_face: 얼굴 식별 관련 패키지를 포함할지 여부입니다.
+    반환값:
+        RuntimeRequirement 목록을 반환합니다.
+    """
+
+    yolo_model = os.getenv("AI_CCTV_YOLO_MODEL_PATH", DEFAULT_YOLO_MODEL_PATH)
+    qwen_model = os.getenv("AI_CCTV_QWEN_MODEL_ID", DEFAULT_QWEN_MODEL_ID)
+    requirements = []
+    if use_yolo or use_vlm or include_face:
+        requirements.append(
+            RuntimeRequirement("PyTorch", "package", "torch", "torch", "AI 추론 런타임")
+        )
+    if use_yolo:
+        requirements.extend([
+            RuntimeRequirement("Ultralytics", "package", "ultralytics", "ultralytics", "YOLO 추적"),
+            RuntimeRequirement("YOLO 모델", "yolo_model", install_spec=yolo_model, description="사람 탐지 모델"),
+        ])
+    if use_vlm:
+        requirements.extend([
+            RuntimeRequirement("Transformers", "package", "transformers", "transformers>=4.51.0", "Qwen VLM"),
+            RuntimeRequirement("Accelerate", "package", "accelerate", "accelerate", "Qwen device map"),
+            RuntimeRequirement("bitsandbytes", "package", "bitsandbytes", "bitsandbytes", "Qwen 4bit 로딩"),
+            RuntimeRequirement("huggingface-hub", "package", "huggingface_hub", "huggingface-hub", "Qwen 모델 캐시 다운로드"),
+            RuntimeRequirement("Pillow", "package", "PIL", "pillow", "이미지 처리"),
+            RuntimeRequirement("qwen-vl-utils", "package", "qwen_vl_utils", "qwen-vl-utils", "Qwen 입력 처리"),
+            RuntimeRequirement("Qwen VLM 모델", "qwen_model", install_spec=qwen_model, description="사람 속성 분석 모델"),
+        ])
+    if include_discord and use_yolo:
+        requirements.append(
+            RuntimeRequirement("discord.py", "package", "discord", "discord.py>=2.0.0", "Discord 이상 상황 알림")
+        )
+    if include_face:
+        requirements.extend([
+            RuntimeRequirement("InsightFace", "package", "insightface", "insightface", "얼굴 식별"),
+            RuntimeRequirement("ONNX Runtime", "package", "onnxruntime", "onnxruntime", "InsightFace 추론"),
+        ])
+    return _deduplicate_requirements(requirements)
+
+
 def build_default_requirements():
     """AI server 기본 실행 요구사항 목록을 생성합니다.
 
@@ -339,29 +415,35 @@ def build_default_requirements():
         RuntimeRequirement 목록을 반환합니다.
     """
 
-    yolo_model = os.getenv("AI_CCTV_YOLO_MODEL_PATH", DEFAULT_YOLO_MODEL_PATH)
-    qwen_model = os.getenv("AI_CCTV_QWEN_MODEL_ID", DEFAULT_QWEN_MODEL_ID)
-    return [
-        RuntimeRequirement("PyTorch", "package", "torch", "torch", "AI 추론 런타임"),
-        RuntimeRequirement("PyQt5", "package", "PyQt5", "PyQt5", "GUI 실행"),
-        RuntimeRequirement("OpenCV", "package", "cv2", "opencv-python", "영상 입력 처리"),
-        RuntimeRequirement("Ultralytics", "package", "ultralytics", "ultralytics", "YOLO 추적"),
-        RuntimeRequirement("Transformers", "package", "transformers", "transformers>=4.51.0", "Qwen VLM"),
-        RuntimeRequirement("Accelerate", "package", "accelerate", "accelerate", "Qwen device map"),
-        RuntimeRequirement("bitsandbytes", "package", "bitsandbytes", "bitsandbytes", "Qwen 4bit 로딩"),
-        RuntimeRequirement("huggingface-hub", "package", "huggingface_hub", "huggingface-hub", "Qwen 모델 캐시 다운로드"),
-        RuntimeRequirement("Pillow", "package", "PIL", "pillow", "이미지 처리"),
-        RuntimeRequirement("NumPy", "package", "numpy", "numpy", "영상/AI 배열 처리"),
-        RuntimeRequirement("qwen-vl-utils", "package", "qwen_vl_utils", "qwen-vl-utils", "Qwen 입력 처리"),
-        RuntimeRequirement("requests", "package", "requests", "requests", "백업 복구 요청"),
-        RuntimeRequirement("paho-mqtt", "package", "paho.mqtt.client", "paho-mqtt", "Edge 상태 MQTT"),
-        RuntimeRequirement("psutil", "package", "psutil", "psutil", "자원 상태 처리"),
-        RuntimeRequirement("discord.py", "package", "discord", "discord.py>=2.0.0", "Discord 이상 상황 알림"),
-        RuntimeRequirement("InsightFace", "package", "insightface", "insightface", "얼굴 식별"),
-        RuntimeRequirement("ONNX Runtime", "package", "onnxruntime", "onnxruntime", "InsightFace 추론"),
-        RuntimeRequirement("YOLO 모델", "yolo_model", install_spec=yolo_model, description="사람 탐지 모델"),
-        RuntimeRequirement("Qwen VLM 모델", "qwen_model", install_spec=qwen_model, description="사람 속성 분석 모델"),
-    ]
+    return _deduplicate_requirements(
+        build_startup_requirements(use_edge_node=True)
+        + build_analysis_requirements(use_yolo=True, use_vlm=False)
+    )
+
+
+def _deduplicate_requirements(requirements):
+    """동일한 요구사항이 중복 등록되지 않도록 목록을 정리합니다.
+
+    인자:
+        requirements: 정리할 RuntimeRequirement 목록입니다.
+    반환값:
+        중복이 제거된 RuntimeRequirement 목록을 반환합니다.
+    """
+
+    unique_requirements = []
+    seen_keys = set()
+    for requirement in requirements:
+        key = (
+            requirement.name,
+            requirement.kind,
+            requirement.import_name,
+            requirement.install_spec,
+        )
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        unique_requirements.append(requirement)
+    return unique_requirements
 
 
 def _read_distribution_version(install_spec):

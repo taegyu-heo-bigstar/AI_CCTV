@@ -327,6 +327,9 @@ class CCTVMainWindow(QMainWindow):
         if self.worker is not None:
             return
 
+        if not self._ensure_analysis_runtime_ready():
+            return
+
         try:
             from ..analysis.video_worker import VideoWorker
 
@@ -354,6 +357,30 @@ class CCTVMainWindow(QMainWindow):
         self.cam_status.setText("CAM-01 - LOADING")
         self._set_camera_status_style("#facc15", "#facc15")
         self._set_run_button_state(is_running=True)
+
+    def _ensure_analysis_runtime_ready(self):
+        """현재 설정된 AI 분석 기능에 필요한 패키지와 모델을 확인합니다.
+
+        인자:
+            없음.
+        반환값:
+            실행 준비가 완료되면 True, 사용자가 설치를 거부하면 False를 반환합니다.
+        """
+
+        if not self.use_yolo and not self.use_vlm:
+            return True
+
+        from ..runtime import RuntimeEnvironmentChecker, build_analysis_requirements
+        from .runtime_readiness_dialog import ensure_runtime_readiness
+
+        checker = RuntimeEnvironmentChecker(
+            requirements=build_analysis_requirements(
+                use_yolo=self.use_yolo,
+                use_vlm=self.use_vlm,
+                include_discord=True,
+            )
+        )
+        return ensure_runtime_readiness(parent=self, checker=checker)
 
     def stop_video(self):
         """영상 처리 작업자를 중지하고 카메라 상태를 갱신합니다.
@@ -677,15 +704,22 @@ def main(pre_start_callback=None):
     """
 
     app = QApplication(sys.argv)
-    from .runtime_readiness_dialog import ensure_runtime_readiness
-
-    if not ensure_runtime_readiness():
-        sys.exit(1)
-
     from .edge_connection_dialog import EdgeConnectionDialog
 
     connection_dialog = EdgeConnectionDialog()
     if connection_dialog.exec_() != QDialog.Accepted:
+        sys.exit(1)
+
+    from ..runtime import RuntimeEnvironmentChecker, build_startup_requirements
+    from .runtime_readiness_dialog import ensure_runtime_readiness
+
+    connection_config = connection_dialog.connection_config
+    checker = RuntimeEnvironmentChecker(
+        requirements=build_startup_requirements(
+            use_edge_node=not connection_config.use_local_camera
+        )
+    )
+    if not ensure_runtime_readiness(checker=checker):
         sys.exit(1)
 
     if pre_start_callback is not None:

@@ -1,4 +1,3 @@
-pygobject
 fastapi
 uvicorn
 paho-mqtt
