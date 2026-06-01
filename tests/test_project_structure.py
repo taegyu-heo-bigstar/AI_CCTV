@@ -3,7 +3,10 @@
 # 종합설계 문서의 핵심 실행 단위가 코드로 유지되는지 확인합니다.
 
 import unittest
+import os
+import tempfile
 import tomllib
+import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -16,10 +19,25 @@ from ai_cctv.ai_server.analysis.anomaly.detector import (
     DwellTimeAnomalyRule,
     ObjectAppearanceRule,
 )
+from ai_cctv.ai_server.monitoring.resource_monitor_client import (
+    MqttResourceMonitorConfig as MqttResourceSubscriberConfig,
+)
+from ai_cctv.ai_server.analysis.rtsp_receiver import is_rtsp_source
+from ai_cctv.ai_server.recovery.network_recovery_manager import (
+    NetworkRecoveryConfig,
+    NetworkRecoveryManager,
+)
+from ai_cctv.edge_node.backup_recovery_server import (
+    BackupRecoveryService,
+    BackupSegmentFinder,
+)
 from ai_cctv.edge_node.failover import EdgeNetworkFailoverPolicy
 from ai_cctv.edge_node.local_backup import LocalBackupConfig
 from ai_cctv.edge_node.mediamtx import MediaMtxConfig, MediaMtxReleaseResolver
 from ai_cctv.edge_node.monitoring.power_status import UpsPlusPowerReader
+from ai_cctv.edge_node.monitoring.resource_monitor_publisher import (
+    MqttResourceMonitorConfig,
+)
 from ai_cctv.edge_node.streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
 
 
@@ -360,6 +378,14 @@ class ProjectStructureTest(unittest.TestCase):
 
         self.assertEqual(scripts["ai-cctv-edge"], "ai_cctv.edge_node.main:main")
         self.assertEqual(
+            scripts["ai-cctv-edge-monitor"],
+            "ai_cctv.edge_node.monitoring.resource_monitor_publisher:main",
+        )
+        self.assertEqual(
+            scripts["ai-cctv-edge-backup-recovery"],
+            "ai_cctv.edge_node.backup_recovery_server:main",
+        )
+        self.assertEqual(
             scripts["ai-cctv-ai-server"],
             "ai_cctv.ai_server.server_run:main",
         )
@@ -367,6 +393,11 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertIn("edge-node", extras)
         self.assertIn("ai-server", extras)
         self.assertIn("smbus2", extras["edge-node"])
+        self.assertIn("paho-mqtt", extras["edge-node"])
+        self.assertIn("paho-mqtt", extras["ai-server"])
+        self.assertIn("fastapi", extras["edge-node"])
+        self.assertIn("uvicorn", extras["edge-node"])
+        self.assertIn("requests", extras["ai-server"])
         self.assertNotIn("edge-pi", extras)
         self.assertNotIn("windows-server", extras)
         self.assertNotIn("edge", extras)
@@ -375,9 +406,15 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(Path("src/ai_cctv/edge_node/local_backup.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/mediamtx.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/runtime.py").is_file())
+        self.assertTrue(Path("src/ai_cctv/edge_node/backup_recovery_server.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/monitoring").is_dir())
         self.assertTrue(
-            Path("src/ai_cctv/edge_node/monitoring/resource_monitor_server.py").is_file()
+            Path(
+                "src/ai_cctv/edge_node/monitoring/resource_monitor_publisher.py"
+            ).is_file()
+        )
+        self.assertFalse(
+            Path("src/ai_cctv/edge_node/monitoring/resource_monitor_server.py").exists()
         )
         self.assertTrue(
             Path("src/ai_cctv/edge_node/monitoring/power_status.py").is_file()
@@ -394,6 +431,11 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(Path("src/ai_cctv/ai_server/ui").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/ui/edge_status_window.py").is_file())
         self.assertTrue(Path("src/ai_cctv/ai_server/analysis").is_dir())
+        self.assertTrue(Path("src/ai_cctv/ai_server/analysis/rtsp_receiver.py").is_file())
+        self.assertTrue(Path("src/ai_cctv/ai_server/recovery").is_dir())
+        self.assertTrue(
+            Path("src/ai_cctv/ai_server/recovery/network_recovery_manager.py").is_file()
+        )
         self.assertTrue(Path("src/ai_cctv/ai_server/analysis/anomaly").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/storage").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/storage/clip_manager.py").is_file())
@@ -420,6 +462,89 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertFalse(Path("scripts/stream_and_record.sh").exists())
         self.assertTrue(Path("requirements/edge-node.txt").is_file())
         self.assertTrue(Path("requirements/ai-server.txt").is_file())
+
+    def test_rtsp_source_detection(self):
+        """RTSP URL과 일반 카메라 번호를 구분하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        self.assertTrue(is_rtsp_source("rtsp://192.168.137.2:8554/live"))
+        self.assertFalse(is_rtsp_source(0))
+        self.assertFalse(is_rtsp_source("http://127.0.0.1/video"))
+
+    def test_network_recovery_manager_skips_when_url_missing(self):
+        """복구 서버 URL이 없을 때 네트워크 요청 없이 실패 사유를 반환하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        manager = NetworkRecoveryManager(NetworkRecoveryConfig(server_url=""))
+        manager.record_failure(datetime(2026, 5, 31, 10, 0, 0))
+
+        result = manager.record_recovery(datetime(2026, 5, 31, 10, 0, 5))
+
+        self.assertFalse(result["requested"])
+        self.assertEqual(result["reason"], "server_url_not_configured")
+
+    def test_backup_recovery_service_archives_overlapping_segments(self):
+        """요청 시간대와 겹치는 TS 백업 파일을 ZIP으로 묶는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            backup_dir = Path(temp_dir)
+            segment_path = backup_dir / "backup_20260531_100000_00001.ts"
+            segment_path.write_bytes(b"segment")
+            end_time = datetime(2026, 5, 31, 10, 0, 10)
+            os.utime(segment_path, (end_time.timestamp(), end_time.timestamp()))
+
+            service = BackupRecoveryService(
+                BackupSegmentFinder(backup_dir, segment_seconds=10)
+            )
+            archive = service.recover(
+                "2026-05-31T10:00:05",
+                "2026-05-31T10:00:12",
+            )
+
+            try:
+                with zipfile.ZipFile(archive.path) as zip_file:
+                    self.assertEqual(
+                        zip_file.namelist(),
+                        ["backup_20260531_100000_00001.ts"],
+                    )
+                self.assertEqual(archive.file_count, 1)
+            finally:
+                archive.path.unlink(missing_ok=True)
+
+    def test_resource_monitor_mqtt_defaults_match_between_nodes(self):
+        """Edge node와 AI server의 기본 MQTT topic이 같은지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        edge_config = MqttResourceMonitorConfig()
+        ai_server_config = MqttResourceSubscriberConfig()
+
+        self.assertEqual(edge_config.broker_host, "127.0.0.1")
+        self.assertEqual(edge_config.broker_port, 1883)
+        self.assertEqual(edge_config.topic, "ai-cctv/edge-node/status")
+        self.assertEqual(ai_server_config.broker_host, edge_config.broker_host)
+        self.assertEqual(ai_server_config.broker_port, edge_config.broker_port)
+        self.assertEqual(ai_server_config.topic, edge_config.topic)
 
 
 if __name__ == "__main__":

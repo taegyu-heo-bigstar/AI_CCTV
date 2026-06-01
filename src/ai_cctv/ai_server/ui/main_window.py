@@ -525,6 +525,7 @@ class CCTVMainWindow(QMainWindow):
         time_label.setStyleSheet(f"color: {display.color};")
         desc_label = QLabel(display.description)
         desc_label.setStyleSheet("font-size: 15px; font-weight: bold;")
+        desc_label.setWordWrap(True)
 
         layout.addWidget(time_label)
         layout.addWidget(desc_label)

@@ -10,6 +10,7 @@ matplotlib
 scipy
 pyyaml
 requests
+paho-mqtt
 psutil
 insightface
 onnxruntime

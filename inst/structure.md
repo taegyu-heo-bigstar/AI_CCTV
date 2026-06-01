@@ -186,13 +186,36 @@
 
 | ?? | ?? | ??? | ??? | ?? ?? |
 |---|---|---|---|---|
-| `VideoStream` | VideoStream 클래스의 주요 책임을 수행합니다. | VideoStream ???? | ??? ?? ?? ?? | ?? ?? |
-| `VideoStream.__init__` | __init__ 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? |
-| `VideoStream.open` | open 함수의 주요 기능을 수행합니다. | True | ??? ?? ?? ?? | ?? ?? ?? |
-| `VideoStream.read` | read 함수의 주요 기능을 수행합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `VideoStream.get_fps` | get_fps 함수의 주요 기능을 수행합니다. | ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
-| `VideoStream.get_frame_size` | get_frame_size 함수의 주요 기능을 수행합니다. | tuple | ??? ?? ?? ?? | ?? ?? ?? |
-| `VideoStream.release` | release 함수의 주요 기능을 수행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `VideoStream` | 웹캠 또는 RTSP 영상 입력을 공통 인터페이스로 감쌉니다. | VideoStream 객체 | 없음 | RTSP 입력은 별도 수신 thread 사용 |
+| `VideoStream.__init__` | 입력 소스와 RTSP 수신 상태를 초기화합니다. | None | 없음 | 복구 URL이 있으면 복구 관리자 생성 |
+| `VideoStream.open` | 영상 입력을 엽니다. | bool | OpenCV 열기 실패 | RTSP는 수신 thread 시작 후 True |
+| `VideoStream.read` | 최신 영상 프레임을 읽습니다. | (bool, frame) | 프레임 없음 | RTSP 장애/복구 상태 기록 |
+| `VideoStream.get_fps` | 입력 영상의 FPS를 반환합니다. | 숫자 | 없음 | 알 수 없으면 30 |
+| `VideoStream.get_frame_size` | 입력 영상의 프레임 크기를 반환합니다. | tuple | 없음 | 기본 640x480 |
+| `VideoStream.is_recovering` | RTSP 입력이 현재 복구 대기 상태인지 반환합니다. | bool | 없음 | UI 상태 메시지에 사용 |
+| `VideoStream.get_last_recovery_result` | 마지막 백업 복구 요청 결과를 반환합니다. | dict 또는 None | 없음 | VideoWorker가 UI 이벤트로 표시 |
+| `VideoStream.release` | 영상 입력 자원을 해제합니다. | None | 없음 | RTSP receiver와 VideoCapture 정리 |
+| `VideoStream._read_rtsp_frame` | RTSP 수신기에서 새 프레임을 가져오고 장애/복구 상태를 기록합니다. | (bool, frame) | 없음 | 내부 함수 |
+| `VideoStream._record_rtsp_failure` | RTSP 프레임 미수신 상태를 복구 관리자에 기록합니다. | None | 없음 | 내부 함수 |
+| `VideoStream._record_rtsp_recovery` | RTSP 프레임 재수신 상태를 복구 관리자에 기록합니다. | None | 복구 요청 실패 결과 | 내부 함수 |
+
+## `src/ai_cctv/ai_server/analysis/rtsp_receiver.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `RtspFrameSnapshot` | RTSP 수신기가 보관한 최신 프레임 상태를 표현합니다. | RtspFrameSnapshot 객체 | 없음 | dataclass |
+| `is_rtsp_source` | 입력 소스가 RTSP URL인지 확인합니다. | bool | 없음 | `rtsp://` 문자열 판정 |
+| `check_rtsp_port_open` | RTSP URL의 TCP 포트가 열려 있는지 빠르게 확인합니다. | bool | False | socket timeout 사용 |
+| `RtspFrameReceiver` | RTSP 프레임을 백그라운드에서 수신하고 재연결을 관리합니다. | RtspFrameReceiver 객체 | 없음 | OpenCV 장기 대기 완화 |
+| `RtspFrameReceiver.__init__` | RTSP 수신 thread 상태와 동기화 객체를 초기화합니다. | None | 없음 | 조건 변수 사용 |
+| `RtspFrameReceiver.start` | RTSP 수신 thread를 시작합니다. | None | thread 시작 오류 | FFmpeg TCP timeout 설정 |
+| `RtspFrameReceiver.read_new_frame` | 이전 순번 이후의 최신 프레임을 반환합니다. | RtspFrameSnapshot | 프레임 없음 snapshot | sequence 기반 중복 방지 |
+| `RtspFrameReceiver.stop` | RTSP 수신 thread를 중지합니다. | None | 없음 | 최대 3초 join |
+| `RtspFrameReceiver._receive_loop` | RTSP 연결과 프레임 수신을 반복합니다. | None | 연결 실패 메시지 | 내부 재연결 루프 |
+| `RtspFrameReceiver._read_capture_until_failure` | 열려 있는 VideoCapture에서 프레임을 읽고 실패 시 루프를 종료합니다. | None | 없음 | 연속 실패 80회 기준 |
+| `RtspFrameReceiver._store_frame` | 수신한 최신 프레임을 thread-safe하게 저장합니다. | None | 없음 | frame copy 저장 |
+| `RtspFrameReceiver._set_connection_state` | RTSP 연결 상태와 마지막 오류 메시지를 갱신합니다. | None | 없음 | 대기 중인 read 호출 알림 |
+| `RtspFrameReceiver._update_capture_metadata` | VideoCapture에서 FPS와 프레임 크기 정보를 읽어 저장합니다. | None | 없음 | 기본값 보정 |
 
 ## `src/ai_cctv/ai_server/analysis/video_worker.py`
 
@@ -209,6 +232,8 @@
 | `VideoWorker._start_vlm_loading` | VLM 작업자를 별도 thread에서 준비합니다. | None | 없음 | 선택 기능 |
 | `VideoWorker._load_vlm_worker` | VLM 작업자를 생성하고 인물 처리 파이프라인에 연결합니다. | None | VLM 준비 오류 | loader thread에서 실행 |
 | `VideoWorker._emit_preview_frame` | AI 모델 준비 전 프리뷰 프레임과 기본 지표를 발행합니다. | None | 없음 | 영상 우선 출력 |
+| `VideoWorker._emit_stream_wait_status` | RTSP 스트림 복구 대기 상태를 과도하지 않게 UI에 알립니다. | None | 없음 | 5초 간격 제한 |
+| `VideoWorker._emit_recovery_result_if_needed` | RTSP 복구 후 백업 ZIP 요청 결과가 있으면 UI 이벤트로 표시합니다. | None | 없음 | 성공/실패 메시지 표시 |
 | `VideoWorker.stop` | 영상 처리 루프를 중지하고 스레드 종료를 기다립니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 | `VideoWorker._cleanup` | 사용 중인 분석 작업자, 녹화기, 영상 스트림을 정리합니다. | None | ??? ?? ?? ?? | ?? ?? |
 | `VideoWorker._join_loader_threads` | 모델 로더 thread가 짧은 시간 안에 끝나면 정리합니다. | None | 없음 | 종료 대기 최소화 |
@@ -245,13 +270,14 @@
 | ?? | ?? | ??? | ??? | ?? ?? |
 |---|---|---|---|---|
 | `VLMWorker` | VLM 모델 로딩과 crop 이미지 분석 작업을 관리합니다. | VLMWorker 객체 | 없음 | 준비/실패 이벤트 제공 |
-| `VLMWorker.__init__` | VLM 작업 큐와 준비 상태 이벤트를 초기화합니다. | None | 없음 | ready/failed event 보유 |
+| `VLMWorker.__init__` | VLM 작업 큐, 준비 상태 이벤트, 결과 콜백을 초기화합니다. | None | 없음 | ready/failed event 보유 |
 | `VLMWorker.start` | VLM 모델 로딩과 분석 큐 처리를 위한 thread를 시작합니다. | None | thread 시작 오류 | 중복 시작 방지 |
 | `VLMWorker.is_ready` | VLM 모델이 분석 가능한 상태인지 반환합니다. | bool | 없음 | ready_event 조회 |
 | `VLMWorker.has_failed` | VLM 모델 로딩이 실패했는지 반환합니다. | bool | 없음 | failed_event 조회 |
 | `VLMWorker.wait_until_ready` | 지정 시간 동안 VLM 준비 완료를 기다립니다. | bool | 없음 | VideoWorker가 대기/실패 판단에 사용 |
 | `VLMWorker.add_task` | VLM 분석 큐에 인물 crop 이미지를 등록합니다. | None | 없음 | 준비 전 작업은 무시 |
-| `VLMWorker._run` | VLM 모델을 로딩하고 큐에 등록된 분석 작업을 반복 처리합니다. | None | 모델 로딩/분석 오류 | Discord 알림 전송 |
+| `VLMWorker._run` | VLM 모델을 로딩하고 큐에 등록된 분석 작업을 반복 처리합니다. | None | 모델 로딩/분석 오류 | Discord 알림과 GUI 이벤트 전송 |
+| `VLMWorker._emit_result_event` | VLM 분석 결과를 GUI 이벤트 콜백으로 전달합니다. | None | 없음 | `vlm_done` 이벤트 생성 |
 | `VLMWorker.stop` | VLM 분석 thread를 중지하고 모델 자원을 정리합니다. | None | 없음 | 종료 대기 포함 |
 | `VLMWorker.cleanup` | VLM 분석기와 GPU 캐시 자원을 해제합니다. | None | 없음 | torch 지연 import |
 
@@ -262,28 +288,71 @@
 | `preload_ai_runtime_libraries` | PyQt 로딩 전에 AI 런타임 네이티브 라이브러리를 초기화합니다. | None | PyTorch 초기화 오류 | torch DLL 로딩 순서 안정화 |
 | `main` | AI server 관제 GUI 애플리케이션을 실행합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
 
+## `src/ai_cctv/ai_server/recovery/network_recovery_manager.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `NetworkRecoveryConfig` | 네트워크 복구 요청 설정을 표현합니다. | NetworkRecoveryConfig 객체 | 없음 | dataclass |
+| `NetworkRecoveryManager` | RTSP 단절 시작/복구 시각을 기록하고 누락 영상 ZIP을 요청합니다. | NetworkRecoveryManager 객체 | 없음 | requests 사용 |
+| `NetworkRecoveryManager.__init__` | 복구 요청 상태와 중복 요청 방지 목록을 초기화합니다. | None | 없음 | 요청 구간 set 보관 |
+| `NetworkRecoveryManager.has_active_failure` | 현재 기록 중인 네트워크 장애 구간이 있는지 반환합니다. | bool | 없음 | 복구 시점 판단 |
+| `NetworkRecoveryManager.record_failure` | 네트워크 장애 시작 시각을 기록합니다. | dict | 없음 | 중복 시작 방지 |
+| `NetworkRecoveryManager.record_recovery` | 네트워크 복구 시각을 기록하고 필요하면 백업 ZIP을 요청합니다. | dict | 요청 실패 결과 | 최소 장애 시간/중복 구간 확인 |
+| `NetworkRecoveryManager.build_payload` | 복구 요청에 사용할 시작/종료 시각 payload를 생성합니다. | dict | 없음 | ISO 초 단위 문자열 |
+| `NetworkRecoveryManager.request_recovery` | Edge node FastAPI 복구 서버에 ZIP 파일을 요청하고 저장합니다. | dict | requests/HTTP/네트워크 오류 | query params 사용 |
+| `NetworkRecoveryManager._save_file_response` | HTTP 응답 파일명을 해석하고 ZIP 파일을 저장합니다. | Path | 파일 저장 오류 | 중복 파일명 보정 |
+| `NetworkRecoveryManager._get_response_filename` | Content-Disposition 헤더에서 파일명을 추출합니다. | 문자열 또는 None | 없음 | RFC 5987 일부 지원 |
+| `NetworkRecoveryManager._make_default_filename` | 복구 응답에 파일명이 없을 때 사용할 기본 파일명을 생성합니다. | 문자열 | 없음 | 카메라 ID와 시간 포함 |
+| `NetworkRecoveryManager._get_unique_save_path` | 같은 파일명이 있을 때 번호를 붙인 저장 경로를 반환합니다. | Path | 없음 | 덮어쓰기 방지 |
+| `NetworkRecoveryManager._get_request_key` | 중복 요청 확인에 사용할 키를 생성합니다. | tuple | 없음 | 카메라 ID와 시간 구간 |
+| `NetworkRecoveryManager._format_time` | datetime 값을 초 단위 ISO 문자열로 변환합니다. | 문자열 | 없음 | microsecond 제거 |
+| `NetworkRecoveryManager._sanitize_filename` | 파일명에서 경로와 Windows 금지 문자를 제거합니다. | 문자열 | 없음 | 보안 보정 |
+| `build_network_recovery_manager_from_env` | 환경 변수 기준으로 NetworkRecoveryManager를 생성합니다. | NetworkRecoveryManager 또는 None | ValueError | URL이 없으면 비활성화 |
+
 ## `src/ai_cctv/ai_server/monitoring/resource_monitor_client.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `ResourceMonitorClient` | Edge node 자원 모니터링 API 호출 책임을 담당합니다. | ResourceMonitorClient 인스턴스 | 없음 | AI server에는 HTTP 조회 책임만 남김 |
-| `ResourceMonitorClient.__init__` | Edge node 모니터링 서버 주소와 요청 제한 시간을 초기화합니다. | None | 없음 | 서버 주소 끝의 `/` 제거 |
-| `ResourceMonitorClient.request_resource_usage` | Edge node의 `/monitor/top` 엔드포인트에 GET 요청을 보내 자원 사용률 JSON을 받습니다. | dict | RuntimeError | requests 예외와 400 이상 응답을 오류로 변환 |
-| `build_monitor_client` | 환경 변수 기준으로 모니터링 클라이언트를 생성합니다. | ResourceMonitorClient 인스턴스 | 없음 | `RESOURCE_MONITOR_SERVER_URL` 지원 |
-| `request_resource_usage` | 기본 모니터링 클라이언트로 Edge node 자원 사용률을 요청합니다. | dict | RuntimeError | 외부 호출용 편의 함수 |
+| `MqttResourceMonitorConfig` | AI server의 MQTT 상태 수신 설정을 표현합니다. | MqttResourceMonitorConfig 인스턴스 | 없음 | broker, topic, timeout, stale 기준 포함 |
+| `MqttResourceMonitorConfig.from_environment` | 환경 변수에서 MQTT 수신 설정을 생성합니다. | MqttResourceMonitorConfig 인스턴스 | ValueError | `AI_CCTV_MQTT_*` 환경 변수 지원 |
+| `ResourceMonitorClient` | Edge node MQTT 상태 topic 구독 책임을 담당합니다. | ResourceMonitorClient 인스턴스 | 없음 | 공유 클라이언트로 연결 재사용 |
+| `ResourceMonitorClient.__init__` | MQTT 클라이언트, 수신 캐시, 동기화 이벤트를 초기화합니다. | None | 없음 | paho-mqtt callback 등록 |
+| `ResourceMonitorClient.matches_config` | 현재 클라이언트 설정과 새 설정이 같은지 비교합니다. | bool | 없음 | 환경 변수 변경 시 재생성 판단 |
+| `ResourceMonitorClient.start` | MQTT broker에 접속하고 상태 topic 구독을 시작합니다. | None | MQTT 연결 오류 | background loop 시작 |
+| `ResourceMonitorClient.request_resource_usage` | 최신 MQTT 상태 JSON을 반환하거나 새 메시지를 기다립니다. | dict | RuntimeError | stale 메시지는 실패로 처리 |
+| `ResourceMonitorClient.stop` | MQTT 구독 loop와 broker 연결을 종료합니다. | None | MQTT 종료 오류 | 상태 조회 창 종료 시 호출 가능 |
+| `ResourceMonitorClient._handle_connect` | MQTT 연결 완료 시 상태 topic을 구독합니다. | None | 연결 실패 메시지 | paho v1/v2 callback 호환 |
+| `ResourceMonitorClient._handle_message` | MQTT payload를 JSON 딕셔너리로 변환해 캐시에 저장합니다. | None | JSON 해석 오류 | worker 대기 이벤트 해제 |
+| `ResourceMonitorClient._get_fresh_resource_usage` | 최신 캐시가 유효하면 복사본을 반환합니다. | dict 또는 None | 없음 | stale 기준 적용 |
+| `build_monitor_client` | 환경 변수 기준으로 공유 MQTT 클라이언트를 생성합니다. | ResourceMonitorClient 인스턴스 | 없음 | 설정 변경 시 기존 연결 종료 |
+| `request_resource_usage` | 공유 MQTT 클라이언트로 Edge node 자원 상태를 수신합니다. | dict | RuntimeError | UI worker에서 호출 |
+| `stop_monitor_client` | 공유 MQTT 클라이언트 연결을 종료합니다. | None | 없음 | 상태 조회 창 closeEvent에서 호출 |
 | `print_resource_usage` | 자원 사용률 응답을 JSON 문자열로 출력합니다. | None | JSON 직렬화 오류 | 한글 출력 보존 |
-| `main` | Edge node 자원 모니터링 결과를 요청하고 콘솔에 출력합니다. | None | RuntimeError | `python -m` 실행 진입점 |
+| `_create_mqtt_client` | paho-mqtt 버전에 맞는 MQTT 클라이언트를 생성합니다. | MQTT Client | ImportError | Callback API v1/v2 호환 |
+| `_to_int_reason_code` | paho 연결 결과 코드를 정수로 변환합니다. | int | ValueError | v2 ReasonCode 대응 |
+| `main` | Edge node MQTT 상태 메시지를 한 번 수신해 콘솔에 출력합니다. | None | RuntimeError | `python -m` 실행 진입점 |
 
-## `src/ai_cctv/edge_node/monitoring/resource_monitor_server.py`
+## `src/ai_cctv/edge_node/monitoring/resource_monitor_publisher.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `ResourceUsageCollector` | Edge node 전체 시스템, 지정 프로세스, UPS 전원 상태 수집 책임을 담당합니다. | ResourceUsageCollector 인스턴스 | 없음 | 기본 프로세스 ID는 현재 FastAPI 서버 프로세스 |
+| `MqttResourceMonitorConfig` | Edge node의 MQTT 상태 발행 설정을 표현합니다. | MqttResourceMonitorConfig 인스턴스 | 없음 | broker, topic, QoS, retain 포함 |
+| `MqttResourceMonitorConfig.from_environment` | 환경 변수에서 MQTT 발행 설정을 생성합니다. | MqttResourceMonitorConfig 인스턴스 | ValueError | `AI_CCTV_MQTT_*` 환경 변수 지원 |
+| `ResourceUsageCollector` | Edge node 전체 시스템, 지정 프로세스, UPS 전원 상태 수집 책임을 담당합니다. | ResourceUsageCollector 인스턴스 | 없음 | 기본 프로세스 ID는 현재 publisher 프로세스 |
 | `ResourceUsageCollector.__init__` | 수집 대상 프로세스 ID, CPU 샘플링 시간, 전원 상태 provider를 초기화합니다. | None | 없음 | 전원 provider 미주입 시 기본 캐시 provider 생성 |
 | `ResourceUsageCollector.collect` | 전체 CPU, 전체 메모리, 대상 프로세스, UPS 전원 상태를 딕셔너리로 반환합니다. | dict | RuntimeError | `power` 섹션을 함께 포함 |
 | `ResourceUsageCollector._get_process` | psutil 기준 모니터링 대상 프로세스 객체를 반환합니다. | psutil.Process | RuntimeError | 프로세스 없음/권한 오류를 한글 메시지로 변환 |
-| `read_resource_usage` | FastAPI `/monitor/top` 요청에 Edge node 자원 사용률과 전원 상태 JSON을 반환합니다. | dict | HTTPException 500 | collector 오류를 HTTP 응답으로 변환 |
-| `main` | 개발용 uvicorn 모니터링 서버를 `0.0.0.0:8001`에서 실행합니다. | 반환 없음 | uvicorn 실행 오류 | `python -m` 실행 진입점 |
+| `MqttResourceMonitorPublisher` | 수집한 자원 상태를 MQTT broker로 주기 발행합니다. | MqttResourceMonitorPublisher 인스턴스 | 없음 | Edge node 실행 보조 프로세스 |
+| `MqttResourceMonitorPublisher.__init__` | MQTT 발행 설정, 수집기, MQTT 클라이언트를 초기화합니다. | None | ImportError | paho-mqtt 필요 |
+| `MqttResourceMonitorPublisher.publish_once` | 자원 상태를 한 번 수집해 MQTT topic으로 발행합니다. | dict | MQTT 발행 오류 | retain 옵션 지원 |
+| `MqttResourceMonitorPublisher.run_forever` | broker에 접속한 뒤 설정 주기마다 상태를 발행합니다. | 반환 없음 | MQTT 연결/발행 오류 | 기본 2초 주기 |
+| `MqttResourceMonitorPublisher.stop` | MQTT loop와 broker 연결을 종료합니다. | None | MQTT 종료 오류 | KeyboardInterrupt 처리 |
+| `build_resource_usage_collector_from_environment` | 환경 변수 기준으로 자원 수집기를 생성합니다. | ResourceUsageCollector 인스턴스 | ValueError | `AI_CCTV_MONITOR_PROCESS_ID` 지원 |
+| `build_resource_monitor_publisher` | 환경 변수 기준으로 MQTT publisher를 생성합니다. | MqttResourceMonitorPublisher 인스턴스 | ImportError | 실행 진입점에서 사용 |
+| `_create_mqtt_client` | paho-mqtt 버전에 맞는 MQTT 클라이언트를 생성합니다. | MQTT Client | ImportError | Callback API v1/v2 호환 |
+| `_load_psutil_module` | 설치된 psutil 모듈을 실제 수집 시점에 불러옵니다. | psutil 모듈 | ImportError | 테스트 import와 런타임 의존 분리 |
+| `_read_bool_env` | 환경 변수 문자열을 bool 값으로 변환합니다. | bool | 없음 | retain 설정 처리 |
+| `main` | Edge node 자원 상태 MQTT 발행 루프를 실행합니다. | 반환 없음 | MQTT 연결/발행 오류 | `python -m` 실행 진입점 |
 
 ## `src/ai_cctv/edge_node/monitoring/power_status.py`
 
@@ -294,12 +363,12 @@
 | `PowerStatusSnapshot.unavailable` | UPS 값을 읽을 수 없을 때 사용할 실패 스냅샷을 생성합니다. | PowerStatusSnapshot 인스턴스 | 없음 | `available=False`와 오류 메시지 포함 |
 | `UpsPlusPowerReader` | 52Pi EP-0136 UPS Plus I2C 레지스터 읽기 책임을 담당합니다. | UpsPlusPowerReader 인스턴스 | 없음 | 기본 I2C 주소 `0x17` |
 | `UpsPlusPowerReader.__init__` | I2C 버스, 장치 주소, 외부 전원 판단 전압 기준을 초기화합니다. | None | 없음 | 기본 버스 1, 기준 4000mV |
-| `UpsPlusPowerReader.read_snapshot` | 배터리 잔량, USB-C/MicroUSB 입력 전압, 전원 상태 원본값을 읽습니다. | PowerStatusSnapshot 인스턴스 | 실패 스냅샷 | SMBus 오류를 API 장애로 전파하지 않음 |
+| `UpsPlusPowerReader.read_snapshot` | 배터리 잔량, USB-C/MicroUSB 입력 전압, 전원 상태 원본값을 읽습니다. | PowerStatusSnapshot 인스턴스 | 실패 스냅샷 | SMBus 오류를 MQTT 발행 장애로 전파하지 않음 |
 | `UpsPlusPowerReader._open_bus` | SMBus 인스턴스를 열어 I2C 통신을 준비합니다. | SMBus 인스턴스 | RuntimeError | `smbus2` 우선, `smbus` fallback |
 | `UpsPlusPowerReader._read_percent` | 배터리 잔량 레지스터 `0x13-0x14`를 백분율로 읽습니다. | int | SMBus 읽기 오류 | 0~100 범위로 보정 |
 | `UpsPlusPowerReader._read_word` | 연속된 저위/고위 바이트 레지스터를 16비트 정수로 읽습니다. | int | SMBus 읽기 오류 | EP-0136 데모 코드의 little-endian 조합 기준 |
 | `UpsPlusPowerReader._read_byte` | UPS Plus 단일 레지스터 바이트 값을 읽습니다. | int | SMBus 읽기 오류 | `read_byte_data` 사용 |
-| `CachedPowerStatusProvider` | UPS Plus 전원 상태를 일정 시간 캐시합니다. | CachedPowerStatusProvider 인스턴스 | 없음 | 반복 HTTP 조회 시 I2C 접근 감소 |
+| `CachedPowerStatusProvider` | UPS Plus 전원 상태를 일정 시간 캐시합니다. | CachedPowerStatusProvider 인스턴스 | 없음 | 반복 MQTT 발행 시 I2C 접근 감소 |
 | `CachedPowerStatusProvider.__init__` | 전원 상태 리더, 캐시 유지 시간, 동기화 lock을 초기화합니다. | None | 없음 | 기본 캐시 2초 |
 | `CachedPowerStatusProvider.get_snapshot` | 캐시가 유효하면 저장값을, 아니면 새 UPS 측정값을 반환합니다. | PowerStatusSnapshot 인스턴스 | 실패 스냅샷 | thread lock으로 동시 요청 보호 |
 | `CachedPowerStatusProvider._is_cache_fresh` | 현재 캐시가 재사용 가능한지 판단합니다. | bool | 없음 | monotonic 시간 기준 |
@@ -362,15 +431,15 @@
 |---|---|---|---|---|
 | `EventDisplay` | 이벤트 표시 정보를 담는 값 객체입니다. | EventDisplay ???? | ??? ?? ?? ?? | ?? ?? ?? |
 | `EventPresenter` | 이벤트 딕셔너리를 UI 표시 정보로 변환합니다. | EventPresenter ???? | ??? ?? ?? ?? | ?? ?? ?? |
-| `EventPresenter.build_display` | 이벤트 유형별 설명과 색상을 생성합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
+| `EventPresenter.build_display` | 이벤트 유형별 설명과 색상을 생성합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | `vlm_done` 결과 표시 지원 |
 | `EventPresenter.get_time_text` | 이벤트 시간 문자열을 가져오거나 현재 시각으로 대체합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
 
 ## `src/ai_cctv/ai_server/ui/edge_status_window.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `ResourceMonitorRequestWorker` | Edge node 모니터링 API 요청을 UI와 분리된 QThread에서 수행합니다. | ResourceMonitorRequestWorker 인스턴스 | 요청 예외 문자열 | UI 멈춤 방지 |
-| `ResourceMonitorRequestWorker.run` | 자원 사용률 요청 결과 또는 오류를 PyQt 신호로 전달합니다. | None | error_ready 신호 | 백그라운드 실행 |
+| `ResourceMonitorRequestWorker` | Edge node MQTT 상태 메시지 수신을 UI와 분리된 QThread에서 수행합니다. | ResourceMonitorRequestWorker 인스턴스 | 수신 예외 문자열 | UI 멈춤 방지 |
+| `ResourceMonitorRequestWorker.run` | 자원 사용률 수신 결과 또는 오류를 PyQt 신호로 전달합니다. | None | error_ready 신호 | 백그라운드 실행 |
 | `ResourceLineGraph` | 최근 자원 사용률과 배터리 잔량 샘플을 작업 관리자 형태의 선 그래프로 표시합니다. | ResourceLineGraph 인스턴스 | 없음 | CPU, Memory, Process CPU/Memory, Battery 표시 |
 | `ResourceLineGraph.__init__` | 그래프 샘플 목록과 시리즈 색상을 초기화합니다. | None | 없음 | 최대 60개 샘플 유지 |
 | `ResourceLineGraph.sizeHint` | 그래프 위젯의 권장 크기를 반환합니다. | QSize | 없음 | PyQt 레이아웃용 |
@@ -384,7 +453,7 @@
 | `EdgeNodeStatusWindow.__init__` | 상태 조회 창의 UI 상태와 타이머를 초기화합니다. | None | 없음 | 응답 수신 여부 보관, Windows `?` 버튼 제거 |
 | `EdgeNodeStatusWindow._build_ui` | 제목, 새로고침 버튼, 그래프, 표를 구성합니다. | None | 없음 | 표는 읽기 전용 |
 | `EdgeNodeStatusWindow.start_monitoring` | 창이 열릴 때 즉시 조회하고 주기 갱신을 시작합니다. | None | 요청 실패 | 타이머 시작 |
-| `EdgeNodeStatusWindow.request_resource_status` | Edge node 상태 JSON 조회 worker를 시작합니다. | None | 요청 실패 신호 | 중복 요청 방지 |
+| `EdgeNodeStatusWindow.request_resource_status` | Edge node 상태 JSON 수신 worker를 시작합니다. | None | 수신 실패 신호 | 중복 수신 방지 |
 | `EdgeNodeStatusWindow.handle_resource_status` | 성공 JSON을 그래프와 표에 반영하고 실패 횟수를 초기화합니다. | None | 없음 | 상태를 `연결됨`으로 표시 |
 | `EdgeNodeStatusWindow.handle_resource_error` | 조회 실패를 누적하고 상태 라벨과 경고를 갱신합니다. | None | 없음 | 1~2회 실패는 `조회중`, 3회 이상은 `연결실패` |
 | `EdgeNodeStatusWindow._clear_request_worker` | 완료된 요청 worker 참조를 정리합니다. | None | 없음 | 다음 요청 허용 |
@@ -396,7 +465,7 @@
 | `EdgeNodeStatusWindow._format_millivolt` | 밀리볼트 전압 값을 화면 표시 문자열로 변환합니다. | 문자열 | 값 변환 오류 | None은 `-` 표시 |
 | `EdgeNodeStatusWindow._format_power_connection` | 외부 전원 연결 여부를 한글 상태 문자열로 변환합니다. | 문자열 | 없음 | True는 `연결됨`, False는 `미연결` |
 | `EdgeNodeStatusWindow._format_power_status` | UPS 전원 상태 읽기 결과를 화면 표시 문자열로 변환합니다. | 문자열 | 없음 | 읽기 실패 원인을 표에 표시 |
-| `EdgeNodeStatusWindow.closeEvent` | 창이 닫힐 때 주기 조회 타이머를 중지합니다. | None | 없음 | 백그라운드 갱신 중단 |
+| `EdgeNodeStatusWindow.closeEvent` | 창이 닫힐 때 주기 조회 타이머와 MQTT 연결을 중지합니다. | None | 없음 | 백그라운드 갱신 중단 |
 
 ## `src/ai_cctv/ai_server/ui/main_window.py`
 
@@ -471,6 +540,26 @@
 | `EdgeNetworkFailoverPolicy.__init__` | 장애 대응 정책을 초기화합니다. | None | ??? ?? ?? ?? | ?? ?? |
 | `EdgeNetworkFailoverPolicy.decide_for_network` | 네트워크 상태에 맞는 Edge node 동작을 결정합니다. | ?? ?? ?? ?? | ??? ?? ?? ?? | ?? ?? ?? |
 
+## `src/ai_cctv/edge_node/backup_recovery_server.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `BackupRecoveryArchive` | 복구 요청으로 생성된 임시 ZIP 파일 정보를 표현합니다. | BackupRecoveryArchive 객체 | 없음 | dataclass |
+| `BackupSegmentFinder` | 로컬 백업 폴더에서 시간 구간과 겹치는 TS 세그먼트를 찾습니다. | BackupSegmentFinder 객체 | 없음 | 파일 mtime 기준 |
+| `BackupSegmentFinder.__init__` | 백업 탐색 위치와 세그먼트 길이를 초기화합니다. | None | 없음 | 기본 10초 |
+| `BackupSegmentFinder.find_segments` | 요청 시간대와 겹치는 TS 백업 파일 목록을 반환합니다. | list | FileNotFoundError | `.ts` 파일만 탐색 |
+| `BackupSegmentFinder._ranges_overlap` | 두 시간 구간이 겹치는지 확인합니다. | bool | 없음 | 내부 함수 |
+| `BackupRecoveryService` | 복구 요청 시간을 검증하고 대상 백업 파일을 ZIP으로 묶습니다. | BackupRecoveryService 객체 | 없음 | HTTP handler와 분리 |
+| `BackupRecoveryService.__init__` | 백업 세그먼트 탐색 의존 객체를 저장합니다. | None | 없음 | 테스트 가능 |
+| `BackupRecoveryService.recover` | 요청 구간에 해당하는 백업 세그먼트 ZIP을 생성합니다. | BackupRecoveryArchive | ValueError, FileNotFoundError | ISO 8601 시간 사용 |
+| `BackupRecoveryService._parse_iso_datetime` | ISO 8601 시각 문자열을 datetime으로 변환합니다. | datetime | ValueError | 입력 검증 |
+| `BackupRecoveryService._build_archive` | 대상 TS 파일 목록을 임시 ZIP 파일로 묶습니다. | BackupRecoveryArchive | zip 생성 오류 | 전송 후 삭제 대상 |
+| `remove_temp_file` | 파일 전송 완료 후 임시 ZIP 파일을 삭제합니다. | None | 삭제 오류 로그 | FastAPI BackgroundTasks에서 호출 |
+| `create_backup_recovery_app` | BackupRecoveryService를 사용하는 FastAPI 앱을 생성합니다. | FastAPI app | ImportError | `/recover` endpoint 등록 |
+| `create_backup_recovery_app.recover_backups` | 요청 시간대와 겹치는 백업 TS 파일을 ZIP으로 반환합니다. | FileResponse | HTTPException | start/end query 사용 |
+| `build_backup_recovery_app` | 환경 설정을 반영한 FastAPI 백업 복구 앱을 생성합니다. | FastAPI app | ImportError | backup_dir 주입 |
+| `main` | 환경 변수 기준으로 Edge node 백업 복구 FastAPI 서버를 실행합니다. | 반환 없음 | uvicorn 실행 오류 | `ai-cctv-edge-backup-recovery` 진입점 |
+
 ## `src/ai_cctv/edge_node/main.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
@@ -535,24 +624,21 @@
 | `MediaMtxGStreamerCommandBuilder.build_command_args` | GStreamer 백업 및 송출 명령 인자 목록을 생성합니다. | list | 없음 | tee, splitmuxsink, rtmpsink 포함 |
 | `MediaMtxGStreamerCommandBuilder.build_shell_command_text` | 운영자가 확인할 수 있는 GStreamer 명령 문자열을 생성합니다. | 문자열 | 없음 | `--print-command`에서 사용 |
 
-## `test_http.py`
+## `test_mqtt.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
 | `MockResourceState` | UI 검증용 모의 자원 사용률 상태를 생성하고 보관합니다. | MockResourceState 인스턴스 | 없음 | 실제 Edge node 없이 사용 |
-| `MockResourceState.__init__` | 서버 시작 시각, 응답용 PID, 정상 응답 횟수 제한을 초기화합니다. | None | 없음 | PID 기본값은 현재 프로세스 |
-| `MockResourceState.can_respond` | 정상 JSON 응답을 더 보낼 수 있는지 판단합니다. | bool | 없음 | 기본 10회까지 True |
-| `MockResourceState.build_response` | `/monitor/top`이 반환할 모의 CPU, memory, process, power JSON을 생성합니다. | dict | 없음 | 요청마다 값이 변하고 성공 횟수 증가 |
+| `MockResourceState.__init__` | publisher 시작 시각, 응답용 PID, 정상 발행 횟수 제한을 초기화합니다. | None | 없음 | PID 기본값은 현재 프로세스 |
+| `MockResourceState.can_publish` | 정상 JSON 메시지를 더 발행할 수 있는지 판단합니다. | bool | 없음 | 기본 10회까지 True |
+| `MockResourceState.build_message` | MQTT로 발행할 모의 CPU, memory, process, power JSON을 생성합니다. | dict | 없음 | 발행마다 값이 변하고 성공 횟수 증가 |
 | `MockResourceState._wave` | 사인파 기반의 0~100 범위 백분율 값을 계산합니다. | float | 없음 | 그래프 변화 확인용 |
-| `MockResourceRequestHandler` | 모의 HTTP GET 요청을 처리합니다. | MockResourceRequestHandler 인스턴스 | 없음 | BaseHTTPRequestHandler 상속 |
-| `MockResourceRequestHandler.do_GET` | `/monitor/top` 요청에는 JSON을, 10회 이후에는 응답을 보내지 않습니다. | None | 없음 | 연결 실패 UI 검증용 |
-| `MockResourceRequestHandler.log_message` | HTTP 접근 로그를 콘솔에 출력합니다. | None | 없음 | mock-edge 접두어 사용 |
-| `MockResourceRequestHandler._send_json` | 딕셔너리를 JSON HTTP 응답으로 전송합니다. | None | 직렬화 오류 | UTF-8 응답 |
-| `MockResourceServer` | 모의 자원 상태 객체를 포함한 ThreadingHTTPServer입니다. | MockResourceServer 인스턴스 | 서버 바인딩 오류 | 표준 라이브러리만 사용 |
-| `MockResourceServer.__init__` | HTTP 서버, 모의 자원 상태, 무응답 대기 시간을 초기화합니다. | None | 서버 초기화 오류 | 127.0.0.1:8001 기본 사용 |
-| `build_argument_parser` | 모의 서버 실행용 명령행 인자 파서를 생성합니다. | ArgumentParser | 없음 | `--host`, `--port` 지원 |
-| `run_server` | 모의 Edge node 모니터링 HTTP 서버를 실행합니다. | 반환 없음 | 포트 충돌, 바인딩 오류 | Ctrl+C로 종료 |
-| `main` | 명령행 인자를 읽고 모의 서버를 시작합니다. | None | 서버 실행 오류 | 임시 테스트 진입점 |
+| `MockMqttResourcePublisher` | 모의 Edge node 상태를 MQTT topic으로 발행합니다. | MockMqttResourcePublisher 인스턴스 | 없음 | 실제 Edge node 없이 사용 |
+| `MockMqttResourcePublisher.__init__` | broker 접속 정보와 모의 상태 생성기를 초기화합니다. | None | ImportError | paho-mqtt 필요 |
+| `MockMqttResourcePublisher.run` | MQTT broker에 연결한 뒤 모의 상태 메시지를 발행합니다. | 반환 없음 | MQTT 연결/발행 오류 | 10회 이후 발행 중단 |
+| `build_argument_parser` | 모의 publisher 실행용 명령행 인자 파서를 생성합니다. | ArgumentParser | 없음 | `--host`, `--port`, `--topic`, `--interval` 지원 |
+| `_create_mqtt_client` | paho-mqtt 버전에 맞는 MQTT 클라이언트를 생성합니다. | MQTT Client | ImportError | Callback API v1/v2 호환 |
+| `main` | 명령행 인자를 읽고 모의 MQTT publisher를 시작합니다. | None | MQTT 실행 오류 | 임시 테스트 진입점 |
 
 ## `tests/test_project_structure.py`
 
@@ -580,3 +666,7 @@
 | `ProjectStructureTest.test_ups_plus_power_reader_reads_battery_and_external_power` | UPS Plus 레지스터에서 배터리 잔량과 외부 전원 상태를 해석하는지 검증합니다. | None | AssertionError | 가짜 SMBus 사용 |
 | `ProjectStructureTest.test_ups_plus_power_reader_reports_unavailable_on_i2c_error` | UPS Plus I2C 접근 실패가 사용 불가 스냅샷으로 변환되는지 검증합니다. | None | AssertionError | 실패 리더 사용 |
 | `ProjectStructureTest.test_console_scripts_are_split_by_deployment_bundle` | Edge node와 AI server 실행 진입점이 분리되어 있는지 검증합니다. | None | ??? ?? ?? ?? | ?? ?? ?? |
+| `ProjectStructureTest.test_rtsp_source_detection` | RTSP URL과 일반 카메라 번호를 구분하는지 검증합니다. | None | AssertionError | RTSP receiver 보조 함수 검증 |
+| `ProjectStructureTest.test_network_recovery_manager_skips_when_url_missing` | 복구 서버 URL이 없을 때 네트워크 요청 없이 실패 사유를 반환하는지 검증합니다. | None | AssertionError | 외부 네트워크 불필요 |
+| `ProjectStructureTest.test_backup_recovery_service_archives_overlapping_segments` | 요청 시간대와 겹치는 TS 백업 파일을 ZIP으로 묶는지 검증합니다. | None | AssertionError | 임시 파일 기반 |
+| `ProjectStructureTest.test_resource_monitor_mqtt_defaults_match_between_nodes` | Edge node와 AI server의 기본 MQTT 접속 설정이 일치하는지 검증합니다. | None | AssertionError | 상태 topic 불일치 방지 |

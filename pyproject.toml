@@ -15,6 +15,7 @@ edge-node = [
     "pygobject",
     "fastapi",
     "uvicorn",
+    "paho-mqtt",
     "psutil",
     "smbus2",
 ]
@@ -31,6 +32,7 @@ ai-server = [
     "scipy",
     "pyyaml",
     "requests",
+    "paho-mqtt",
     "psutil",
     "insightface",
     "onnxruntime",
@@ -45,6 +47,8 @@ vision-demo = [
 [project.scripts]
 ai-cctv = "ai_cctv.ai_server.server_run:main"
 ai-cctv-edge = "ai_cctv.edge_node.main:main"
+ai-cctv-edge-monitor = "ai_cctv.edge_node.monitoring.resource_monitor_publisher:main"
+ai-cctv-edge-backup-recovery = "ai_cctv.edge_node.backup_recovery_server:main"
 ai-cctv-ai-server = "ai_cctv.ai_server.server_run:main"
 
 [tool.setuptools.packages.find]

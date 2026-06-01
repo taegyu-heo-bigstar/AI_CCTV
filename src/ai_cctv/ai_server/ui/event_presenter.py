@@ -55,6 +55,9 @@ class EventPresenter:
         if event_type == "anomaly":
             message = event.get("message", "Anomaly detected")
             return EventDisplay(message, "#facc15", event_type)
+        if event_type == "vlm_done":
+            message = event.get("message", "")
+            return EventDisplay(f"ID {person_id} VLM 분석 완료\n{message}", "#a855f7", event_type)
 
         return EventDisplay(f"ID {person_id} {event_type}", "#38bdf8", event_type)
 

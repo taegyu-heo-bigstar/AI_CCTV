@@ -18,16 +18,18 @@ AI_CCTV/
 |       |   |-- mediamtx.py         # MediaMTX 다운로드, 설치 확인, 프로세스 관리
 |       |   |-- streaming.py        # GStreamer 송출/로컬 백업 파이프라인 생성
 |       |   |-- local_backup.py     # 로컬 백업 세그먼트 파일명 정책
-|       |   |-- monitoring/         # Edge node 자원/전원 모니터링 FastAPI 서버
+|       |   |-- backup_recovery_server.py # 누락 구간 로컬 백업 ZIP 제공
+|       |   |-- monitoring/         # Edge node 자원/전원 모니터링 MQTT publisher
 |       |   `-- failover.py         # 네트워크 장애 대응 정책
 |       `-- ai_server/              # Windows AI server 배포 단위
 |           |-- server_run.py       # AI server 실행 진입점
 |           |-- stream_receiver.py  # MediaMTX RTSP 수신 수동 점검 도구
 |           |-- ui/                 # PyQt 화면, 설정창, 이벤트 표시
-|           |-- analysis/           # 영상 입력, 추적, VLM, 이상 상황 판정
+|           |-- analysis/           # 영상 입력, RTSP 재연결, 추적, VLM, 이상 상황 판정
+|           |-- recovery/           # RTSP 단절 구간 백업 복구 요청
 |           |-- storage/            # 저장 경로, 원본 녹화, 이벤트 클립 관리
 |           |-- alerts/             # Discord 알림 메시지, 디스패처, 챗봇 전송
-|           |-- monitoring/         # Edge node 자원 모니터링 HTTP 조회 클라이언트
+|           |-- monitoring/         # Edge node 자원 모니터링 MQTT 구독 클라이언트
 |           `-- common/             # 서버 노드 내부 공통 값 객체 재노출
 `-- tests/                          # 구조와 도메인 경계 단위 테스트
 ```
@@ -36,8 +38,8 @@ AI_CCTV/
 
 | 실행 묶음 | 설치 extras | console script | 주요 책임 |
 |---|---|---|---|
-| Edge node | `ai-cctv[edge-node]` | `ai-cctv-edge` | 카메라 송출, MediaMTX 실행, 로컬 백업, 자원/전원 모니터링, 네트워크 장애 대응 정책 |
-| AI server | `ai-cctv[ai-server]` | `ai-cctv-ai-server` 또는 `ai-cctv` | RTSP 수신, OpenCV/YOLO 분석, 이상 상황 판정, Discord 알림, GUI |
+| Edge node | `ai-cctv[edge-node]` | `ai-cctv-edge`, `ai-cctv-edge-monitor`, `ai-cctv-edge-backup-recovery` | 카메라 송출, MediaMTX 실행, 로컬 백업, FastAPI 백업 복구 ZIP 제공, MQTT 자원/전원 상태 발행, 네트워크 장애 대응 정책 |
+| AI server | `ai-cctv[ai-server]` | `ai-cctv-ai-server` 또는 `ai-cctv` | RTSP 수신/재연결, OpenCV/YOLO 분석, MQTT 상태 구독, 이상 상황 판정, Discord 알림, GUI, requests 기반 누락 구간 복구 요청 |
 
 ## System Flow
 
@@ -46,21 +48,24 @@ flowchart LR
     Camera["Camera Module"] --> Pi["Raspberry Pi 4B"]
     Pi --> EdgeMain["ai_cctv/edge_node/main.py"]
     EdgeMain --> EdgeRuntime["EdgeNodeRuntime"]
-    EdgeMain -. "same Edge node" .-> MonitorApi["edge_node/monitoring/resource_monitor_server.py"]
+    EdgeMain -. "same Edge node" .-> MonitorPublisher["edge_node/monitoring/resource_monitor_publisher.py"]
     Pi --> UpsPlus["52Pi EP-0136 UPS Plus"]
     EdgeRuntime --> MediaMtxManager["MediaMtxInstaller / MediaMtxProcessManager"]
     EdgeRuntime --> BackupConfig["LocalBackupConfig"]
     EdgeRuntime --> StreamBuilder["MediaMtxGStreamerCommandBuilder"]
+    EdgeMain -. "optional same Edge node" .-> BackupRecoveryServer["FastAPI backup_recovery_server.py"]
     Pi --> Failover["EdgeNetworkFailoverPolicy"]
     StreamBuilder --> BackupFiles["10초 단위 로컬 TS 백업"]
+    BackupRecoveryServer --> BackupFiles
     StreamBuilder --> MediaMTX["로컬 MediaMTX RTMP publish"]
     MediaMTX --> RTSP["RTSP Stream"]
+    MonitorPublisher --> MQTTBroker["MQTT Broker"]
     RTSP --> ServerRun["ai_cctv/ai_server/server_run.py"]
     ServerRun --> MainWindow["ai_server/ui/main_window.py"]
     MainWindow --> EdgeStatusWindow["ui/edge_status_window.py"]
     EdgeStatusWindow --> MonitorClient["ResourceMonitorClient"]
-    MonitorClient --> MonitorApi
-    MonitorApi --> ResourceCollector["ResourceUsageCollector"]
+    MonitorClient --> MQTTBroker
+    MonitorPublisher --> ResourceCollector["ResourceUsageCollector"]
     ResourceCollector --> PowerProvider["CachedPowerStatusProvider"]
     PowerProvider --> PowerReader["UpsPlusPowerReader"]
     PowerReader --> UpsPlus
@@ -68,6 +73,10 @@ flowchart LR
     MainWindow --> SettingsWindow["ui/settings_window.py"]
     SettingsWindow --> RuntimeOptions["YOLO/VLM on-off, 클립 길이, 저장 경로"]
     MainWindow --> VideoWorker["ai_server/analysis/video_worker.py"]
+    VideoWorker --> VideoStream["VideoStream"]
+    VideoStream --> RtspReceiver["RtspFrameReceiver"]
+    VideoStream --> RecoveryManager["NetworkRecoveryManager"]
+    RecoveryManager -- "requests GET /recover" --> BackupRecoveryServer
     VideoWorker --> Tracker["PersonTracker"]
     Tracker --> Processor["PersonFrameProcessor"]
     Tracker --> RuleEngine["AnomalyRuleEngine"]
@@ -113,6 +122,14 @@ classDiagram
         +segment_duration_nanoseconds()
     }
 
+    class BackupSegmentFinder {
+        +find_segments(start_time, end_time)
+    }
+
+    class BackupRecoveryService {
+        +recover(start_text, end_text)
+    }
+
     class EdgeNetworkFailoverPolicy {
         +decide_for_network(network_available)
     }
@@ -137,8 +154,22 @@ classDiagram
         +stop()
         -_disable_ai_pipeline(message)
         -_record_person_clip(person, frame)
+        -_emit_stream_wait_status()
+        -_emit_recovery_result_if_needed()
         -_create_default_notification_dispatcher()
         -_cleanup()
+    }
+
+    class RtspFrameReceiver {
+        +start()
+        +read_new_frame(last_sequence)
+        +stop()
+    }
+
+    class NetworkRecoveryManager {
+        +record_failure(failed_time)
+        +record_recovery(recovered_time)
+        +request_recovery(payload)
     }
 
     class VLMWorker {
@@ -146,6 +177,7 @@ classDiagram
         +has_failed()
         +wait_until_ready(timeout)
         +add_task(person_id, crop_path)
+        -_emit_result_event(person_id, result)
     }
 
     class ClipManager {
@@ -168,6 +200,16 @@ classDiagram
         -_get_process()
     }
 
+    class MqttResourceMonitorPublisher {
+        +publish_once()
+        +run_forever()
+        +stop()
+    }
+
+    class MqttResourceMonitorConfig {
+        +from_environment()
+    }
+
     class CachedPowerStatusProvider {
         +get_snapshot()
         -_is_cache_fresh(now)
@@ -187,7 +229,9 @@ classDiagram
     }
 
     class ResourceMonitorClient {
+        +start()
         +request_resource_usage()
+        +stop()
     }
 
     class EdgeNodeStatusWindow {
@@ -206,6 +250,7 @@ classDiagram
     EdgeNodeRuntime --> LocalBackupConfig
     EdgeNodeRuntime --> MediaMtxGStreamerCommandBuilder
     EdgeNodeRuntime --> EdgeNetworkFailoverPolicy
+    BackupRecoveryService --> BackupSegmentFinder
     CCTVMainWindow --> SettingsWindow
     CCTVMainWindow --> VideoWorker
     CCTVMainWindow --> EdgeNodeStatusWindow
@@ -215,7 +260,10 @@ classDiagram
     VideoWorker --> NotificationDispatcher
     VideoWorker --> ClipManager
     VideoWorker --> VLMWorker
-    ResourceMonitorClient --> ResourceUsageCollector
+    VideoWorker --> RtspFrameReceiver
+    VideoWorker --> NetworkRecoveryManager
+    MqttResourceMonitorPublisher --> ResourceUsageCollector
+    MqttResourceMonitorPublisher --> MqttResourceMonitorConfig
     ResourceUsageCollector --> CachedPowerStatusProvider
     CachedPowerStatusProvider --> UpsPlusPowerReader
     UpsPlusPowerReader --> PowerStatusSnapshot
@@ -234,8 +282,21 @@ ai-cctv-ai-server
 ```
 
 ```bash
-python -m ai_cctv.edge_node.monitoring.resource_monitor_server
+ai-cctv-edge-monitor
 python -m ai_cctv.ai_server.monitoring.resource_monitor_client
+```
+
+네트워크 단절 구간 복구 서버 실행 예시는 다음과 같습니다.
+
+```bash
+ai-cctv-edge-backup-recovery
+```
+
+AI server에서 복구 요청을 활성화하려면 다음 환경 변수를 지정합니다.
+
+```powershell
+$env:AI_CCTV_RECOVERY_SERVER_URL="http://192.168.137.2:8002/recover"
+ai-cctv-ai-server
 ```
 
 검증 명령은 다음과 같습니다.

@@ -1,6 +1,6 @@
 # Edge node 상태 조회 창을 정의하는 PyQt 파일입니다.
-# AI server UI에서 Edge node 모니터링 API를 호출하고 결과를 시각화합니다.
-# 네트워크 요청은 별도 QThread에서 실행해 메인 UI 멈춤을 방지합니다.
+# AI server UI에서 Edge node가 MQTT로 발행한 상태 JSON을 시각화합니다.
+# MQTT 수신 대기는 별도 QThread에서 실행해 메인 UI 멈춤을 방지합니다.
 # 최신 JSON 값은 표로, 최근 사용률과 배터리 잔량 변화는 선 그래프로 표시합니다.
 
 """Edge node 상태 조회 PyQt 창입니다."""
@@ -24,11 +24,14 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ..monitoring.resource_monitor_client import request_resource_usage
+from ..monitoring.resource_monitor_client import (
+    request_resource_usage,
+    stop_monitor_client,
+)
 
 
 class ResourceMonitorRequestWorker(QThread):
-    """Edge node 모니터링 API 요청을 백그라운드에서 수행합니다.
+    """Edge node MQTT 상태 메시지 수신을 백그라운드에서 수행합니다.
 
     인자:
         없음.
@@ -40,7 +43,7 @@ class ResourceMonitorRequestWorker(QThread):
     error_ready = pyqtSignal(str)
 
     def run(self):
-        """Edge node 자원 사용률을 요청하고 결과 신호를 발생시킵니다.
+        """Edge node 자원 사용률을 수신하고 결과 신호를 발생시킵니다.
 
         인자:
             없음.
@@ -99,7 +102,7 @@ class ResourceLineGraph(QWidget):
         """자원 사용률 JSON에서 그래프 샘플을 추출해 누적합니다.
 
         인자:
-            resource_usage: Edge node 모니터링 API가 반환한 JSON 딕셔너리입니다.
+            resource_usage: Edge node가 MQTT로 발행한 JSON 딕셔너리입니다.
         반환값:
             없음.
         """
@@ -129,7 +132,7 @@ class ResourceLineGraph(QWidget):
         """중첩 JSON에서 백분율 값을 안전하게 읽습니다.
 
         인자:
-            resource_usage: Edge node 모니터링 API가 반환한 JSON 딕셔너리입니다.
+            resource_usage: Edge node가 MQTT로 발행한 JSON 딕셔너리입니다.
             section_name: 값을 읽을 상위 키 이름입니다.
             field_name: 값을 읽을 하위 키 이름입니다.
         반환값:
@@ -349,7 +352,7 @@ class EdgeNodeStatusWindow(QDialog):
         self.refresh_timer.start()
 
     def request_resource_status(self):
-        """Edge node 상태 JSON을 백그라운드 요청으로 조회합니다.
+        """Edge node 상태 JSON을 백그라운드 MQTT 수신으로 조회합니다.
 
         인자:
             없음.
@@ -373,7 +376,7 @@ class EdgeNodeStatusWindow(QDialog):
         """성공적으로 수신한 JSON을 그래프와 표에 반영합니다.
 
         인자:
-            resource_usage: Edge node 모니터링 API가 반환한 JSON 딕셔너리입니다.
+            resource_usage: Edge node가 MQTT로 발행한 JSON 딕셔너리입니다.
         반환값:
             없음.
         """
@@ -431,7 +434,7 @@ class EdgeNodeStatusWindow(QDialog):
         """최신 자원 사용률 JSON 값을 표 형태로 갱신합니다.
 
         인자:
-            resource_usage: Edge node 모니터링 API가 반환한 JSON 딕셔너리입니다.
+            resource_usage: Edge node가 MQTT로 발행한 JSON 딕셔너리입니다.
         반환값:
             없음.
         """
@@ -481,7 +484,7 @@ class EdgeNodeStatusWindow(QDialog):
         """자원 사용률 JSON을 화면 표시용 행 목록으로 변환합니다.
 
         인자:
-            resource_usage: Edge node 모니터링 API가 반환한 JSON 딕셔너리입니다.
+            resource_usage: Edge node가 MQTT로 발행한 JSON 딕셔너리입니다.
         반환값:
             항목 이름과 표시 값을 담은 튜플 목록을 반환합니다.
         """
@@ -561,7 +564,7 @@ class EdgeNodeStatusWindow(QDialog):
         """UPS 전원 상태 읽기 결과를 화면 표시 문자열로 변환합니다.
 
         인자:
-            power: `/monitor/top` JSON의 power 딕셔너리입니다.
+            power: MQTT 상태 JSON의 power 딕셔너리입니다.
         반환값:
             UPS 읽기 상태 표시 문자열을 반환합니다.
         """
@@ -576,7 +579,7 @@ class EdgeNodeStatusWindow(QDialog):
         return "실패"
 
     def closeEvent(self, event):
-        """창이 닫힐 때 주기 조회 타이머를 중지합니다.
+        """창이 닫힐 때 주기 조회 타이머와 MQTT 수신 연결을 중지합니다.
 
         인자:
             event: PyQt 닫기 이벤트 객체입니다.
@@ -586,4 +589,5 @@ class EdgeNodeStatusWindow(QDialog):
 
         self.refresh_timer.stop()
         self.is_monitoring_active = False
+        stop_monitor_client()
         event.accept()

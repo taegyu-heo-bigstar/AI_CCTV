@@ -7,12 +7,15 @@ from .local_backup import LocalBackupConfig
 from .mediamtx import MediaMtxConfig, MediaMtxInstaller, MediaMtxProcessManager
 from .runtime import EdgeNodeRuntime
 from .streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
+from .backup_recovery_server import BackupRecoveryService, BackupSegmentFinder
 
 __all__ = [
     "EdgeFailoverDecision",
     "EdgeNetworkFailoverPolicy",
     "EdgeNodeRuntime",
     "EdgeStreamConfig",
+    "BackupRecoveryService",
+    "BackupSegmentFinder",
     "LocalBackupConfig",
     "MediaMtxGStreamerCommandBuilder",
     "MediaMtxConfig",

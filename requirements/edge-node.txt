@@ -1,5 +1,6 @@
 pygobject
 fastapi
 uvicorn
+paho-mqtt
 psutil
 smbus2

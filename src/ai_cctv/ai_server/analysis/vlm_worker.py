@@ -5,6 +5,7 @@
 import gc
 import queue
 import threading
+from datetime import datetime
 
 
 class VLMWorker:
@@ -12,20 +13,23 @@ class VLMWorker:
 
     인자:
         state_manager: 인물별 VLM 완료 상태를 기록하는 상태 관리자입니다.
+        result_callback: VLM 결과 이벤트를 받을 콜백입니다.
     반환값:
         VLMWorker 인스턴스를 반환합니다.
     """
 
-    def __init__(self, state_manager):
+    def __init__(self, state_manager, result_callback=None):
         """VLM 작업 큐와 준비 상태 이벤트를 초기화합니다.
 
         인자:
             state_manager: 인물별 상태를 관리하는 객체입니다.
+            result_callback: VLM 완료 이벤트를 전달할 콜백입니다.
         반환값:
             없음.
         """
 
         self.state_manager = state_manager
+        self.result_callback = result_callback
         self.task_queue = queue.Queue()
         self.running = False
         self.thread = None
@@ -141,12 +145,33 @@ class VLMWorker:
                 from ..alerts.chat_bot import chat_bot as chatbot
 
                 chatbot.send_msg(result)
+                self._emit_result_event(person_id, result)
             except Exception as error:
                 print(f"ID {person_id} VLM 분석 실패: {error}")
             finally:
                 self.task_queue.task_done()
 
         self.cleanup()
+
+    def _emit_result_event(self, person_id, result):
+        """VLM 분석 결과를 GUI 이벤트 콜백으로 전달합니다.
+
+        인자:
+            person_id: 분석 대상 추적 인물 식별자입니다.
+            result: VLM 분석 결과 문자열입니다.
+        반환값:
+            없음.
+        """
+
+        if self.result_callback is None:
+            return
+
+        self.result_callback({
+            "type": "vlm_done",
+            "person_id": person_id,
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "message": result,
+        })
 
     def stop(self):
         """VLM 분석 thread를 중지하고 모델 자원을 정리합니다.

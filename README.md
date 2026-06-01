@@ -6,8 +6,8 @@ Raspberry Pi 기반 Edge node와 Windows 기반 AI server를 분리해 구성하
 
 | 묶음 | 역할 | 실행 명령 |
 |---|---|---|
-| Edge node | 카메라 영상 송출, MediaMTX 실행, GStreamer 송출/로컬 백업, 네트워크 장애 대응 정책 | `ai-cctv-edge` |
-| AI server | RTSP 수신, OpenCV/YOLO 분석, 이상 상황 판정, Discord 알림, GUI | `ai-cctv-ai-server` |
+| Edge node | 카메라 영상 송출, MediaMTX 실행, GStreamer 송출/로컬 백업, MQTT 상태 발행, 백업 복구 ZIP 제공, 네트워크 장애 대응 정책 | `ai-cctv-edge`, `ai-cctv-edge-monitor`, `ai-cctv-edge-backup-recovery` |
+| AI server | RTSP 수신/재연결, OpenCV/YOLO 분석, MQTT 상태 구독, 이상 상황 판정, Discord 알림, GUI, 누락 구간 복구 요청 | `ai-cctv-ai-server` |
 
 ## 설치
 
@@ -28,6 +28,24 @@ AI server 실행 환경:
 
 ```bash
 pip install -e ".[ai-server]"
+ai-cctv-ai-server
+```
+
+Edge node 상태 정보는 MQTT broker를 기준으로 주고받습니다. 기본 broker는 `127.0.0.1:1883`, 기본 topic은 `ai-cctv/edge-node/status`입니다.
+
+```bash
+ai-cctv-edge-monitor
+python -m ai_cctv.ai_server.monitoring.resource_monitor_client
+```
+
+네트워크 단절 후 누락 구간 영상을 복구하려면 Edge node에서 FastAPI 기반 백업 복구 서버를 함께 실행합니다. AI server는 `requests`로 해당 API를 호출하므로 `AI_CCTV_RECOVERY_SERVER_URL`을 지정합니다.
+
+```bash
+ai-cctv-edge-backup-recovery
+```
+
+```powershell
+$env:AI_CCTV_RECOVERY_SERVER_URL="http://192.168.137.2:8002/recover"
 ai-cctv-ai-server
 ```
 
@@ -54,12 +72,16 @@ src/
     |   |-- runtime.py  # MediaMTX 준비와 GStreamer 실행 조율
     |   |-- mediamtx.py # MediaMTX 다운로드/프로세스 관리
     |   |-- streaming.py # GStreamer 송출/백업 파이프라인 생성
+    |   |-- backup_recovery_server.py # 누락 구간 백업 ZIP 제공
+    |   |-- monitoring/ # MQTT 자원/전원 상태 발행
     |   `-- local_backup.py # 백업 세그먼트 경로 정책
     `-- ai_server/      # Windows AI server 실행 코드
         |-- server_run.py
         |-- ui/         # PyQt 화면, 설정창, 이벤트 표시
-        |-- analysis/   # 영상 입력, 추적, VLM, 이상 상황 판정
+        |-- analysis/   # 영상 입력, RTSP 재연결, 추적, VLM, 이상 상황 판정
+        |-- recovery/   # RTSP 장애 구간 백업 복구 요청
         |-- storage/    # 저장 경로와 녹화 관리
+        |-- monitoring/ # Edge node MQTT 상태 구독
         |-- alerts/     # Discord 알림과 챗봇 전송
         `-- common/     # 서버 내부 공통 값 객체 재노출
 ```

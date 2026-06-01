@@ -3,6 +3,7 @@
 # 카메라 프리뷰를 먼저 표시하고 AI 모델은 별도 thread에서 준비합니다.
 
 import threading
+import time
 from datetime import datetime
 from PyQt5.QtCore import QThread, pyqtSignal
 
@@ -99,6 +100,8 @@ class VideoWorker(QThread):
             state_manager=self.state_manager,
             vlm_worker=self.vlm_worker,
         )
+        self.last_stream_status_at = 0.0
+        self.last_reported_recovery_result_id = None
 
     def run(self):
         """스레드 메인 루프에서 프레임 처리와 신호 발행을 수행합니다.
@@ -142,11 +145,16 @@ class VideoWorker(QThread):
             ret, frame = self.stream.read()
 
             if not ret:
+                if getattr(self.stream, "is_rtsp", False):
+                    self._emit_stream_wait_status()
+                    continue
                 self.event_ready.emit({
                     "type": "error",
                     "message": "Failed to read frame",
                 })
                 continue
+
+            self._emit_recovery_result_if_needed()
 
             if self.recording_manager is not None:
                 self.recording_manager.write_frame(frame)
@@ -347,7 +355,10 @@ class VideoWorker(QThread):
         try:
             from .vlm_worker import VLMWorker
 
-            vlm_worker = VLMWorker(self.state_manager)
+            vlm_worker = VLMWorker(
+                self.state_manager,
+                result_callback=self.event_ready.emit,
+            )
             vlm_worker.start()
         except Exception as exc:
             self.vlm_load_error = exc
@@ -398,6 +409,59 @@ class VideoWorker(QThread):
             "tracked_total": len(self.state_manager.person_states),
         })
         self.frame_ready.emit(frame)
+
+    def _emit_stream_wait_status(self):
+        """RTSP 스트림 복구 대기 상태를 과도하지 않게 UI에 알립니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        now = time.monotonic()
+        if now - self.last_stream_status_at < 5.0:
+            return
+
+        self.last_stream_status_at = now
+        message = "RTSP 연결 복구 대기 중입니다."
+        if not self.stream.is_recovering():
+            message = "RTSP 프레임 수신 대기 중입니다."
+        self.event_ready.emit({
+            "type": "status",
+            "message": message,
+        })
+
+    def _emit_recovery_result_if_needed(self):
+        """RTSP 복구 후 백업 ZIP 요청 결과가 있으면 UI 이벤트로 표시합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        result = self.stream.get_last_recovery_result()
+        if not result:
+            return
+
+        result_id = id(result)
+        if result_id == self.last_reported_recovery_result_id:
+            return
+
+        self.last_reported_recovery_result_id = result_id
+        if result.get("success") and result.get("saved_file"):
+            self.event_ready.emit({
+                "type": "status",
+                "message": f"누락 구간 복구 ZIP 저장 완료: {result.get('file_path')}",
+            })
+            return
+
+        if result.get("requested") and not result.get("success"):
+            self.event_ready.emit({
+                "type": "error",
+                "message": f"누락 구간 복구 요청 실패: {result.get('error') or result.get('reason')}",
+            })
 
     def stop(self):
         """영상 처리 루프를 중지하고 스레드 종료를 기다립니다.
