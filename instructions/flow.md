@@ -392,7 +392,7 @@ BACKUP_RECOVERY_URL=http://192.168.137.2:8002/recover
 BACKUP_DIR=~/backups
 ```
 
-자동 감지가 SSH 서버 IP, 지정 인터페이스 IP, UDP 라우팅 결과 순서로 실패하면 `127.0.0.1`이 출력될 수 있습니다. 이때는 Edge node에서 `AI_CCTV_EDGE_HOST`를 유선 IP로 지정한 뒤 다시 실행합니다.
+Edge node는 host를 자동 추정하지 않습니다. 실행 전에 `.env`의 `AI_CCTV_EDGE_HOST`에 AI server가 접근할 수 있는 유선 IP를 지정해야 합니다. SSH 세션 IP, 인터페이스 조회, UDP 라우팅, hostname 해석은 `future/edge_host_auto_detection.md`에 차후 구현점으로 분리했습니다.
 
 Edge node의 `ai-cctv-edge`, `ai-cctv-edge-mqtt-broker`, `ai-cctv-edge-monitor`, `ai-cctv-edge-backup-recovery` 진입점은 실행 직후 `ensure_supported_edge_os`를 호출합니다. Windows나 macOS는 즉시 종료되며, `/etc/os-release`에서 배포판을 확인할 수 있는 Linux 환경은 Debian, Raspbian, Ubuntu 계열만 허용합니다. 배포판 정보를 읽을 수 없는 최소 Linux 환경은 Linux 커널 실행 환경으로 보고 허용합니다. 기본 `ai-cctv-edge` 실행은 MediaMTX와 GStreamer 외에도 MQTT broker, MQTT 상태 publisher, FastAPI 백업 복구 서버를 보조 프로세스로 함께 실행합니다. RTSP 송출만 단독 점검하려면 `ai-cctv-edge --no-support-services`를 사용합니다.
 

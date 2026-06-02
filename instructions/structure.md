@@ -813,15 +813,10 @@
 | `EdgeConnectionInfo.to_terminal_text` | 운영자가 복사할 수 있는 표준 연결 정보 블록을 생성합니다. | 문자열 | 없음 | PowerShell 설정 예시 포함 |
 | `build_edge_connection_info` | 환경 변수와 호출 인자를 합쳐 Edge node 연결 정보를 생성합니다. | EdgeConnectionInfo 객체 | 잘못된 정수 환경 변수 | MQTT, RTSP, 백업 복구 설정 통합 |
 | `print_edge_connection_info` | Edge node 연결 정보를 표준 출력 또는 지정 스트림에 즉시 출력합니다. | EdgeConnectionInfo 객체 | 출력 스트림 오류 | `AI_CCTV_PRINT_STARTUP_INFO=0`이면 출력 생략 |
-| `resolve_edge_host` | AI server가 접속할 Edge node 호스트 값을 결정합니다. | IP 또는 호스트 문자열 | 없음 | 명시값, SSH, 인터페이스, UDP 라우팅 순서 |
+| `resolve_edge_host` | AI server가 접속할 Edge node 호스트 값을 결정합니다. | IP 또는 호스트 문자열 | RuntimeError | `AI_CCTV_EDGE_HOST` 또는 명시 인자만 사용 |
 | `_build_rtsp_url` | MediaMTX 기본 RTSP 주소를 생성합니다. | RTSP URL 문자열 | 잘못된 포트 환경 변수 | 내부 함수 |
 | `_resolve_int` | 명시값 또는 환경 변수를 정수로 해석합니다. | int | ValueError | 내부 함수 |
 | `_read_bool_env` | 환경 변수 문자열을 bool 값으로 변환합니다. | bool | 없음 | 내부 함수 |
-| `_read_ssh_server_host` | SSH_CONNECTION 환경 변수에서 서버 측 IP를 읽습니다. | IP 문자열 또는 None | 없음 | SSH 접속 실행에 우선 사용 |
-| `_read_interface_host` | 지정한 Linux 네트워크 인터페이스의 IPv4 주소를 조회합니다. | IP 문자열 또는 None | ip 명령 실행 오류는 None 처리 | AI_CCTV_EDGE_INTERFACE 지원 |
-| `_detect_host_by_udp_probe` | UDP 라우팅 결과로 로컬 IPv4 주소를 추정합니다. | IP 문자열 또는 None | 소켓 오류는 None 처리 | 패킷 전송 없이 라우팅만 확인 |
-| `_read_hostname_host` | 호스트 이름 해석 결과에서 외부 접속 가능한 IPv4 주소를 찾습니다. | IP 문자열 또는 None | 이름 해석 오류는 None 처리 | 마지막 자동 감지 후보 |
-| `_is_loopback_host` | 호스트 값이 loopback 주소인지 판단합니다. | bool | 없음 | localhost, 127.*, ::1 처리 |
 
 ## `src/ai_cctv/edge_node/streaming.py`
 

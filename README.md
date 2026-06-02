@@ -6,10 +6,6 @@ Runtime settings are read from `.env`. Copy `.env.example` to `.env` and edit
 the values there. The application no longer reads AI CCTV settings from OS
 environment variables.
 
-System-provided runtime metadata, such as `SSH_CONNECTION`, is still read from
-the OS environment because it is created by the active shell/session, not by the
-project configuration.
-
 Raspberry Pi 기반 Edge node와 Windows 기반 AI server를 분리해 구성하는 AI CCTV 프로젝트입니다.
 
 ## 실행 묶음
@@ -124,7 +120,7 @@ $env:PYTHONPATH="src;."; python -m unittest discover -s tester/tests -t .
 
 ## SSH 유선 연결 실행 절차
 
-라즈베리 파이를 Windows AI server와 유선 Ethernet으로 연결하고 SSH 터미널에서 실행하면, Edge node 프로그램은 시작 직후 표준 출력으로 AI server에 입력할 값을 출력합니다. 자동 IP 감지가 틀리면 실행 전에 `AI_CCTV_EDGE_HOST`를 라즈베리 파이의 유선 IP로 지정합니다.
+라즈베리 파이를 Windows AI server와 유선 Ethernet으로 연결하고 SSH 터미널에서 실행하면, Edge node 프로그램은 시작 직후 표준 출력으로 AI server에 입력할 값을 출력합니다. 실행 전에 `.env`의 `AI_CCTV_EDGE_HOST`를 라즈베리 파이의 유선 IP로 지정해야 합니다.
 
 Edge node 진입점은 Linux에서만 실행됩니다. `/etc/os-release`로 배포판을 확인할 수 있는 경우 Debian, Raspbian, Ubuntu 계열만 허용하고, Windows나 macOS에서는 오류 메시지를 출력한 뒤 종료합니다.
 

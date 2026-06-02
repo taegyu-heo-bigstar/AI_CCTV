@@ -1,12 +1,9 @@
 # Edge node 시작 시 AI server 설정에 필요한 연결 정보를 만드는 파일입니다.
-# SSH 접속으로 실행하는 라즈베리 파이의 유선 IP를 우선 추정합니다.
+# 실행자가 지정한 Edge node host를 기준으로 연결 정보를 만듭니다.
 # RTSP 수신 주소, MQTT 상태 topic, 백업 복구 API 주소를 한 번에 출력합니다.
-# 자동 감지가 틀리면 AI_CCTV_EDGE_HOST 환경 변수로 값을 고정할 수 있습니다.
+# AI_CCTV_EDGE_HOST가 없으면 자동 추정하지 않고 오류를 반환합니다.
 
 from dataclasses import dataclass
-import os
-import socket
-import subprocess
 import sys
 
 from ..config import get_env_bool, get_env_int, get_env_value
@@ -73,7 +70,7 @@ class EdgeConnectionInfo:
                 f'영상 입력 주소: "{self.rtsp_url}"',
                 "",
                 "[주의]",
-                "EDGE_HOST가 127.0.0.1이면 AI_CCTV_EDGE_HOST에 유선 IP를 지정한 뒤 다시 실행하세요.",
+                "AI_CCTV_EDGE_HOST에는 AI server가 접근할 수 있는 Edge node 유선 IP를 지정하세요.",
                 "MQTT broker는 기본적으로 Edge node에서 실행됩니다.",
                 "외부 MQTT broker를 사용할 때만 AI_CCTV_MQTT_HOST를 별도로 지정하세요.",
             ]
@@ -160,33 +157,16 @@ def resolve_edge_host(edge_host=None, probe_host=None):
 
     인자:
         edge_host: 호출자가 명시한 Edge node 호스트입니다.
-        probe_host: UDP 경로 감지에 사용할 상대 호스트입니다.
+        probe_host: 현재는 사용하지 않는 예약 인자입니다.
     반환값:
-        감지된 IP 또는 호스트 문자열을 반환합니다.
+        명시된 IP 또는 호스트 문자열을 반환합니다.
     """
 
     explicit_host = edge_host or get_env_value("AI_CCTV_EDGE_HOST", "")
     if explicit_host:
         return explicit_host
 
-    ssh_host = _read_ssh_server_host()
-    if ssh_host:
-        return ssh_host
-
-    interface_host = _read_interface_host(get_env_value("AI_CCTV_EDGE_INTERFACE", ""))
-    if interface_host:
-        return interface_host
-
-    route_probe_host = probe_host if probe_host and not _is_loopback_host(probe_host) else None
-    probed_host = _detect_host_by_udp_probe(route_probe_host or "8.8.8.8")
-    if probed_host:
-        return probed_host
-
-    hostname_host = _read_hostname_host()
-    if hostname_host:
-        return hostname_host
-
-    return "127.0.0.1"
+    raise RuntimeError("AI_CCTV_EDGE_HOST를 .env에 설정하거나 edge_host 인자로 전달해야 합니다.")
 
 
 def _build_rtsp_url(edge_host):
@@ -232,110 +212,3 @@ def _read_bool_env(name, default):
     return get_env_bool(name, default)
 
 
-def _read_ssh_server_host():
-    """SSH 접속 환경에서 서버 측 IP를 읽습니다.
-
-    인자:
-        없음.
-    반환값:
-        SSH_CONNECTION의 서버 IP 또는 None을 반환합니다.
-    """
-
-    ssh_connection = os.getenv("SSH_CONNECTION", "")
-    parts = ssh_connection.split()
-    if len(parts) >= 3 and not _is_loopback_host(parts[2]):
-        return parts[2]
-    return None
-
-
-def _read_interface_host(interface_name):
-    """지정한 네트워크 인터페이스의 IPv4 주소를 조회합니다.
-
-    인자:
-        interface_name: 조회할 Linux 네트워크 인터페이스 이름입니다.
-    반환값:
-        IPv4 주소 문자열 또는 None을 반환합니다.
-    """
-
-    if not interface_name:
-        return None
-
-    try:
-        result = subprocess.run(
-            ["ip", "-o", "-4", "addr", "show", "dev", interface_name],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=2,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-
-    for line in result.stdout.splitlines():
-        fields = line.split()
-        if "inet" in fields:
-            address = fields[fields.index("inet") + 1].split("/", 1)[0]
-            if not _is_loopback_host(address):
-                return address
-    return None
-
-
-def _detect_host_by_udp_probe(probe_host, probe_port=80):
-    """UDP 라우팅 결과로 로컬 IPv4 주소를 추정합니다.
-
-    인자:
-        probe_host: 라우팅 판단에 사용할 상대 호스트입니다.
-        probe_port: 라우팅 판단에 사용할 상대 포트입니다.
-    반환값:
-        로컬 IPv4 주소 또는 None을 반환합니다.
-    """
-
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            sock.connect((probe_host, probe_port))
-            detected_host = sock.getsockname()[0]
-    except OSError:
-        return None
-
-    if _is_loopback_host(detected_host):
-        return None
-    return detected_host
-
-
-def _read_hostname_host():
-    """호스트 이름 해석 결과에서 외부 접속 가능한 IPv4 주소를 찾습니다.
-
-    인자:
-        없음.
-    반환값:
-        IPv4 주소 문자열 또는 None을 반환합니다.
-    """
-
-    try:
-        host_candidates = socket.getaddrinfo(
-            socket.gethostname(),
-            None,
-            family=socket.AF_INET,
-            type=socket.SOCK_STREAM,
-        )
-    except OSError:
-        return None
-
-    for candidate in host_candidates:
-        host = candidate[4][0]
-        if not _is_loopback_host(host):
-            return host
-    return None
-
-
-def _is_loopback_host(host):
-    """호스트 값이 loopback 주소인지 판단합니다.
-
-    인자:
-        host: 검사할 IP 또는 호스트 이름입니다.
-    반환값:
-        loopback이면 True, 아니면 False를 반환합니다.
-    """
-
-    normalized_host = str(host).strip().lower()
-    return normalized_host in {"localhost", "::1"} or normalized_host.startswith("127.")
