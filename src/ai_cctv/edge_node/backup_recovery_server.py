@@ -202,7 +202,7 @@ def create_backup_recovery_app(service):
     """
 
     from fastapi import BackgroundTasks, FastAPI, HTTPException
-    from fastapi.responses import FileResponse
+    from fastapi.responses import FileResponse, JSONResponse
 
     app = FastAPI(title="AI CCTV Edge Backup Recovery Server")
 
@@ -223,14 +223,17 @@ def create_backup_recovery_app(service):
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         except FileNotFoundError as error:
-            raise HTTPException(status_code=404, detail=str(error)) from error
+            return JSONResponse(
+                status_code=404,
+                content={"message": str(error)},
+            )
         except OSError as error:
             raise HTTPException(status_code=500, detail=str(error)) from error
 
         background_tasks.add_task(remove_temp_file, archive.path)
         return FileResponse(
             path=archive.path,
-            media_type="application/zip",
+            media_type="application/x-zip-compressed",
             filename=archive.filename,
         )
 

@@ -387,7 +387,12 @@ class CCTVMainWindow(QMainWindow):
         """
 
         if self.worker is not None:
-            self.worker.stop()
+            stopped_normally = self.worker.stop()
+            if not stopped_normally:
+                self.add_event({
+                    "type": "error",
+                    "message": "영상 작업자가 임계시간 안에 종료되지 않아 강제 종료했습니다.",
+                })
             self.worker = None
 
         self.cam_status.setText("CAM-01 - STOPPED")

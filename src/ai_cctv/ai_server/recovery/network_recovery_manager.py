@@ -118,11 +118,11 @@ class NetworkRecoveryManager:
 
         recovered_time = recovered_time or datetime.now()
         failure_start_time = self.failure_start_time
-        self.failure_start_time = None
         duration_seconds = (recovered_time - failure_start_time).total_seconds()
         payload = self.build_payload(failure_start_time, recovered_time)
 
         if duration_seconds < self.config.min_failure_seconds:
+            self.failure_start_time = None
             return {
                 "requested": False,
                 "success": True,
@@ -134,6 +134,7 @@ class NetworkRecoveryManager:
 
         request_key = self._get_request_key(payload)
         if request_key in self.requested_ranges:
+            self.failure_start_time = None
             return {
                 "requested": False,
                 "success": True,
@@ -151,6 +152,7 @@ class NetworkRecoveryManager:
         result = self.request_recovery(payload)
         if result.get("success"):
             self.requested_ranges.add(request_key)
+            self.failure_start_time = None
 
         result["duration_seconds"] = duration_seconds
         result["payload"] = payload
@@ -206,19 +208,34 @@ class NetworkRecoveryManager:
         try:
             response = requests.get(
                 self.config.server_url,
-                params=payload,
+                params={
+                    "start": payload["start"],
+                    "end": payload["end"],
+                },
                 timeout=self.config.request_timeout_seconds,
                 stream=True,
             )
         except requests.RequestException as error:
             return {"requested": True, "success": False, "error": str(error)}
 
-        if response.status_code >= 400:
+        if response.status_code == 404:
+            return {
+                "requested": True,
+                "success": False,
+                "status_code": 404,
+                "reason": "not_found",
+                "error": self._get_response_error_text(
+                    response,
+                    "요청한 시간 구간에 해당하는 백업 파일이 없습니다.",
+                ),
+            }
+
+        if not response.ok:
             return {
                 "requested": True,
                 "success": False,
                 "status_code": response.status_code,
-                "error": response.text[:200],
+                "error": self._get_response_error_text(response, response.text[:200]),
             }
 
         save_path = self._save_file_response(response, payload)
@@ -479,6 +496,25 @@ class NetworkRecoveryManager:
                 filename = part.split("=", 1)[1].strip().strip('"')
                 return self._sanitize_filename(unquote(filename))
         return None
+
+    def _get_response_error_text(self, response, default):
+        """복구 API 오류 응답에서 사용자에게 보여줄 메시지를 추출합니다.
+
+        인자:
+            response: requests가 반환한 HTTP 응답 객체입니다.
+            default: 구조화된 메시지가 없을 때 사용할 기본 메시지입니다.
+        반환값:
+            오류 메시지 문자열을 반환합니다.
+        """
+
+        try:
+            data = response.json()
+        except Exception:
+            return default
+
+        if isinstance(data, dict):
+            return str(data.get("message") or data.get("detail") or default)
+        return default
 
     def _make_default_zip_filename(self, payload):
         """복구 응답에 파일명이 없을 때 사용할 기본 파일명을 생성합니다.

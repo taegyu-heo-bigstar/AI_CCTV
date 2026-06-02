@@ -18,6 +18,10 @@ from ..storage.recording_manager import RecordingManager
 from .video_stream import VideoStream
 
 
+DEFAULT_STOP_TIMEOUT_MS = 5000
+FORCED_TERMINATION_TIMEOUT_MS = 1000
+
+
 class VideoWorker(QThread):
     """영상 캡처, 추적, 녹화, 선택적 VLM 분석을 조정합니다.
 
@@ -483,8 +487,27 @@ class VideoWorker(QThread):
         if self.stream.has_active_recovery_failure():
             self.recording_manager.stop_recording()
 
-    def stop(self):
-        """영상 처리 루프를 중지하고 스레드 종료를 기다립니다.
+    def stop(self, timeout_ms=DEFAULT_STOP_TIMEOUT_MS):
+        """영상 처리 루프를 중지하고 임계시간 안에 스레드 종료를 기다립니다.
+
+        인자:
+            timeout_ms: 정상 종료를 기다릴 최대 시간입니다.
+        반환값:
+            정상 종료되면 True, 임계시간 초과 후 강제 종료되면 False를 반환합니다.
+        """
+
+        self.running = False
+        self._request_stream_shutdown()
+        if self.wait(timeout_ms):
+            return True
+
+        self.terminate()
+        self.wait(FORCED_TERMINATION_TIMEOUT_MS)
+        self._cleanup()
+        return False
+
+    def _request_stream_shutdown(self):
+        """대기 중인 영상 입력 객체를 해제해 worker 종료를 앞당깁니다.
 
         인자:
             없음.
@@ -492,8 +515,10 @@ class VideoWorker(QThread):
             없음.
         """
 
-        self.running = False
-        self.wait()
+        try:
+            self.stream.release()
+        except Exception:
+            pass
 
     def _cleanup(self):
         """사용 중인 분석 작업자, 녹화기, 영상 스트림을 정리합니다.

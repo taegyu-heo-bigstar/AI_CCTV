@@ -5,12 +5,13 @@
 import unittest
 import os
 import socket
+import sys
 import tempfile
 import tomllib
 import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from ai_cctv.ai_server.alerts.dispatcher import (
     NotificationChannel,
@@ -65,6 +66,7 @@ from ai_cctv.edge_node.monitoring.mqtt_broker import (
 )
 from ai_cctv.edge_node.monitoring.resource_monitor_publisher import (
     MqttResourceMonitorConfig,
+    SUPPORTED_MQTT_QOS_VALUES,
 )
 from ai_cctv.edge_node.startup_info import build_edge_connection_info
 from ai_cctv.edge_node.streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
@@ -655,6 +657,97 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertFalse(result["requested"])
         self.assertEqual(result["reason"], "server_url_not_configured")
 
+    def test_network_recovery_manager_uses_rtsp_review_request_contract(self):
+        """복구 요청이 start/end만 전송하고 실패 시 장애 구간을 유지하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        calls = []
+
+        class FakeResponse:
+            """복구 API 404 응답을 흉내 내는 객체입니다.
+
+            인자:
+                없음.
+            반환값:
+                FakeResponse 인스턴스를 반환합니다.
+            """
+
+            status_code = 404
+            ok = False
+            text = '{"message": "no backup"}'
+            headers = {}
+
+            def json(self):
+                """JSON 오류 메시지를 반환합니다.
+
+                인자:
+                    없음.
+                반환값:
+                    message 필드가 있는 딕셔너리를 반환합니다.
+                """
+
+                return {"message": "no backup"}
+
+        class FakeRequests:
+            """requests 모듈의 get 호출만 흉내 내는 객체입니다.
+
+            인자:
+                없음.
+            반환값:
+                FakeRequests 인스턴스를 반환합니다.
+            """
+
+            RequestException = Exception
+
+            @staticmethod
+            def get(url, params, timeout, stream):
+                """복구 API 호출 인자를 기록하고 404 응답을 반환합니다.
+
+                인자:
+                    url: 호출 대상 URL입니다.
+                    params: HTTP query parameter 딕셔너리입니다.
+                    timeout: 요청 제한 시간입니다.
+                    stream: 스트리밍 응답 사용 여부입니다.
+                반환값:
+                    FakeResponse 인스턴스를 반환합니다.
+                """
+
+                calls.append({
+                    "url": url,
+                    "params": params,
+                    "timeout": timeout,
+                    "stream": stream,
+                })
+                return FakeResponse()
+
+        manager = NetworkRecoveryManager(
+            NetworkRecoveryConfig(
+                server_url="http://edge-node:8002/recover",
+                settle_seconds=0,
+            )
+        )
+        manager.record_failure(datetime(2026, 5, 31, 10, 0, 0))
+
+        with patch.dict(sys.modules, {"requests": FakeRequests}):
+            result = manager.record_recovery(datetime(2026, 5, 31, 10, 0, 5))
+
+        self.assertEqual(
+            calls[0]["params"],
+            {
+                "start": "2026-05-31T10:00:00",
+                "end": "2026-05-31T10:00:05",
+            },
+        )
+        self.assertTrue(calls[0]["stream"])
+        self.assertEqual(result["reason"], "not_found")
+        self.assertEqual(result["error"], "no backup")
+        self.assertTrue(manager.has_active_failure())
+
     def test_network_recovery_manager_merges_recovered_ts_segments_to_mp4(self):
         """복구 ZIP의 TS 세그먼트를 원본 녹화 폴더의 MP4로 병합하는지 검증합니다.
 
@@ -887,6 +980,23 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertEqual(ai_server_config.broker_port, edge_config.broker_port)
         self.assertEqual(ai_server_config.topic, edge_config.topic)
         self.assertTrue(support_config.run_mqtt_broker)
+
+    def test_resource_monitor_mqtt_qos_is_fixed_to_zero(self):
+        """MQTT 상태 발행 QoS가 현재 정책상 0으로 고정되는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        with patch.dict(os.environ, {"AI_CCTV_MQTT_QOS": "1"}):
+            config = MqttResourceMonitorConfig.from_environment()
+
+        self.assertEqual(SUPPORTED_MQTT_QOS_VALUES, (0,))
+        self.assertEqual(config.qos, 0)
+        with self.assertRaises(ValueError):
+            MqttResourceMonitorConfig(qos=1)
 
     def test_edge_connection_info_prints_ai_server_settings(self):
         """Edge node 시작 정보가 AI server 설정값을 포함하는지 검증합니다.

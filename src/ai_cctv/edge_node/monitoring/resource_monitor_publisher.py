@@ -19,6 +19,7 @@ DEFAULT_MQTT_PORT = 1883
 DEFAULT_MQTT_TOPIC = "ai-cctv/edge-node/status"
 DEFAULT_PUBLISH_INTERVAL_SECONDS = 2.0
 DEFAULT_MQTT_QOS = 0
+SUPPORTED_MQTT_QOS_VALUES = (0,)
 DEFAULT_MQTT_RETAIN = True
 DEFAULT_CLIENT_ID = "ai-cctv-edge-monitor"
 
@@ -47,6 +48,21 @@ class MqttResourceMonitorConfig:
     retain: bool = DEFAULT_MQTT_RETAIN
     client_id: str = DEFAULT_CLIENT_ID
 
+    def __post_init__(self):
+        """MQTT QoS 값이 현재 지원 범위 안에 있는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        if self.qos not in SUPPORTED_MQTT_QOS_VALUES:
+            raise ValueError(
+                f"지원하지 않는 MQTT QoS입니다: {self.qos}. "
+                f"현재 지원값: {SUPPORTED_MQTT_QOS_VALUES}"
+            )
+
     @classmethod
     def from_environment(cls):
         """환경 변수에서 MQTT 상태 발행 설정을 생성합니다.
@@ -67,7 +83,7 @@ class MqttResourceMonitorConfig:
                     DEFAULT_PUBLISH_INTERVAL_SECONDS,
                 )
             ),
-            qos=int(os.getenv("AI_CCTV_MQTT_QOS", DEFAULT_MQTT_QOS)),
+            qos=DEFAULT_MQTT_QOS,
             retain=_read_bool_env("AI_CCTV_MQTT_RETAIN", DEFAULT_MQTT_RETAIN),
             client_id=os.getenv("AI_CCTV_MQTT_EDGE_CLIENT_ID", DEFAULT_CLIENT_ID),
         )

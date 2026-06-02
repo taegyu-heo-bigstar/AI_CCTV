@@ -19,6 +19,7 @@ MQTT_PINGREQ = 12
 MQTT_DISCONNECT = 14
 DEFAULT_BROKER_HOST = "0.0.0.0"
 DEFAULT_BROKER_PORT = 1883
+SUPPORTED_MQTT_QOS_VALUES = (0,)
 
 
 @dataclass(frozen=True)
@@ -193,6 +194,9 @@ class TinyMqttBroker:
                     self._handle_subscribe(client, payload)
                     continue
                 if packet_type == MQTT_PUBLISH:
+                    qos = (flags >> 1) & 0x03
+                    if qos not in SUPPORTED_MQTT_QOS_VALUES:
+                        break
                     self._handle_publish(payload, retain=bool(flags & 0x01))
                     continue
                 if packet_type == MQTT_PINGREQ:
