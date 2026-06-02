@@ -36,7 +36,10 @@ AI_CCTV/
 |           |-- alerts/             # Discord 알림 메시지, 디스패처, 챗봇 전송
 |           |-- monitoring/         # Edge node 자원 모니터링 MQTT 구독 클라이언트
 |           `-- common/             # 서버 노드 내부 공통 값 객체 재노출
-`-- tests/                          # 구조와 도메인 경계 단위 테스트
+`-- tester/                         # 테스트 도구, pseudo edge, 회귀 테스트, 테스트 문서
+    |-- tests/                      # 구조와 도메인 경계 단위 테스트
+    |-- tools/                      # 수동 검증 도구
+    `-- pseudo_edge_node/           # Windows 테스트용 Edge 유사 실행체
 ```
 
 ## Deployment Bundles
@@ -397,6 +400,6 @@ Edge node 모드에서는 Edge node 표준 출력 블록을 붙여넣거나 RTSP
 검증 명령은 다음과 같습니다.
 
 ```bash
-python -m compileall src main.py tests
-$env:PYTHONPATH="src"; python -m unittest discover -s tests
+python -m compileall src main.py tester
+$env:PYTHONPATH="src;."; python -m unittest discover -s tester/tests -t .
 ```

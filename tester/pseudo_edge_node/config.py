@@ -1,7 +1,7 @@
 # pseudo Edge node 실행 설정 파일입니다.
 # Windows 단일 PC 테스트에서 사용할 RTSP, MQTT, 백업 복구 API 주소를 관리합니다.
 # 실제 Edge node 표준 출력과 같은 형식으로 AI server 입력값을 생성합니다.
-# 환경 변수와 명령행 인자를 조합해 테스트용 포트와 topic을 바꿀 수 있습니다.
+# AI server가 테스트 여부를 알 필요 없도록 일반 Edge node 연결 블록만 출력합니다.
 
 from dataclasses import dataclass
 import os
@@ -15,9 +15,6 @@ DEFAULT_MQTT_TOPIC = "ai-cctv/edge-node/status"
 DEFAULT_BACKUP_RECOVERY_PORT = 8002
 DEFAULT_BACKUP_DIR = "./pseudo_backups"
 DEFAULT_STATUS_INTERVAL_SECONDS = 2.0
-DEFAULT_FRAME_WIDTH = 640
-DEFAULT_FRAME_HEIGHT = 480
-DEFAULT_FRAME_FPS = 30
 
 
 @dataclass(frozen=True)
@@ -33,9 +30,6 @@ class PseudoEdgeNodeConfig:
         backup_recovery_port: 백업 복구 HTTP API 포트입니다.
         backup_dir: pseudo 백업 파일을 저장하거나 생성할 폴더입니다.
         status_interval_seconds: 상태 JSON 발행 주기입니다.
-        frame_width: AI server synthetic 영상 프레임 너비입니다.
-        frame_height: AI server synthetic 영상 프레임 높이입니다.
-        frame_fps: AI server synthetic 영상 FPS입니다.
     반환값:
         PseudoEdgeNodeConfig 인스턴스를 반환합니다.
     """
@@ -48,9 +42,6 @@ class PseudoEdgeNodeConfig:
     backup_recovery_port: int = DEFAULT_BACKUP_RECOVERY_PORT
     backup_dir: str = DEFAULT_BACKUP_DIR
     status_interval_seconds: float = DEFAULT_STATUS_INTERVAL_SECONDS
-    frame_width: int = DEFAULT_FRAME_WIDTH
-    frame_height: int = DEFAULT_FRAME_HEIGHT
-    frame_fps: int = DEFAULT_FRAME_FPS
 
     @classmethod
     def from_environment(cls):
@@ -84,13 +75,6 @@ class PseudoEdgeNodeConfig:
                     DEFAULT_STATUS_INTERVAL_SECONDS,
                 )
             ),
-            frame_width=int(
-                os.getenv("AI_CCTV_PSEUDO_FRAME_WIDTH", DEFAULT_FRAME_WIDTH)
-            ),
-            frame_height=int(
-                os.getenv("AI_CCTV_PSEUDO_FRAME_HEIGHT", DEFAULT_FRAME_HEIGHT)
-            ),
-            frame_fps=int(os.getenv("AI_CCTV_PSEUDO_FRAME_FPS", DEFAULT_FRAME_FPS)),
         )
 
     @property
@@ -135,13 +119,12 @@ class PseudoEdgeNodeConfig:
         인자:
             없음.
         반환값:
-            pseudo Edge node 연결 정보와 PowerShell 환경 변수 예시 문자열을 반환합니다.
+            일반 Edge node 연결 정보와 PowerShell 환경 변수 예시 문자열을 반환합니다.
         """
 
         return "\n".join(
             [
-                "[AI_CCTV Pseudo Edge Node Connection]",
-                "PSEUDO_EDGE=1",
+                "[AI_CCTV Edge Node Connection]",
                 f"EDGE_HOST={self.host}",
                 f"RTSP_URL={self.rtsp_url}",
                 f"MQTT_BROKER={self.mqtt_broker_text}",
@@ -150,18 +133,14 @@ class PseudoEdgeNodeConfig:
                 f"BACKUP_DIR={self.backup_dir}",
                 "",
                 "[AI server PowerShell]",
-                '$env:AI_CCTV_USE_PSEUDO_EDGE="1"',
                 f'$env:AI_CCTV_RTSP_URL="{self.rtsp_url}"',
                 f'$env:AI_CCTV_MQTT_HOST="{self.host}"',
                 f'$env:AI_CCTV_MQTT_PORT="{self.mqtt_port}"',
                 f'$env:AI_CCTV_MQTT_STATUS_TOPIC="{self.mqtt_topic}"',
                 f'$env:AI_CCTV_RECOVERY_SERVER_URL="{self.backup_recovery_url}"',
-                f'$env:AI_CCTV_PSEUDO_FRAME_WIDTH="{self.frame_width}"',
-                f'$env:AI_CCTV_PSEUDO_FRAME_HEIGHT="{self.frame_height}"',
-                f'$env:AI_CCTV_PSEUDO_FRAME_FPS="{self.frame_fps}"',
                 "",
                 "[주의]",
-                "이 실행체는 Windows 테스트용이며 실제 Raspberry Pi 카메라 품질이나 GStreamer 송출을 검증하지 않습니다.",
+                "이 실행체의 RTSP 포트는 연결 검증용 stub이며 실제 영상 프레임을 송출하지 않습니다.",
             ]
         )
 

@@ -61,9 +61,9 @@ from ai_cctv.edge_node.monitoring.resource_monitor_publisher import (
 )
 from ai_cctv.edge_node.startup_info import build_edge_connection_info
 from ai_cctv.edge_node.streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
-from ai_cctv.pseudo_edge_node.backup_recovery import build_pseudo_recovery_archive
-from ai_cctv.pseudo_edge_node.config import PseudoEdgeNodeConfig
-from ai_cctv.pseudo_edge_node.mqtt_broker import build_publish_packet
+from tester.pseudo_edge_node.backup_recovery import build_pseudo_recovery_archive
+from tester.pseudo_edge_node.config import PseudoEdgeNodeConfig
+from tester.pseudo_edge_node.mqtt_broker import build_publish_packet
 
 
 class FakeSmbus:
@@ -414,14 +414,10 @@ class ProjectStructureTest(unittest.TestCase):
             scripts["ai-cctv-ai-server"],
             "ai_cctv.ai_server.server_run:main",
         )
-        self.assertEqual(
-            scripts["ai-cctv-pseudo-edge"],
-            "ai_cctv.pseudo_edge_node.main:main",
-        )
         self.assertEqual(scripts["ai-cctv"], "ai_cctv.ai_server.server_run:main")
         self.assertIn("edge-node", extras)
-        self.assertIn("pseudo-edge-node", extras)
         self.assertIn("ai-server", extras)
+        self.assertNotIn("pseudo-edge-node", extras)
         self.assertIn("smbus2", extras["edge-node"])
         self.assertIn("paho-mqtt", extras["edge-node"])
         self.assertIn("paho-mqtt", extras["ai-server"])
@@ -455,13 +451,16 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(
             Path("src/ai_cctv/edge_node/monitoring/power_status.py").is_file()
         )
-        self.assertTrue(Path("src/ai_cctv/pseudo_edge_node").is_dir())
-        self.assertTrue(Path("src/ai_cctv/pseudo_edge_node/main.py").is_file())
-        self.assertTrue(Path("src/ai_cctv/pseudo_edge_node/mqtt_broker.py").is_file())
-        self.assertTrue(Path("src/ai_cctv/pseudo_edge_node/rtsp_stub.py").is_file())
-        self.assertTrue(
-            Path("src/ai_cctv/pseudo_edge_node/backup_recovery.py").is_file()
-        )
+        self.assertFalse(Path("src/ai_cctv/pseudo_edge_node").exists())
+        self.assertTrue(Path("tester").is_dir())
+        self.assertTrue(Path("tester/README.md").is_file())
+        self.assertTrue(Path("tester/tests/test_project_structure.py").is_file())
+        self.assertTrue(Path("tester/tools/mock_edge_mqtt_publisher.py").is_file())
+        self.assertTrue(Path("tester/pseudo_edge_node").is_dir())
+        self.assertTrue(Path("tester/pseudo_edge_node/main.py").is_file())
+        self.assertTrue(Path("tester/pseudo_edge_node/mqtt_broker.py").is_file())
+        self.assertTrue(Path("tester/pseudo_edge_node/rtsp_stub.py").is_file())
+        self.assertTrue(Path("tester/pseudo_edge_node/backup_recovery.py").is_file())
         self.assertTrue(Path("src/ai_cctv/ai_server").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/server_run.py").is_file())
         self.assertTrue(Path("src/ai_cctv/ai_server/connection").is_dir())
@@ -941,8 +940,8 @@ class ProjectStructureTest(unittest.TestCase):
             "http://192.168.137.2:8002/recover",
         )
 
-    def test_ai_server_parses_pseudo_edge_startup_connection_text(self):
-        """pseudo Edge node 출력값이 AI server 설정의 pseudo flag로 반영되는지 검증합니다.
+    def test_tester_edge_connection_text_is_parsed_as_regular_edge(self):
+        """tester의 Edge 연결 출력값이 일반 Edge 설정으로만 해석되는지 검증합니다.
 
         인자:
             없음.
@@ -962,7 +961,7 @@ class ProjectStructureTest(unittest.TestCase):
             base_config=EdgeConnectionConfig(),
         )
 
-        self.assertTrue(config.use_pseudo_edge)
+        self.assertFalse(hasattr(config, "use_pseudo_edge"))
         self.assertEqual(config.rtsp_url, "rtsp://127.0.0.1:8554/live")
         self.assertEqual(config.mqtt_host, "127.0.0.1")
         self.assertEqual(config.mqtt_port, 1883)
@@ -971,8 +970,8 @@ class ProjectStructureTest(unittest.TestCase):
             "http://127.0.0.1:8002/recover",
         )
 
-    def test_pseudo_edge_config_prints_ai_server_environment(self):
-        """pseudo Edge node 설정 출력이 AI server 환경 변수 예시를 포함하는지 검증합니다.
+    def test_tester_edge_config_does_not_publish_test_flag(self):
+        """tester Edge 설정 출력이 AI server에 테스트 플래그를 노출하지 않는지 검증합니다.
 
         인자:
             없음.
@@ -982,8 +981,9 @@ class ProjectStructureTest(unittest.TestCase):
 
         terminal_text = PseudoEdgeNodeConfig(host="127.0.0.1").to_terminal_text()
 
-        self.assertIn("PSEUDO_EDGE=1", terminal_text)
-        self.assertIn('$env:AI_CCTV_USE_PSEUDO_EDGE="1"', terminal_text)
+        self.assertIn("[AI_CCTV Edge Node Connection]", terminal_text)
+        self.assertNotIn("PSEUDO_EDGE=1", terminal_text)
+        self.assertNotIn("AI_CCTV_USE_PSEUDO_EDGE", terminal_text)
         self.assertIn("RTSP_URL=rtsp://127.0.0.1:8554/live", terminal_text)
 
     def test_pseudo_mqtt_publish_packet_contains_topic_and_payload(self):
@@ -1169,7 +1169,13 @@ class ProjectStructureTest(unittest.TestCase):
         """
 
         self.assertFalse(Path("test_mqtt.py").exists())
-        self.assertTrue(Path("tools/mock_edge_mqtt_publisher.py").is_file())
+        self.assertFalse(Path("tests").exists())
+        self.assertFalse(Path("tools").exists())
+        self.assertTrue(Path("tester/tools/mock_edge_mqtt_publisher.py").is_file())
+        self.assertTrue(Path("tester/README.md").is_file())
+        self.assertTrue(Path("tester/tests/test_project_structure.py").is_file())
+        self.assertTrue(Path("tester/pseudo_edge_node/main.py").is_file())
+        self.assertFalse(Path("src/ai_cctv/pseudo_edge_node").exists())
         self.assertFalse(
             Path(
                 "src/ai_cctv/ai_server/analysis/vlm_person_analyzer_qwen_test.py"

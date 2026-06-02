@@ -1,6 +1,6 @@
 # pseudo Edge node용 RTSP 포트 stub 파일입니다.
 # AI server의 Edge 연결 검증이 RTSP TCP 포트를 확인할 수 있도록 listen socket을 제공합니다.
-# 실제 영상 프레임은 AI server의 pseudo synthetic frame 분기가 생성합니다.
+# 실제 영상 프레임은 송출하지 않으므로 영상 분석 검증에는 실제 Edge node 또는 로컬 카메라를 사용합니다.
 # 일반 RTSP client가 접속하면 OPTIONS, DESCRIBE 같은 기본 요청에 200 OK를 응답합니다.
 
 import socket

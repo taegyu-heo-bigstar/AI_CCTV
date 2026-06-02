@@ -802,7 +802,7 @@
 | `MediaMtxGStreamerCommandBuilder.build_command_args` | GStreamer 백업 및 송출 명령 인자 목록을 생성합니다. | list | 없음 | tee, splitmuxsink, rtmpsink 포함 |
 | `MediaMtxGStreamerCommandBuilder.build_shell_command_text` | 운영자가 확인할 수 있는 GStreamer 명령 문자열을 생성합니다. | 문자열 | 없음 | `--print-command`에서 사용 |
 
-## `tools/mock_edge_mqtt_publisher.py`
+## `tester/tools/mock_edge_mqtt_publisher.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
@@ -818,7 +818,7 @@
 | `_create_mqtt_client` | paho-mqtt 버전에 맞는 MQTT 클라이언트를 생성합니다. | MQTT Client | ImportError | Callback API v1/v2 호환 |
 | `main` | 명령행 인자를 읽고 모의 MQTT publisher를 시작합니다. | None | MQTT 실행 오류 | 임시 테스트 진입점 |
 
-## `tests/test_project_structure.py`
+## `tester/tests/test_project_structure.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|

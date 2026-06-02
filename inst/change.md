@@ -100,7 +100,7 @@ ai_server/alerts/
 
 ## 6. 검증 기준
 
-`tests/test_project_structure.py`는 다음을 확인합니다.
+`tester/tests/test_project_structure.py`는 다음을 확인합니다.
 
 | 검증 항목 | 의미 |
 |---|---|

@@ -100,8 +100,8 @@ src/
 ## 검증
 
 ```bash
-python -m compileall src main.py tests
-$env:PYTHONPATH="src"; python -m unittest discover -s tests
+python -m compileall src main.py tester
+$env:PYTHONPATH="src;."; python -m unittest discover -s tester/tests -t .
 ```
 
 ## SSH 유선 연결 실행 절차

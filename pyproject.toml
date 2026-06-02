@@ -18,8 +18,6 @@ edge-node = [
     "psutil",
     "smbus2",
 ]
-pseudo-edge-node = [
-]
 ai-server = [
     "torch",
     "transformers>=4.51.0",
@@ -53,7 +51,6 @@ ai-cctv-edge = "ai_cctv.edge_node.main:main"
 ai-cctv-edge-monitor = "ai_cctv.edge_node.monitoring.resource_monitor_publisher:main"
 ai-cctv-edge-backup-recovery = "ai_cctv.edge_node.backup_recovery_server:main"
 ai-cctv-ai-server = "ai_cctv.ai_server.server_run:main"
-ai-cctv-pseudo-edge = "ai_cctv.pseudo_edge_node.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

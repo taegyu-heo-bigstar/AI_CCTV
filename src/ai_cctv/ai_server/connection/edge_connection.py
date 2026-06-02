@@ -45,7 +45,6 @@ class EdgeConnectionConfig:
     backup_recovery_url: str = DEFAULT_BACKUP_RECOVERY_URL
     use_local_camera: bool = False
     local_camera_index: int = 0
-    use_pseudo_edge: bool = False
 
     @classmethod
     def from_environment(cls):
@@ -66,7 +65,6 @@ class EdgeConnectionConfig:
                 "AI_CCTV_RECOVERY_SERVER_URL",
                 DEFAULT_BACKUP_RECOVERY_URL,
             ),
-            use_pseudo_edge=_read_bool_env("AI_CCTV_USE_PSEUDO_EDGE", False),
         )
 
     def apply_environment(self):
@@ -86,7 +84,6 @@ class EdgeConnectionConfig:
             os.environ.pop("AI_CCTV_MQTT_PORT", None)
             os.environ.pop("AI_CCTV_MQTT_STATUS_TOPIC", None)
             os.environ.pop("AI_CCTV_RECOVERY_SERVER_URL", None)
-            os.environ.pop("AI_CCTV_USE_PSEUDO_EDGE", None)
             return
 
         os.environ["AI_CCTV_USE_LOCAL_CAMERA"] = "0"
@@ -96,10 +93,6 @@ class EdgeConnectionConfig:
         os.environ["AI_CCTV_MQTT_PORT"] = str(self.mqtt_port)
         os.environ["AI_CCTV_MQTT_STATUS_TOPIC"] = self.mqtt_topic
         os.environ["AI_CCTV_RECOVERY_SERVER_URL"] = self.backup_recovery_url
-        if self.use_pseudo_edge:
-            os.environ["AI_CCTV_USE_PSEUDO_EDGE"] = "1"
-        else:
-            os.environ.pop("AI_CCTV_USE_PSEUDO_EDGE", None)
 
     def video_source(self):
         """메인 영상 입력에 사용할 OpenCV 소스 값을 반환합니다.
@@ -317,12 +310,6 @@ def parse_edge_startup_text(text, base_config=None):
         ),
         use_local_camera=fallback.use_local_camera,
         local_camera_index=fallback.local_camera_index,
-        use_pseudo_edge=_read_bool_value(
-            values.get(
-                "PSEUDO_EDGE",
-                values.get("AI_CCTV_USE_PSEUDO_EDGE", fallback.use_pseudo_edge),
-            )
-        ),
     )
 
 
@@ -376,32 +363,3 @@ def _split_host_port(value, default_host, default_port):
     host, port = value.rsplit(":", 1)
     return host or default_host, port or default_port
 
-
-def _read_bool_env(name, default):
-    """환경 변수 문자열을 bool 값으로 변환합니다.
-
-    인자:
-        name: 읽을 환경 변수 이름입니다.
-        default: 환경 변수가 없을 때 사용할 기본값입니다.
-    반환값:
-        bool 값을 반환합니다.
-    """
-
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return _read_bool_value(value)
-
-
-def _read_bool_value(value):
-    """문자열 또는 bool 값을 bool 값으로 정규화합니다.
-
-    인자:
-        value: 변환할 문자열 또는 bool 값입니다.
-    반환값:
-        참으로 해석되는 값이면 True, 아니면 False를 반환합니다.
-    """
-
-    if isinstance(value, bool):
-        return value
-    return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}

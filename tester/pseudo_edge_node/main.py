@@ -1,5 +1,5 @@
 # pseudo Edge node 명령행 진입점 파일입니다.
-# Windows에서 ai-cctv-pseudo-edge 명령으로 테스트용 Edge node를 실행합니다.
+# Windows에서 python -m tester.pseudo_edge_node.main 명령으로 테스트용 Edge node를 실행합니다.
 # 포트와 topic은 명령행 인자 또는 AI_CCTV_PSEUDO_* 환경 변수로 바꿀 수 있습니다.
 # 실행 직후 AI server 시작 UI에 붙여넣을 연결 정보 블록을 표준 출력에 표시합니다.
 
@@ -27,9 +27,6 @@ def build_argument_parser():
     parser.add_argument("--recovery-port", type=int, help="백업 복구 HTTP 포트")
     parser.add_argument("--backup-dir", help="pseudo 백업 폴더")
     parser.add_argument("--status-interval", type=float, help="MQTT 상태 발행 주기")
-    parser.add_argument("--frame-width", type=int, help="synthetic 영상 너비")
-    parser.add_argument("--frame-height", type=int, help="synthetic 영상 높이")
-    parser.add_argument("--frame-fps", type=int, help="synthetic 영상 FPS")
     return parser
 
 
@@ -52,9 +49,6 @@ def build_config_from_args(args):
         backup_recovery_port=args.recovery_port,
         backup_dir=args.backup_dir,
         status_interval_seconds=args.status_interval,
-        frame_width=args.frame_width,
-        frame_height=args.frame_height,
-        frame_fps=args.frame_fps,
     )
 
 
