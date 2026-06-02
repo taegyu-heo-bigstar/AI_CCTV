@@ -141,6 +141,18 @@ class RtspFrameReceiver:
         os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", DEFAULT_FFMPEG_CAPTURE_OPTIONS)
         self.running = True
         self.last_frame_received_at = time.monotonic()
+        if is_pseudo_rtsp_enabled():
+            self.frame_width = read_int_env("AI_CCTV_PSEUDO_FRAME_WIDTH", 640)
+            self.frame_height = read_int_env("AI_CCTV_PSEUDO_FRAME_HEIGHT", 480)
+            self.fps = read_int_env("AI_CCTV_PSEUDO_FRAME_FPS", 30)
+            self.thread = threading.Thread(
+                target=self._receive_pseudo_loop,
+                name="PseudoRtspFrameReceiver",
+                daemon=True,
+            )
+            self.thread.start()
+            return
+
         self.thread = threading.Thread(
             target=self._receive_loop,
             name="RtspFrameReceiver",
@@ -153,6 +165,33 @@ class RtspFrameReceiver:
             daemon=True,
         )
         self.watchdog_thread.start()
+
+    def _receive_pseudo_loop(self):
+        """pseudo Edge node 모드에서 synthetic RTSP 프레임을 생성합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        try:
+            import numpy as np
+        except ImportError as error:
+            self._set_connection_state(False, f"pseudo frame 생성 실패: {error}")
+            return
+
+        frame_interval = 1.0 / max(1, self.fps)
+        self._set_connection_state(True, "")
+        while self.running:
+            frame = build_pseudo_frame(
+                np,
+                self.frame_width,
+                self.frame_height,
+                self.frame_sequence,
+            )
+            self._store_frame(frame)
+            time.sleep(frame_interval)
 
     def read_new_frame(self, last_sequence=0):
         """이전 순번 이후의 최신 프레임을 반환합니다.
@@ -432,3 +471,92 @@ class RtspFrameReceiver:
             if width > 0 and height > 0:
                 self.frame_width = width
                 self.frame_height = height
+
+
+def is_pseudo_rtsp_enabled():
+    """pseudo Edge node synthetic frame 모드가 켜져 있는지 반환합니다.
+
+    인자:
+        없음.
+    반환값:
+        AI_CCTV_USE_PSEUDO_EDGE가 참이면 True, 아니면 False를 반환합니다.
+    """
+
+    return read_bool_env("AI_CCTV_USE_PSEUDO_EDGE", False)
+
+
+def read_bool_env(name, default):
+    """환경 변수 문자열을 bool 값으로 변환합니다.
+
+    인자:
+        name: 읽을 환경 변수 이름입니다.
+        default: 환경 변수가 없을 때 사용할 기본값입니다.
+    반환값:
+        bool 값을 반환합니다.
+    """
+
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def read_int_env(name, default):
+    """환경 변수 문자열을 int 값으로 변환합니다.
+
+    인자:
+        name: 읽을 환경 변수 이름입니다.
+        default: 환경 변수가 없거나 잘못되었을 때 사용할 기본값입니다.
+    반환값:
+        정수 값을 반환합니다.
+    """
+
+    try:
+        return int(os.getenv(name, default))
+    except (TypeError, ValueError):
+        return default
+
+
+def build_pseudo_frame(np_module, width, height, sequence):
+    """pseudo Edge node 영상 테스트용 BGR 프레임을 생성합니다.
+
+    인자:
+        np_module: numpy 모듈입니다.
+        width: 생성할 프레임 너비입니다.
+        height: 생성할 프레임 높이입니다.
+        sequence: 현재 프레임 순번입니다.
+    반환값:
+        OpenCV BGR 형식의 numpy 배열을 반환합니다.
+    """
+
+    safe_width = max(160, int(width))
+    safe_height = max(120, int(height))
+    frame = np_module.zeros((safe_height, safe_width, 3), dtype=np_module.uint8)
+    frame[:, :, 0] = 30
+    frame[:, :, 1] = (sequence * 3) % 120
+    frame[:, :, 2] = 70
+
+    center_x = int((safe_width - 80) * (0.5 + 0.45 * _sin(sequence / 30.0)))
+    top = max(20, safe_height // 5)
+    bottom = min(safe_height - 20, top + safe_height // 2)
+    frame[top:bottom, center_x : center_x + 50] = (40, 210, 90)
+
+    line_y = safe_height - 40
+    frame[line_y : line_y + 6, 20 : safe_width - 20] = (220, 220, 220)
+    marker_x = 20 + (sequence * 7) % max(1, safe_width - 70)
+    frame[line_y - 18 : line_y + 24, marker_x : marker_x + 24] = (20, 120, 240)
+    return frame
+
+
+def _sin(value):
+    """math.sin 지연 import 결과를 반환합니다.
+
+    인자:
+        value: sin 계산에 사용할 숫자입니다.
+    반환값:
+        sin 계산 결과를 반환합니다.
+    """
+
+    import math
+
+    return math.sin(value)

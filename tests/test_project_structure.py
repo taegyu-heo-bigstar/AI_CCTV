@@ -61,6 +61,9 @@ from ai_cctv.edge_node.monitoring.resource_monitor_publisher import (
 )
 from ai_cctv.edge_node.startup_info import build_edge_connection_info
 from ai_cctv.edge_node.streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
+from ai_cctv.pseudo_edge_node.backup_recovery import build_pseudo_recovery_archive
+from ai_cctv.pseudo_edge_node.config import PseudoEdgeNodeConfig
+from ai_cctv.pseudo_edge_node.mqtt_broker import build_publish_packet
 
 
 class FakeSmbus:
@@ -411,8 +414,13 @@ class ProjectStructureTest(unittest.TestCase):
             scripts["ai-cctv-ai-server"],
             "ai_cctv.ai_server.server_run:main",
         )
+        self.assertEqual(
+            scripts["ai-cctv-pseudo-edge"],
+            "ai_cctv.pseudo_edge_node.main:main",
+        )
         self.assertEqual(scripts["ai-cctv"], "ai_cctv.ai_server.server_run:main")
         self.assertIn("edge-node", extras)
+        self.assertIn("pseudo-edge-node", extras)
         self.assertIn("ai-server", extras)
         self.assertIn("smbus2", extras["edge-node"])
         self.assertIn("paho-mqtt", extras["edge-node"])
@@ -446,6 +454,13 @@ class ProjectStructureTest(unittest.TestCase):
         )
         self.assertTrue(
             Path("src/ai_cctv/edge_node/monitoring/power_status.py").is_file()
+        )
+        self.assertTrue(Path("src/ai_cctv/pseudo_edge_node").is_dir())
+        self.assertTrue(Path("src/ai_cctv/pseudo_edge_node/main.py").is_file())
+        self.assertTrue(Path("src/ai_cctv/pseudo_edge_node/mqtt_broker.py").is_file())
+        self.assertTrue(Path("src/ai_cctv/pseudo_edge_node/rtsp_stub.py").is_file())
+        self.assertTrue(
+            Path("src/ai_cctv/pseudo_edge_node/backup_recovery.py").is_file()
         )
         self.assertTrue(Path("src/ai_cctv/ai_server").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/server_run.py").is_file())
@@ -925,6 +940,88 @@ class ProjectStructureTest(unittest.TestCase):
             config.backup_recovery_url,
             "http://192.168.137.2:8002/recover",
         )
+
+    def test_ai_server_parses_pseudo_edge_startup_connection_text(self):
+        """pseudo Edge node 출력값이 AI server 설정의 pseudo flag로 반영되는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        startup_text = PseudoEdgeNodeConfig(
+            host="127.0.0.1",
+            rtsp_port=8554,
+            mqtt_port=1883,
+            backup_recovery_port=8002,
+        ).to_terminal_text()
+
+        config = parse_edge_startup_text(
+            startup_text,
+            base_config=EdgeConnectionConfig(),
+        )
+
+        self.assertTrue(config.use_pseudo_edge)
+        self.assertEqual(config.rtsp_url, "rtsp://127.0.0.1:8554/live")
+        self.assertEqual(config.mqtt_host, "127.0.0.1")
+        self.assertEqual(config.mqtt_port, 1883)
+        self.assertEqual(
+            config.backup_recovery_url,
+            "http://127.0.0.1:8002/recover",
+        )
+
+    def test_pseudo_edge_config_prints_ai_server_environment(self):
+        """pseudo Edge node 설정 출력이 AI server 환경 변수 예시를 포함하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        terminal_text = PseudoEdgeNodeConfig(host="127.0.0.1").to_terminal_text()
+
+        self.assertIn("PSEUDO_EDGE=1", terminal_text)
+        self.assertIn('$env:AI_CCTV_USE_PSEUDO_EDGE="1"', terminal_text)
+        self.assertIn("RTSP_URL=rtsp://127.0.0.1:8554/live", terminal_text)
+
+    def test_pseudo_mqtt_publish_packet_contains_topic_and_payload(self):
+        """pseudo MQTT broker가 publish packet을 생성하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        packet = build_publish_packet("ai-cctv/edge-node/status", '{"ok": true}')
+
+        self.assertTrue(packet.startswith(b"\x31"))
+        self.assertIn(b"ai-cctv/edge-node/status", packet)
+        self.assertIn(b'{"ok": true}', packet)
+
+    def test_pseudo_backup_recovery_archive_contains_ts_segment(self):
+        """pseudo 백업 복구 응답 ZIP에 TS segment가 포함되는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            archive_bytes = build_pseudo_recovery_archive(
+                "2026-05-31T10:00:00",
+                "2026-05-31T10:00:10",
+                temp_dir,
+            )
+            archive_path = Path(temp_dir) / "pseudo.zip"
+            archive_path.write_bytes(archive_bytes)
+            with zipfile.ZipFile(archive_path) as zip_file:
+                names = zip_file.namelist()
+
+        self.assertEqual(names, ["backup_20260531_100000_00001.ts"])
 
     def test_ai_server_os_guard_accepts_only_windows(self):
         """AI server OS guard가 Windows만 허용하고 다른 OS는 종료하는지 검증합니다.

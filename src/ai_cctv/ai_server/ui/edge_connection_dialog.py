@@ -50,6 +50,7 @@ class EdgeConnectionDialog(QDialog):
         self.validator = validator or EdgeConnectionValidator()
         self.connection_config = None
         self.default_config = EdgeConnectionConfig.from_environment()
+        self.use_pseudo_edge = self.default_config.use_pseudo_edge
         self.setWindowTitle("Edge node 연결 설정")
         self.setMinimumWidth(680)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
@@ -183,6 +184,7 @@ class EdgeConnectionDialog(QDialog):
             return
 
         self._populate_fields(config)
+        self.use_pseudo_edge = config.use_pseudo_edge
         self.edge_mode_radio.setChecked(True)
         self.update_input_mode()
         self.status_label.setText("출력값을 입력 필드에 반영했습니다.")
@@ -270,6 +272,7 @@ class EdgeConnectionDialog(QDialog):
             return EdgeConnectionConfig(
                 use_local_camera=True,
                 local_camera_index=local_camera_index,
+                use_pseudo_edge=False,
             )
 
         try:
@@ -284,6 +287,7 @@ class EdgeConnectionDialog(QDialog):
             mqtt_topic=self.mqtt_topic_input.text().strip(),
             backup_recovery_url=self.backup_recovery_url_input.text().strip(),
             use_local_camera=False,
+            use_pseudo_edge=self.use_pseudo_edge,
         )
 
     def _populate_fields(self, config):
