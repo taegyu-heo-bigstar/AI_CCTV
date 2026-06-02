@@ -32,8 +32,10 @@ from ai_cctv.ai_server.analysis.rtsp_receiver import (
     is_rtsp_source,
 )
 from ai_cctv.ai_server.analysis.video_stream import VideoStream
+from ai_cctv.ai_server.connection import edge_connection as edge_connection_module
 from ai_cctv.ai_server.connection.edge_connection import (
     EdgeConnectionConfig,
+    EdgeConnectionValidator,
     parse_edge_startup_text,
 )
 from ai_cctv.ai_server.recovery.network_recovery_manager import (
@@ -41,7 +43,9 @@ from ai_cctv.ai_server.recovery.network_recovery_manager import (
     NetworkRecoveryManager,
 )
 from ai_cctv.ai_server.runtime.bootstrap import ensure_pyqt5_available
+from ai_cctv.ai_server.runtime import environment_check as environment_check_module
 from ai_cctv.ai_server.runtime.environment_check import (
+    RuntimeEnvironmentChecker,
     RuntimeReadinessReport,
     RuntimeRequirement,
     RuntimeRequirementResult,
@@ -75,7 +79,10 @@ from ai_cctv.edge_node.monitoring.resource_monitor_publisher import (
 )
 from ai_cctv.edge_node.startup_info import build_edge_connection_info, resolve_edge_host
 from ai_cctv.edge_node.streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
-from ai_cctv.edge_node.support_processes import EdgeSupportProcessConfig
+from ai_cctv.edge_node.support_processes import (
+    EdgeSupportProcessConfig,
+    EdgeSupportProcessManager,
+)
 from tester.pseudo_edge_node.backup_recovery import build_pseudo_recovery_archive
 from tester.pseudo_edge_node.config import PseudoEdgeNodeConfig
 
@@ -1049,6 +1056,103 @@ class ProjectStructureTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             resolve_edge_host()
 
+    def test_edge_connection_validator_uses_backup_recovery_health_endpoint(self):
+        """백업 복구 연결 검증이 /recover 대신 /health를 확인하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        requested_urls = []
+
+        class FakeHealthResponse:
+            """백업 복구 health 응답을 흉내 냅니다.
+
+            인자:
+                status: HTTP 상태 코드입니다.
+            반환값:
+                FakeHealthResponse 인스턴스를 반환합니다.
+            """
+
+            def __init__(self, status):
+                """상태 코드를 보관합니다.
+
+                인자:
+                    status: HTTP 상태 코드입니다.
+                반환값:
+                    없음.
+                """
+
+                self.status = status
+
+            def __enter__(self):
+                """with 문 진입 시 자기 자신을 반환합니다.
+
+                인자:
+                    없음.
+                반환값:
+                    FakeHealthResponse 인스턴스를 반환합니다.
+                """
+
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                """with 문 종료 인자를 소비합니다.
+
+                인자:
+                    exc_type: 예외 타입입니다.
+                    exc: 예외 객체입니다.
+                    traceback: traceback 객체입니다.
+                반환값:
+                    False를 반환합니다.
+                """
+
+                return False
+
+        def fake_urlopen(request, timeout):
+            """요청 URL을 기록하고 성공 health 응답을 반환합니다.
+
+            인자:
+                request: urllib Request 객체입니다.
+                timeout: 요청 제한 시간입니다.
+            반환값:
+                FakeHealthResponse 인스턴스를 반환합니다.
+            """
+
+            del timeout
+            requested_urls.append(request.full_url)
+            return FakeHealthResponse(200)
+
+        validator = EdgeConnectionValidator()
+        with patch.object(edge_connection_module, "urlopen", fake_urlopen):
+            errors = validator._validate_backup_recovery(
+                "http://192.168.137.2:8002/recover"
+            )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(requested_urls, ["http://192.168.137.2:8002/health"])
+
+    def test_support_process_manager_waits_for_backup_recovery_health(self):
+        """Edge 보조 프로세스 관리자가 복구 서버 health 준비를 기다리는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        process = Mock()
+        manager = EdgeSupportProcessManager(EdgeSupportProcessConfig())
+        with patch.object(manager, "_start_module", return_value=process) as starter:
+            with patch.object(manager, "_wait_for_http_health", return_value=True) as waiter:
+                result = manager.start_backup_recovery("/home/phoenix/backups")
+
+        self.assertIs(result, process)
+        starter.assert_called_once()
+        waiter.assert_called_once_with("http://127.0.0.1:8002/health")
+
     def test_edge_node_os_guard_accepts_linux_debian_family(self):
         """Edge node OS guard가 Linux Debian 계열만 허용하는지 검증합니다.
 
@@ -1347,6 +1451,33 @@ class ProjectStructureTest(unittest.TestCase):
 
         self.assertFalse(report.is_ready())
         self.assertEqual(report.missing_required()[0].requirement.name, "missing")
+
+    def test_runtime_checker_marks_broken_import_as_missing(self):
+        """패키지 경로가 있어도 실제 import가 실패하면 누락으로 판단하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        requirement = RuntimeRequirement(
+            name="broken-native-package",
+            kind="package",
+            import_name="sys",
+            install_spec="sys",
+        )
+        checker = RuntimeEnvironmentChecker(requirements=[requirement])
+
+        with patch.object(
+            environment_check_module,
+            "_run_package_import_check",
+            return_value="실제 import 실패: sys (DLL error)",
+        ):
+            report = checker.check()
+
+        self.assertFalse(report.is_ready())
+        self.assertIn("DLL error", report.results[0].detail)
 
     def test_runtime_requirements_follow_selected_features(self):
         """시작/분석 요구사항이 선택한 기능에 맞게 분리되는지 검증합니다.

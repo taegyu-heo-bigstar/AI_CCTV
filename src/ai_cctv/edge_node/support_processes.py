@@ -7,6 +7,8 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from ..config import get_env_bool, get_env_int
 
@@ -91,7 +93,15 @@ class EdgeSupportProcessManager:
         args = ["--backup-dir", str(backup_dir)]
         if self.config.suppress_startup_info:
             args.append("--no-startup-info")
-        return self._start_module("ai_cctv.edge_node.backup_recovery_server", args)
+        process = self._start_module("ai_cctv.edge_node.backup_recovery_server", args)
+        recovery_port = get_env_int("AI_CCTV_BACKUP_RECOVERY_PORT", 8002)
+        health_url = f"http://127.0.0.1:{recovery_port}/health"
+        if self._wait_for_http_health(health_url):
+            return process
+
+        if process.poll() is not None:
+            raise RuntimeError("Edge node 백업 복구 서버가 시작 직후 종료되었습니다.")
+        raise RuntimeError("Edge node 백업 복구 서버 health 확인에 실패했습니다.")
 
     def start_resource_monitor(self, monitored_process_id=None):
         """MQTT 자원 상태 publisher를 하위 프로세스로 실행합니다.
@@ -169,6 +179,27 @@ class EdgeSupportProcessManager:
                 with socket.create_connection((host, port), timeout=0.2):
                     return True
             except OSError:
+                time.sleep(0.1)
+        return False
+
+    def _wait_for_http_health(self, health_url, timeout_seconds=5.0):
+        """지정한 HTTP health endpoint가 200을 반환할 때까지 대기합니다.
+
+        인자:
+            health_url: 확인할 HTTP health endpoint URL입니다.
+            timeout_seconds: 최대 대기 시간입니다.
+        반환값:
+            HTTP 200 응답을 받으면 True, 제한 시간까지 실패하면 False를 반환합니다.
+        """
+
+        deadline = time.monotonic() + timeout_seconds
+        request = Request(health_url, method="GET")
+        while time.monotonic() < deadline:
+            try:
+                with urlopen(request, timeout=0.5) as response:
+                    if response.status == 200:
+                        return True
+            except (HTTPError, OSError, URLError, TimeoutError):
                 time.sleep(0.1)
         return False
 

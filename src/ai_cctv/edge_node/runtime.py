@@ -7,7 +7,7 @@ import subprocess
 
 from .local_backup import LocalBackupConfig
 from .mediamtx import MediaMtxConfig, MediaMtxInstaller, MediaMtxProcessManager
-from .startup_info import print_edge_connection_info
+from .startup_info import build_edge_connection_info, print_edge_connection_info
 from .streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
 from .support_processes import build_support_process_manager_from_environment
 
@@ -79,7 +79,9 @@ class EdgeNodeRuntime:
             GStreamer 프로세스 종료 코드를 반환합니다.
         """
 
-        print_edge_connection_info(backup_dir=str(self.backup_config.directory))
+        connection_info = build_edge_connection_info(
+            backup_dir=str(self.backup_config.directory)
+        )
         self.backup_config.ensure_directory()
         self.mediamtx_installer.ensure_installed()
         self.mediamtx_process_manager.start()
@@ -87,6 +89,7 @@ class EdgeNodeRuntime:
         self.support_process_manager.start_backup_recovery(
             backup_dir=str(self.backup_config.directory)
         )
+        print_edge_connection_info(connection_info=connection_info)
         self._install_signal_handlers()
 
         try:

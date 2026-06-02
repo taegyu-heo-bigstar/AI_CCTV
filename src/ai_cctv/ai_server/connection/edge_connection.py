@@ -6,7 +6,7 @@
 from dataclasses import dataclass
 import socket
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 from urllib.request import Request, urlopen
 
 from ...config import (
@@ -276,18 +276,17 @@ class EdgeConnectionValidator:
         if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
             return ["BACKUP_RECOVERY_URL은 http:// 또는 https:// 형식이어야 합니다."]
 
-        request = Request(backup_recovery_url, method="GET")
+        health_url = _build_backup_recovery_health_url(backup_recovery_url)
+        request = Request(health_url, method="GET")
         try:
             with urlopen(request, timeout=self.http_timeout_seconds) as response:
-                if response.status < 500:
+                if response.status == 200:
                     return []
-                return [f"백업 복구 서버가 오류 응답을 반환했습니다: HTTP {response.status}"]
+                return [f"백업 복구 health 확인 실패: HTTP {response.status}"]
         except HTTPError as error:
-            if error.code < 500:
-                return []
-            return [f"백업 복구 서버가 오류 응답을 반환했습니다: HTTP {error.code}"]
+            return [f"백업 복구 health 확인 실패: HTTP {error.code}"]
         except (OSError, URLError, TimeoutError) as error:
-            return [f"백업 복구 API에 연결할 수 없습니다: {backup_recovery_url} ({error})"]
+            return [f"백업 복구 API에 연결할 수 없습니다: {health_url} ({error})"]
 
 
 def parse_edge_startup_text(text, base_config=None):
@@ -356,6 +355,26 @@ def _normalize_key(key):
     """
 
     return key.strip().replace("$env:", "").replace("$Env:", "")
+
+
+def _build_backup_recovery_health_url(backup_recovery_url):
+    """백업 복구 URL에서 health check URL을 생성합니다.
+
+    인자:
+        backup_recovery_url: /recover를 포함할 수 있는 백업 복구 API URL입니다.
+    반환값:
+        같은 scheme/host를 사용하는 /health URL 문자열을 반환합니다.
+    """
+
+    parsed_url = urlparse(backup_recovery_url)
+    return urlunparse((
+        parsed_url.scheme,
+        parsed_url.netloc,
+        "/health",
+        "",
+        "",
+        "",
+    ))
 
 
 def _split_host_port(value, default_host, default_port):

@@ -59,7 +59,7 @@ python -m ai_cctv.ai_server.monitoring.resource_monitor_client
 
 통합 실행에서는 broker가 Edge node 유선 IP의 `1883` 포트로 외부에 열리고, 상태 publisher는 같은 Edge node 내부의 `127.0.0.1:1883`로 접속합니다. AI server는 Edge node 표준 출력의 `MQTT_BROKER` 값을 그대로 사용합니다.
 
-네트워크 단절 후 누락 구간 영상을 복구하려면 Edge node에서 FastAPI 기반 백업 복구 서버를 실행합니다. 통합 실행에서는 자동으로 실행되며, 개별 점검 시에는 다음 명령을 직접 사용할 수 있습니다.
+네트워크 단절 후 누락 구간 영상을 복구하려면 Edge node에서 FastAPI 기반 백업 복구 서버를 실행합니다. 통합 실행에서는 자동으로 실행되며, AI server는 `/health`가 HTTP 200을 반환할 때만 복구 서버 연결을 성공으로 판단합니다. 개별 점검 시에는 다음 명령을 직접 사용할 수 있습니다.
 
 ```bash
 ai-cctv-edge-backup-recovery
@@ -120,7 +120,7 @@ $env:PYTHONPATH="src;."; python -m unittest discover -s tester/tests -t .
 
 ## SSH 유선 연결 실행 절차
 
-라즈베리 파이를 Windows AI server와 유선 Ethernet으로 연결하고 SSH 터미널에서 실행하면, Edge node 프로그램은 시작 직후 표준 출력으로 AI server에 입력할 값을 출력합니다. 실행 전에 `.env`의 `AI_CCTV_EDGE_HOST`를 라즈베리 파이의 유선 IP로 지정해야 합니다.
+라즈베리 파이를 Windows AI server와 유선 Ethernet으로 연결하고 SSH 터미널에서 실행하면, Edge node 프로그램은 MediaMTX, MQTT broker, 백업 복구 서버 준비를 확인한 뒤 표준 출력으로 AI server에 입력할 값을 출력합니다. 실행 전에 `.env`의 `AI_CCTV_EDGE_HOST`를 라즈베리 파이의 유선 IP로 지정해야 합니다.
 
 Edge node 진입점은 Linux에서만 실행됩니다. `/etc/os-release`로 배포판을 확인할 수 있는 경우 Debian, Raspbian, Ubuntu 계열만 허용하고, Windows나 macOS에서는 오류 메시지를 출력한 뒤 종료합니다.
 

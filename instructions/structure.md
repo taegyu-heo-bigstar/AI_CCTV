@@ -345,7 +345,7 @@
 | `RuntimeEnvironmentChecker.__init__` | 점검할 요구사항과 프로젝트 루트 경로를 초기화합니다. | None | 없음 | 테스트용 요구사항 주입 가능 |
 | `RuntimeEnvironmentChecker.check` | 모든 요구사항을 점검해 준비 상태 보고서를 반환합니다. | RuntimeReadinessReport | 없음 | 시작 시 자동 호출 |
 | `RuntimeEnvironmentChecker._check_requirement` | 요구사항 종류에 맞는 점검 함수를 호출합니다. | RuntimeRequirementResult | 알 수 없는 종류 결과 | 내부 함수 |
-| `RuntimeEnvironmentChecker._check_package` | Python 패키지 import 가능 여부와 버전을 확인합니다. | RuntimeRequirementResult | 패키지 누락 결과 | `importlib.util.find_spec` 사용 |
+| `RuntimeEnvironmentChecker._check_package` | Python 패키지 경로와 실제 import 가능 여부, 버전을 확인합니다. | RuntimeRequirementResult | 패키지 누락 또는 import 실패 결과 | `find_spec` 후 별도 Python import 검증 |
 | `RuntimeEnvironmentChecker._check_yolo_model` | YOLO 모델 파일 존재 여부를 확인합니다. | RuntimeRequirementResult | 모델 파일 누락 결과 | `AI_CCTV_YOLO_MODEL_PATH` 반영 |
 | `RuntimeEnvironmentChecker._check_qwen_model` | Qwen 모델 config가 HuggingFace 캐시에 있는지 확인합니다. | RuntimeRequirementResult | 캐시 누락 결과 | 네트워크 없이 local cache 확인 |
 | `RuntimeInstaller` | 누락된 패키지 설치와 모델 다운로드를 수행합니다. | RuntimeInstaller 객체 | 없음 | UI에서 O 선택 시 사용 |
@@ -360,6 +360,7 @@
 | `build_default_requirements` | AI server 기본 실행 요구사항 목록을 생성합니다. | RuntimeRequirement 목록 | 없음 | 시작 요구사항과 기본 YOLO 요구사항 조합 |
 | `_deduplicate_requirements` | 중복된 RuntimeRequirement 항목을 제거합니다. | RuntimeRequirement 목록 | 없음 | 내부 함수 |
 | `_read_distribution_version` | 설치 식별자에서 패키지 버전을 조회합니다. | 버전 문자열 또는 빈 문자열 | 없음 | 내부 함수 |
+| `_run_package_import_check` | 별도 Python 프로세스에서 실제 모듈 import 가능 여부를 확인합니다. | 빈 문자열 | import 실패 또는 timeout 메시지 | DLL 초기화 실패 감지 |
 
 ## `src/ai_cctv/ai_server/connection/__init__.py`
 
@@ -386,10 +387,11 @@
 | `EdgeConnectionValidator._validate_local_camera` | Windows 로컬 카메라 인덱스를 OpenCV로 열 수 있는지 검증합니다. | 오류 목록 | 없음 | 로컬 카메라 모드 전용 |
 | `EdgeConnectionValidator._validate_rtsp` | RTSP URL 형식과 TCP 포트 접근 가능 여부를 검증합니다. | 오류 목록 | 없음 | 내부 함수 |
 | `EdgeConnectionValidator._validate_mqtt` | MQTT broker TCP 포트 접근 가능 여부를 검증합니다. | 오류 목록 | 없음 | 내부 함수 |
-| `EdgeConnectionValidator._validate_backup_recovery` | 백업 복구 HTTP endpoint 접근 가능 여부를 검증합니다. | 오류 목록 | 없음 | HTTP 4xx는 연결 성공으로 판단 |
+| `EdgeConnectionValidator._validate_backup_recovery` | 백업 복구 서버의 `/health` endpoint 접근 가능 여부를 검증합니다. | 오류 목록 | 없음 | HTTP 200만 연결 성공으로 판단 |
 | `parse_edge_startup_text` | Edge node 표준 출력 블록에서 AI server 연결 설정을 추출합니다. | EdgeConnectionConfig 객체 | ValueError | 출력 블록 붙여넣기 지원 |
 | `_parse_key_value_lines` | 여러 줄 문자열에서 KEY=VALUE 형식의 값을 추출합니다. | dict | 없음 | 내부 함수 |
 | `_normalize_key` | 환경 변수 또는 출력 항목 이름을 내부 키로 정규화합니다. | 문자열 | 없음 | PowerShell `$env:` 제거 |
+| `_build_backup_recovery_health_url` | 백업 복구 `/recover` URL에서 같은 호스트의 `/health` URL을 생성합니다. | URL 문자열 | URL 파싱 실패 | 내부 함수 |
 | `_split_host_port` | host:port 문자열을 호스트와 포트로 분리합니다. | tuple | 없음 | MQTT_BROKER 해석 |
 
 ## `src/ai_cctv/ai_server/recovery/network_recovery_manager.py`
@@ -651,11 +653,17 @@
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
+| `RuntimeInstallWorker` | 누락 런타임 설치와 재검사를 백그라운드에서 수행합니다. | RuntimeInstallWorker 객체 | error_ready 신호 | QThread |
+| `RuntimeInstallWorker.__init__` | 백그라운드 설치 작업에 필요한 점검기, 설치기, 누락 항목을 보관합니다. | None | 없음 | parent 주입 가능 |
+| `RuntimeInstallWorker.run` | 자동 설치와 재검사를 수행하고 성공/실패 신호를 발생시킵니다. | success_ready 신호 | error_ready 신호 | UI thread 차단 방지 |
 | `RuntimeReadinessDialog` | AI server 실행 전 누락된 패키지와 모델을 보여주고 자동 설치 여부를 묻습니다. | RuntimeReadinessDialog 객체 | 없음 | QDialog |
 | `RuntimeReadinessDialog.__init__` | 런타임 점검 보고서, 점검기, 설치기와 UI 상태를 초기화합니다. | None | 없음 | 설치 재시도 후 재점검 가능 |
 | `RuntimeReadinessDialog._build_ui` | 누락 항목 설명, 점검 결과, O/X 버튼 UI를 구성합니다. | None | PyQt 위젯 생성 오류 | 설치 동의 흐름 담당 |
 | `RuntimeReadinessDialog._create_button` | 런타임 준비 대화상자의 버튼을 생성합니다. | QPushButton | 없음 | 공통 버튼 스타일 |
-| `RuntimeReadinessDialog.install_and_recheck` | 누락 항목을 설치한 뒤 다시 점검하고 준비 완료 시 대화상자를 닫습니다. | None | 설치 RuntimeError | O 버튼 동작 |
+| `RuntimeReadinessDialog.install_and_recheck` | 누락 항목 설치 worker를 시작하고 버튼을 대기 상태로 전환합니다. | None | worker 시작 오류 | O 버튼 동작 |
+| `RuntimeReadinessDialog._handle_install_success` | 자동 설치 성공 후 재검사 결과를 UI에 반영합니다. | None | 없음 | 준비 완료 시 accept |
+| `RuntimeReadinessDialog._handle_install_error` | 자동 설치 실패 메시지를 표시하고 버튼을 복구합니다. | None | QMessageBox 표시 오류 | 실패 후 재시도 가능 |
+| `RuntimeReadinessDialog._clear_install_worker` | 완료된 자동 설치 worker 참조를 정리합니다. | None | 없음 | QThread 생명주기 정리 |
 | `RuntimeReadinessDialog._build_report_text` | 런타임 준비 상태 보고서를 표시 문자열로 변환합니다. | 문자열 | 없음 | 상세 점검 결과 표시 |
 | `ensure_runtime_readiness` | 런타임 요구사항을 점검하고 누락 시 설치 확인 대화상자를 실행합니다. | bool | 설치 실패 또는 사용자 거부 | `main_window.main`에서 호출 |
 
@@ -728,7 +736,8 @@
 | `BackupRecoveryService._parse_iso_datetime` | ISO 8601 시각 문자열을 datetime으로 변환합니다. | datetime | ValueError | 입력 검증 |
 | `BackupRecoveryService._build_archive` | 대상 TS 파일 목록을 임시 ZIP 파일로 묶습니다. | BackupRecoveryArchive | zip 생성 오류 | 전송 후 삭제 대상 |
 | `remove_temp_file` | 파일 전송 완료 후 임시 ZIP 파일을 삭제합니다. | None | 삭제 오류 로그 | FastAPI BackgroundTasks에서 호출 |
-| `create_backup_recovery_app` | BackupRecoveryService를 사용하는 FastAPI 앱을 생성합니다. | FastAPI app | ImportError | `/recover` endpoint 등록 |
+| `create_backup_recovery_app` | BackupRecoveryService를 사용하는 FastAPI 앱을 생성합니다. | FastAPI app | ImportError | `/health`, `/recover` endpoint 등록 |
+| `create_backup_recovery_app.health_check` | 백업 복구 서버가 요청을 받을 준비가 되었는지 반환합니다. | JSON 상태 딕셔너리 | 없음 | 연결 검증용 endpoint |
 | `create_backup_recovery_app.recover_backups` | 요청 시간대와 겹치는 백업 TS 파일을 ZIP으로 반환합니다. | FileResponse | HTTPException | start/end query 사용 |
 | `build_backup_recovery_app` | 환경 설정을 반영한 FastAPI 백업 복구 앱을 생성합니다. | FastAPI app | ImportError | backup_dir 주입 |
 | `main` | OS guard를 통과한 뒤 환경 변수 기준으로 Edge node 백업 복구 FastAPI 서버를 실행합니다. | 반환 없음 | SystemExit, uvicorn 실행 오류 | `ai-cctv-edge-backup-recovery` 진입점 |
@@ -795,11 +804,12 @@
 | `EdgeSupportProcessManager` | MQTT broker, MQTT 상태 publisher, 백업 복구 API 하위 프로세스를 관리합니다. | EdgeSupportProcessManager 객체 | 없음 | GStreamer와 같은 생명주기 |
 | `EdgeSupportProcessManager.__init__` | 보조 프로세스 관리자 상태를 초기화합니다. | None | 없음 | 설정 주입 가능 |
 | `EdgeSupportProcessManager.start_mqtt_broker` | Edge node 내장 MQTT broker를 하위 프로세스로 실행합니다. | Popen 또는 None | 실행 오류 | 포트 open 대기 |
-| `EdgeSupportProcessManager.start_backup_recovery` | 백업 복구 FastAPI 서버를 하위 프로세스로 실행합니다. | Popen 또는 None | 실행 오류 | 백업 경로 환경 변수 전달 |
+| `EdgeSupportProcessManager.start_backup_recovery` | 백업 복구 FastAPI 서버를 하위 프로세스로 실행하고 health 준비를 확인합니다. | Popen 또는 None | 실행 오류 | 백업 경로 환경 변수 전달 |
 | `EdgeSupportProcessManager.start_resource_monitor` | MQTT 자원 상태 publisher를 하위 프로세스로 실행합니다. | Popen 또는 None | 실행 오류 | GStreamer PID를 감시 대상으로 전달 |
 | `EdgeSupportProcessManager.stop` | 실행한 보조 프로세스를 종료합니다. | None | 프로세스 종료 오류 | terminate 후 kill fallback |
 | `EdgeSupportProcessManager._start_module` | Python 모듈을 python -m 하위 프로세스로 실행합니다. | Popen | 실행 오류 | 내부 함수 |
 | `EdgeSupportProcessManager._wait_for_tcp_port` | 지정한 TCP 포트가 연결 가능한 상태가 될 때까지 대기합니다. | bool | 없음 | MQTT broker readiness 확인 |
+| `EdgeSupportProcessManager._wait_for_http_health` | 지정한 HTTP health endpoint가 200을 반환할 때까지 대기합니다. | bool | 없음 | 백업 복구 서버 readiness 확인 |
 | `EdgeSupportProcessManager._build_environment` | 보조 프로세스용 환경 변수를 생성합니다. | dict | 없음 | 중복 시작 정보 출력 억제 |
 | `build_support_process_config_from_environment` | 환경 변수 기준으로 보조 프로세스 실행 설정을 생성합니다. | EdgeSupportProcessConfig | 없음 | 서비스별 on/off 지원 |
 | `build_support_process_manager_from_environment` | 환경 변수 기준으로 보조 프로세스 관리자를 생성합니다. | EdgeSupportProcessManager | 없음 | 런타임 기본값 |

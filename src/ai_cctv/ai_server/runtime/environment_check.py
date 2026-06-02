@@ -14,6 +14,7 @@ from ...config import get_env_value
 
 DEFAULT_YOLO_MODEL_PATH = "yolo26s.pt"
 DEFAULT_QWEN_MODEL_ID = "Qwen/Qwen2.5-VL-3B-Instruct"
+DEFAULT_PACKAGE_IMPORT_TIMEOUT_SECONDS = 60.0
 
 
 @dataclass(frozen=True)
@@ -181,6 +182,13 @@ class RuntimeEnvironmentChecker:
 
         if spec is None:
             return RuntimeRequirementResult(requirement, False, "패키지를 찾을 수 없습니다.")
+
+        import_error = _run_package_import_check(
+            requirement.import_name,
+            timeout_seconds=DEFAULT_PACKAGE_IMPORT_TIMEOUT_SECONDS,
+        )
+        if import_error:
+            return RuntimeRequirementResult(requirement, False, import_error)
 
         version = _read_distribution_version(requirement.install_spec)
         detail = f"설치됨{f' ({version})' if version else ''}"
@@ -468,3 +476,39 @@ def _read_distribution_version(install_spec):
         return importlib.metadata.version(aliases.get(normalized_name, normalized_name))
     except importlib.metadata.PackageNotFoundError:
         return ""
+
+
+def _run_package_import_check(import_name, timeout_seconds=DEFAULT_PACKAGE_IMPORT_TIMEOUT_SECONDS):
+    """별도 Python 프로세스에서 실제 import 가능 여부를 확인합니다.
+
+    인자:
+        import_name: importlib.import_module로 불러올 모듈 이름입니다.
+        timeout_seconds: import 검증 제한 시간입니다.
+    반환값:
+        import가 가능하면 빈 문자열을, 실패하면 오류 설명 문자열을 반환합니다.
+    """
+
+    script = (
+        "import importlib; "
+        f"importlib.import_module({import_name!r}); "
+        "print('import ok')"
+    )
+    command = [sys.executable, "-c", script]
+    try:
+        completed = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=timeout_seconds,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return f"실제 import 제한 시간 초과: {import_name} ({timeout_seconds:.0f}s)"
+
+    if completed.returncode == 0:
+        return ""
+
+    error_text = (completed.stderr or completed.stdout or "").strip()
+    if not error_text:
+        error_text = f"종료 코드 {completed.returncode}"
+    return f"실제 import 실패: {import_name} ({error_text})"

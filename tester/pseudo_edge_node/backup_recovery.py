@@ -1,6 +1,6 @@
 # pseudo Edge node 백업 복구 HTTP 서버 파일입니다.
 # AI server의 BACKUP_RECOVERY_URL 검증과 복구 ZIP 요청을 Windows에서 테스트하게 합니다.
-# /recover endpoint는 start/end query를 받으면 테스트용 TS 파일이 담긴 ZIP을 반환합니다.
+# /health endpoint는 연결 검증용 상태를, /recover endpoint는 테스트 ZIP을 반환합니다.
 # 실제 TS 인코딩 품질과 ffmpeg 병합 성공 여부는 라즈베리파이 Edge node에서 별도로 검증해야 합니다.
 
 from datetime import datetime
@@ -27,7 +27,7 @@ class PseudoBackupRecoveryRequestHandler(BaseHTTPRequestHandler):
     """
 
     def do_GET(self):
-        """GET 요청을 처리하고 /recover 응답을 반환합니다.
+        """GET 요청을 처리하고 /health 또는 /recover 응답을 반환합니다.
 
         인자:
             없음.
@@ -36,6 +36,10 @@ class PseudoBackupRecoveryRequestHandler(BaseHTTPRequestHandler):
         """
 
         parsed_url = urlparse(self.path)
+        if parsed_url.path == "/health":
+            self._send_json(200, {"status": "ok"})
+            return
+
         if parsed_url.path != "/recover":
             self._send_json(404, {"error": "unknown endpoint"})
             return

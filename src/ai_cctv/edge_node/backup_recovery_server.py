@@ -1,6 +1,6 @@
 # Edge node 백업 복구 FastAPI 서버 파일입니다.
 # AI server가 요청한 장애 시간대와 겹치는 로컬 TS 백업을 ZIP으로 묶어 반환합니다.
-# FastAPI 엔드포인트는 /recover이며 start/end 쿼리 값을 사용합니다.
+# FastAPI 엔드포인트는 /health와 /recover이며 /recover는 start/end 쿼리 값을 사용합니다.
 # 기본 포트는 8002이며 AI_CCTV_BACKUP_RECOVERY_PORT로 변경할 수 있습니다.
 
 import argparse
@@ -207,6 +207,18 @@ def create_backup_recovery_app(service):
     from fastapi.responses import FileResponse, JSONResponse
 
     app = FastAPI(title="AI CCTV Edge Backup Recovery Server")
+
+    @app.get("/health")
+    def health_check():
+        """백업 복구 서버가 요청을 받을 준비가 되었는지 반환합니다.
+
+        인자:
+            없음.
+        반환값:
+            서버 상태를 담은 JSON 딕셔너리를 반환합니다.
+        """
+
+        return {"status": "ok"}
 
     @app.get("/recover")
     def recover_backups(start: str, end: str, background_tasks: BackgroundTasks):
