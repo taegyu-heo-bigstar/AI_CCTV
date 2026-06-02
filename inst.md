@@ -1,134 +1,160 @@
-# rtsp-review 브랜치 실행 안내
+# AI_CCTV rtsp-review 브랜치 설치 및 실행 안내
 
-이 문서는 원격 브랜치 `rtsp-review` 기준 실행 방법과 사용 이유를 정리한 안내서입니다.
-사용자가 입력한 `rtsp-reivew`는 오타로 보이며, 현재 원격 저장소의 실제 브랜치명은 `rtsp-review`입니다.
+이 문서는 AI_CCTV 프로젝트를 처음 보는 사람이 `rtsp-review` 브랜치에서 필요한 파일, 패키지, 설치 순서, 실행 방법을 따라 할 수 있도록 정리한 문서입니다.
 
-## 1. 브랜치 목적
+`rtsp-review` 브랜치의 목표는 라즈베리 파이 카메라 영상을 RTSP로 송출하고, 윈도우 데스크탑 관제 프로그램에서 해당 영상을 수신해 AI 분석과 복구 기능을 테스트하는 것입니다.
 
-`rtsp-review` 브랜치는 라즈베리 파이 카메라 영상을 GStreamer와 MediaMTX로 송출하고, 윈도우 데스크탑 관제 프로그램이 RTSP 스트림을 수신하는 방식을 검증하기 위한 브랜치입니다.
+## 1. 전체 구성
 
-핵심 목적은 다음과 같습니다.
+프로젝트는 크게 두 장치로 나뉩니다.
 
-| 목적 | 설명 |
-| --- | --- |
-| RTSP 송출 검증 | 라즈베리 파이에서 카메라 영상을 네트워크로 실시간 송출합니다. |
-| 윈도우 수신 검증 | 윈도우 데스크탑 GUI에서 RTSP 주소를 입력해 영상을 수신합니다. |
-| 장애 복구 검증 | 네트워크 장애 구간에 대해 라즈베리 파이 로컬 백업 영상을 요청해 복구합니다. |
-| 자원 모니터링 검증 | FastAPI 서버를 통해 CPU, 메모리, 프로세스 사용률을 JSON으로 조회합니다. |
+| 장치 | 역할 | 실행 위치 |
+| --- | --- | --- |
+| 라즈베리 파이 | 카메라 영상 촬영, RTSP 송출, 장애 구간 백업 저장, 백업 복구 API 제공 | `rtspv1.0/` |
+| 윈도우 데스크탑 | RTSP 영상 수신, GUI 표시, AI 분석, 장애 구간 복구 요청 | `클라이언트 코드/` |
 
-## 2. 이 구조를 사용하는 이유
-
-### 2.1 GStreamer + MediaMTX를 쓰는 이유
-
-라즈베리 파이에서 카메라 영상을 직접 RTSP로 내보내는 방식은 플러그인, 패드 연결, 하드웨어 인코딩 상태에 따라 불안정해질 수 있습니다.
-이 브랜치의 `rtspv1.0/stream_and_record.sh`는 다음 구조를 사용합니다.
+기본 영상 흐름은 다음과 같습니다.
 
 ```text
 라즈베리 파이 카메라
-  -> GStreamer libcamerasrc
-  -> H.264 인코딩
-  -> tee 분기
-      -> 10초 단위 로컬 TS 백업
-      -> RTMP로 로컬 MediaMTX에 송출
-  -> MediaMTX가 RTSP로 재송출
+  -> GStreamer
+  -> MediaMTX
+  -> rtsp://라즈베리파이IP:8554/live
+  -> 윈도우 관제 GUI
 ```
 
-즉, GStreamer는 카메라 캡처와 인코딩에 집중하고, MediaMTX는 네트워크 스트림 서버 역할을 맡습니다.
-이렇게 나누면 RTSP 서버 구현을 직접 유지하지 않아도 되고, 수신 측에서는 일반적인 `rtsp://IP:8554/live` 주소만 사용하면 됩니다.
+복구 기능을 켜면 다음 흐름도 추가됩니다.
 
-### 2.2 10초 단위 백업을 쓰는 이유
+```text
+라즈베리 파이 로컬 백업 파일
+  -> FastAPI 복구 서버
+  -> http://라즈베리파이IP:8002/recover
+  -> 윈도우 관제 GUI가 ZIP 다운로드
+  -> ffmpeg로 복구 영상 병합
+```
 
-`stream_and_record.sh`는 `splitmuxsink`를 사용해 영상을 10초 단위 `.ts` 파일로 저장합니다.
-네트워크가 끊긴 구간이 발생하면 AI 서버는 장애 시작 시각과 복구 시각을 기준으로 라즈베리 파이에 백업 파일을 요청할 수 있습니다.
+## 2. 주요 파일과 역할
 
-짧은 조각 단위로 저장하는 이유는 다음과 같습니다.
+| 파일 | 실행 장치 | 역할 | 필요한 이유 |
+| --- | --- | --- | --- |
+| `requirements.txt` | 윈도우 데스크탑 | GUI, AI 분석, RTSP 수신, 복구 요청에 필요한 파이썬 패키지 목록 | 윈도우 관제 프로그램 실행에 필요합니다. |
+| `rtspv1.0/requirements.txt` | 라즈베리 파이 | RTSP 수신 테스트와 FastAPI 복구 서버에 필요한 최소 패키지 목록 | 라즈베리 파이에서 복구 API를 실행할 때 필요합니다. |
+| `rtspv1.0/stream_and_record.sh` | 라즈베리 파이 | 카메라 영상을 GStreamer로 읽고 MediaMTX를 통해 RTSP로 송출하며, 동시에 10초 단위 백업을 저장 | 실제 엣지 노드 송출 테스트의 핵심 파일입니다. |
+| `rtspv1.0/backup_api_server.py` | 라즈베리 파이 | 장애 시간 구간에 해당하는 백업 `.ts` 파일을 ZIP으로 반환하는 FastAPI 서버 | 네트워크 장애 후 빠진 영상을 복구하기 위해 필요합니다. |
+| `rtspv1.0/rtsp_receiver.py` | 테스트 장치 | RTSP 스트림을 단독으로 받아 보는 테스트 코드 | GUI 실행 전 RTSP 송출이 정상인지 확인할 수 있습니다. |
+| `클라이언트 코드/gui.py` | 윈도우 데스크탑 | 관제 GUI 메인 실행 파일 | 실제 윈도우 관제 프로그램의 진입점입니다. |
+| `클라이언트 코드/settings_window.py` | 윈도우 데스크탑 | 카메라 소스, RTSP 주소 등 설정 UI | 사용자가 RTSP 주소를 입력할 때 사용됩니다. |
+| `클라이언트 코드/video_stream.py` | 윈도우 데스크탑 | 로컬 카메라 또는 RTSP 입력을 공통 영상 스트림으로 처리 | GUI가 영상 소스 종류에 상관없이 프레임을 읽도록 합니다. |
+| `클라이언트 코드/rtsp_receiver.py` | 윈도우 데스크탑 | RTSP 연결, 재연결, 프레임 수신 watchdog 처리 | RTSP 연결이 끊기거나 멈췄을 때 GUI가 오래 멈추는 문제를 줄입니다. |
+| `클라이언트 코드/network_recovery_manager.py` | 윈도우 데스크탑 | 라즈베리 파이에 복구 API 요청을 보내고 ZIP을 받아 ffmpeg로 병합 | 장애 구간 복구 영상을 만들기 위해 필요합니다. |
+| `서버 코드/resource_monitor_server.py` | 선택 실행 | CPU, 메모리, 프로세스 사용량을 JSON으로 반환하는 FastAPI 서버 | 자원 모니터링 기능 테스트에 사용합니다. |
+| `클라이언트 코드/resource_monitor_client.py` | 선택 실행 | 자원 모니터링 서버에 HTTP 요청을 보내 JSON을 받음 | 모니터링 서버 응답 확인에 사용합니다. |
+| `rtsp/sender.py`, `rtsp/receiver.py` | 테스트 장치 | 단순 RTSP 송수신 프로토타입 | `rtspv1.0` 이전의 기본 RTSP 개념 검증용입니다. |
 
-| 이유 | 설명 |
+## 3. 필요한 준비물
+
+### 3.1 공통 준비물
+
+| 준비물 | 이유 |
 | --- | --- |
-| 복구 범위 최소화 | 장애 구간과 겹치는 파일만 ZIP으로 받을 수 있습니다. |
-| 파일 손상 범위 축소 | 녹화 중 종료되어도 손상 범위가 짧은 조각에 한정됩니다. |
-| 병렬 처리 용이 | 송출과 저장을 `tee`로 분리해 실시간 송출 지연을 줄입니다. |
+| Git | 저장소를 내려받고 `rtsp-review` 브랜치로 전환하기 위해 필요합니다. |
+| 같은 네트워크 | 윈도우 데스크탑이 라즈베리 파이의 RTSP 주소와 복구 API 주소에 접근해야 합니다. |
+| 라즈베리 파이 IP 주소 | 윈도우 GUI에서 `rtsp://라즈베리파이IP:8554/live`를 입력해야 합니다. |
 
-### 2.3 RTSP 수신기에 watchdog을 둔 이유
+### 3.2 라즈베리 파이 준비물
 
-OpenCV의 `VideoCapture`는 RTSP 연결이 비정상 상태가 되었을 때 오래 멈출 수 있습니다.
-`클라이언트 코드/rtsp_receiver.py`는 RTSP 포트를 먼저 TCP로 확인하고, 프레임이 5초 이상 들어오지 않으면 캡처 객체를 해제해 재연결을 유도합니다.
-
-이 방식은 GUI가 응답 없음 상태로 오래 멈추는 문제를 줄이기 위한 방어 로직입니다.
-
-## 3. 폴더별 역할
-
-| 경로 | 역할 |
+| 준비물 | 이유 |
 | --- | --- |
-| `rtspv1.0/` | 라즈베리 파이용 RTSP 송출, 10초 백업, 백업 복구 API 테스트 코드입니다. |
-| `rtsp/` | 최소 RTSP 송수신 프로토타입입니다. 기능 검증용이며 실제 운용은 `rtspv1.0/` 쪽이 더 가깝습니다. |
-| `클라이언트 코드/` | 윈도우 데스크탑에서 실행되는 관제 GUI, RTSP 수신, AI 분석, 복구 요청 코드입니다. |
-| `서버 코드/` | FastAPI 기반 자원 모니터링 서버와 장애 대응 보조 코드입니다. |
-| `requirements.txt` | 윈도우 데스크탑 관제 프로그램 실행에 필요한 주요 파이썬 패키지 목록입니다. |
+| Raspberry Pi OS 또는 Debian 계열 리눅스 | `stream_and_record.sh`가 리눅스, GStreamer, libcamera 기반으로 동작합니다. |
+| 라즈베리 파이 카메라 | 실제 영상을 촬영하기 위해 필요합니다. |
+| 인터넷 연결 | 최초 실행 시 패키지 설치와 MediaMTX 다운로드에 필요합니다. |
+| GStreamer 패키지 | 카메라 입력, H.264 인코딩, RTMP 송출, 파일 백업에 필요합니다. |
+| MediaMTX | RTMP 입력을 RTSP 스트림으로 변환해 주는 중계 서버입니다. 스크립트가 최초 1회 자동 다운로드합니다. |
+| Python 3, pip, venv | 백업 복구 API 서버를 실행하기 위해 필요합니다. |
 
-주의할 점은 이 브랜치가 최신 `refactor` 브랜치처럼 `src/ai_cctv/edge_node`, `src/ai_cctv/ai_server` 구조로 정리되어 있지 않다는 점입니다.
-따라서 이 문서에서는 `rtsp-review` 브랜치의 실제 폴더명을 기준으로 안내합니다.
+### 3.3 윈도우 데스크탑 준비물
 
-## 4. 전체 실행 순서
+| 준비물 | 이유 |
+| --- | --- |
+| Python 3.11 권장 | PyQt5, OpenCV, AI 패키지 설치 안정성을 위해 권장합니다. |
+| pip | 파이썬 패키지 설치에 필요합니다. |
+| ffmpeg | 복구 ZIP 안의 `.ts` 파일을 하나의 복구 영상으로 병합할 때 필요합니다. |
+| NVIDIA GPU와 CUDA 지원 PyTorch 선택 | YOLO, VLM 분석 속도를 높이고 싶을 때 필요합니다. CPU 실행도 가능하지만 느립니다. |
 
-권장 순서는 다음과 같습니다.
+## 4. 저장소 준비
 
-1. 윈도우 데스크탑과 라즈베리 파이를 같은 유선 또는 무선 네트워크에 연결합니다.
-2. 라즈베리 파이에서 카메라 인식 여부를 확인합니다.
-3. 라즈베리 파이에서 RTSP 송출 스크립트를 실행합니다.
-4. 복구 기능까지 테스트하려면 라즈베리 파이에서 백업 복구 API를 별도 터미널로 실행합니다.
-5. 윈도우 데스크탑에서 관제 GUI를 실행합니다.
-6. GUI 설정에서 RTSP 주소를 `rtsp://<라즈베리파이IP>:8554/live`로 입력합니다.
+처음 받는 경우 다음 명령을 사용합니다.
 
-## 5. 라즈베리 파이 실행 방법
+```powershell
+git clone https://github.com/taegyu-heo-bigstar/AI_CCTV.git
+cd AI_CCTV
+git switch rtsp-review
+```
 
-### 5.1 카메라 확인
+이미 저장소가 있다면 다음처럼 브랜치만 맞춥니다.
 
-먼저 라즈베리 파이에서 카메라가 인식되는지 확인합니다.
+```powershell
+cd AI_CCTV
+git fetch origin
+git switch rtsp-review
+git pull origin rtsp-review
+```
+
+## 5. 라즈베리 파이 설치
+
+라즈베리 파이에서 실행합니다.
+
+### 5.1 시스템 패키지 설치
+
+```bash
+sudo apt update
+sudo apt install -y rpicam-apps python3-pip python3-venv wget tar \
+                    gstreamer1.0-tools gstreamer1.0-plugins-base \
+                    gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+                    gstreamer1.0-plugins-ugly gstreamer1.0-libav \
+                    gstreamer1.0-rtsp libcamera-v4l2
+```
+
+각 패키지가 필요한 이유는 다음과 같습니다.
+
+| 패키지 | 이유 |
+| --- | --- |
+| `rpicam-apps` | 카메라 인식 여부를 `rpicam-hello`로 확인하기 위해 필요합니다. |
+| `gstreamer1.0-*` | 카메라 영상을 읽고 인코딩하고 RTMP로 송출하기 위해 필요합니다. |
+| `libcamera-v4l2` | 라즈베리 파이 카메라 입력을 libcamera 기반으로 다루기 위해 필요합니다. |
+| `python3-pip`, `python3-venv` | 백업 복구 API용 파이썬 환경을 만들기 위해 필요합니다. |
+| `wget`, `tar` | MediaMTX 압축 파일을 내려받고 풀기 위해 필요합니다. |
+
+### 5.2 카메라 인식 확인
 
 ```bash
 rpicam-hello --list-cameras
 ```
 
-카메라가 표시되지 않으면 코드 실행 전에 케이블 방향, 카메라 포트 체결 상태, `/boot/firmware/config.txt`의 카메라 설정을 먼저 확인해야 합니다.
+정상이라면 카메라 모델과 해상도 목록이 출력됩니다.
+`No cameras available!`가 나오면 코드 실행 전에 카메라 케이블 방향, 포트 체결, 전원, 카메라 설정을 먼저 확인해야 합니다.
 
-### 5.2 시스템 패키지 설치
+## 6. 라즈베리 파이에서 RTSP 송출 실행
 
-라즈베리 파이에서 다음 패키지를 설치합니다.
+라즈베리 파이에서 저장소가 `~/AI_CCTV`에 있다고 가정합니다.
 
-```bash
-sudo apt update
-sudo apt install -y gstreamer1.0-tools gstreamer1.0-plugins-base \
-                    gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
-                    gstreamer1.0-plugins-ugly gstreamer1.0-libav \
-                    gstreamer1.0-rtsp libcamera-v4l2 python3-pip wget tar
-```
-
-`stream_and_record.sh`는 최초 실행 시 MediaMTX 실행 파일이 없으면 GitHub에서 MediaMTX를 내려받습니다.
-따라서 최초 실행 시점에는 라즈베리 파이가 인터넷에 연결되어 있어야 합니다.
-
-### 5.3 RTSP 송출 실행
-
-라즈베리 파이에서 저장소 루트로 이동한 뒤 다음을 실행합니다.
+복구 기능까지 같이 테스트하려면 홈 디렉터리에서 스크립트를 실행하는 것을 권장합니다.
+현재 코드 기준 `stream_and_record.sh`는 실행 위치 기준 `./backups`에 백업을 저장하고, `backup_api_server.py`는 `~/backups`를 읽습니다.
+따라서 홈 디렉터리에서 실행하면 두 경로가 자연스럽게 `~/backups`로 맞춰집니다.
 
 ```bash
-cd ~/AI_CCTV/rtspv1.0
-chmod +x stream_and_record.sh
-./stream_and_record.sh
+cd ~
+bash ~/AI_CCTV/rtspv1.0/stream_and_record.sh
 ```
 
-정상 실행되면 스크립트가 다음 형태의 주소를 출력합니다.
+정상 실행되면 다음과 비슷한 문장이 출력됩니다.
 
 ```text
 RTSP Stream endpoint: rtsp://localhost:8554/live
 ```
 
-이 주소의 `localhost`는 라즈베리 파이 자신을 의미합니다.
-윈도우 데스크탑에서 접속할 때는 다음처럼 라즈베리 파이의 실제 IP를 넣어야 합니다.
-
-```text
-rtsp://<라즈베리파이IP>:8554/live
-```
+여기서 `localhost`는 라즈베리 파이 자신을 뜻합니다.
+윈도우 데스크탑에서 접속할 때는 반드시 라즈베리 파이의 실제 IP로 바꿔야 합니다.
 
 예시는 다음과 같습니다.
 
@@ -136,235 +162,245 @@ rtsp://<라즈베리파이IP>:8554/live
 rtsp://192.168.137.2:8554/live
 ```
 
-### 5.4 백업 복구 API 실행
+라즈베리 파이 IP는 다음 명령으로 확인할 수 있습니다.
 
-네트워크 장애 구간 복구까지 테스트하려면 라즈베리 파이에서 두 번째 터미널을 열고 다음을 실행합니다.
+```bash
+hostname -I
+ip addr show eth0
+```
+
+무선 네트워크를 쓰는 경우에는 `eth0` 대신 `wlan0`를 확인합니다.
+
+## 7. 라즈베리 파이에서 백업 복구 API 실행
+
+복구 기능을 테스트하려면 RTSP 송출 터미널은 그대로 둔 상태에서, 라즈베리 파이에 새 SSH 터미널을 열어 다음을 실행합니다.
 
 ```bash
 cd ~/AI_CCTV/rtspv1.0
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install fastapi uvicorn
+python -m pip install -r requirements.txt
 python backup_api_server.py
 ```
 
-정상 실행 시 복구 API는 다음 주소에서 대기합니다.
+정상 실행되면 복구 API는 다음 주소에서 대기합니다.
 
 ```text
-http://<라즈베리파이IP>:8002/recover
+http://라즈베리파이IP:8002/recover
 ```
 
-수동 테스트 예시는 다음과 같습니다.
+수동 확인 예시는 다음과 같습니다.
 
 ```bash
-curl "http://<라즈베리파이IP>:8002/recover?start=2026-06-02T10:00:00&end=2026-06-02T10:00:20" -o recovered_backups.zip
+curl "http://라즈베리파이IP:8002/recover?start=2026-06-02T10:00:00&end=2026-06-02T10:00:20" -o recovered_backups.zip
 ```
 
-주의할 점이 있습니다.
-현재 `stream_and_record.sh`는 실행 위치 기준 `./backups`에 영상을 저장하지만, `backup_api_server.py`는 `~/backups`를 조회합니다.
-복구 기능을 테스트하려면 두 경로가 같아야 합니다.
+해당 시간대에 백업 파일이 없으면 404 응답이 정상적으로 나올 수 있습니다.
 
-권장 임시 조치는 다음 둘 중 하나입니다.
+## 8. 윈도우 데스크탑 설치
 
-| 방법 | 설명 |
-| --- | --- |
-| `~/backups`로 맞추기 | 라즈베리 파이 홈 디렉터리에서 `backups` 폴더를 만들고, 송출 스크립트의 백업 경로도 그 위치로 맞춥니다. |
-| API 경로를 맞추기 | `backup_api_server.py`의 `BACKUP_DIR`를 실제 `.ts` 파일이 저장되는 `~/AI_CCTV/rtspv1.0/backups`로 맞춥니다. |
+윈도우 PowerShell에서 실행합니다.
 
-## 6. 윈도우 데스크탑 실행 방법
-
-### 6.1 가상환경 생성
-
-윈도우 PowerShell에서 저장소 루트로 이동한 뒤 실행합니다.
+### 8.1 가상환경 생성
 
 ```powershell
+cd AI_CCTV
 py -3.11 -m venv venv311
-.\venv311\Scripts\activate
+.\venv311\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 ```
 
-Python 3.11 사용을 권장합니다.
-이 브랜치의 AI 관련 패키지들은 Python 버전에 따라 설치 실패 가능성이 있습니다.
+만약 `py -3.11`이 동작하지 않으면 다음을 확인합니다.
 
-### 6.2 패키지 설치
+```powershell
+py --version
+py -0p
+```
+
+### 8.2 파이썬 패키지 설치
 
 ```powershell
 pip install -r requirements.txt
 ```
 
-CUDA GPU를 사용할 경우 PyTorch는 PC의 CUDA 환경에 맞게 별도로 설치하는 편이 안전합니다.
-예를 들어 CUDA 12.1 계열 휠을 쓰려면 다음과 같이 설치합니다.
+이 명령으로 설치되는 주요 패키지와 이유는 다음과 같습니다.
+
+| 패키지 | 이유 |
+| --- | --- |
+| `PyQt5` | 관제 GUI 실행에 필요합니다. |
+| `opencv-python` | 로컬 카메라와 RTSP 영상 프레임 수신에 필요합니다. |
+| `ultralytics` | YOLO 기반 사람 탐지에 필요합니다. |
+| `transformers`, `qwen-vl-utils`, `accelerate` | Qwen VLM 기반 상황 분석에 필요합니다. |
+| `requests` | 라즈베리 파이 복구 API와 모니터링 API 호출에 필요합니다. |
+| `fastapi`, `uvicorn` | 자원 모니터링 서버를 윈도우에서 실행할 때 필요합니다. |
+| `psutil` | CPU, 메모리 사용률 수집에 필요합니다. |
+| `discord.py` | 이상 상황 알림을 Discord로 보낼 때 필요합니다. |
+
+### 8.3 PyTorch 설치
+
+AI 분석을 사용할 경우 PyTorch가 필요합니다.
+GPU를 사용할 수 있다면 CUDA 버전에 맞는 PyTorch를 설치합니다.
+
+예시는 CUDA 12.1 계열입니다.
 
 ```powershell
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 ```
 
-CPU만 사용하는 경우 다음 설치도 가능하지만, YOLO와 VLM 분석 속도가 크게 느려질 수 있습니다.
+GPU를 사용하지 않는다면 CPU 버전을 설치할 수 있습니다.
 
 ```powershell
 pip install torch torchvision torchaudio
 ```
 
-### 6.3 관제 GUI 실행
-
-이 브랜치에서 윈도우 관제 GUI의 진입점은 `클라이언트 코드/gui.py`입니다.
+설치 확인:
 
 ```powershell
+python -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.version.cuda)"
+```
+
+### 8.4 ffmpeg 설치 확인
+
+복구 기능은 `.ts` 조각을 하나의 영상으로 병합할 때 `ffmpeg` 실행 파일을 사용합니다.
+
+```powershell
+ffmpeg -version
+```
+
+명령이 인식되지 않으면 ffmpeg를 설치하고 PATH에 추가해야 합니다.
+
+## 9. 윈도우 데스크탑에서 관제 GUI 실행
+
+라즈베리 파이에서 `stream_and_record.sh`가 실행 중인 상태에서 윈도우 PowerShell을 엽니다.
+
+```powershell
+cd AI_CCTV
+.\venv311\Scripts\Activate.ps1
 cd "클라이언트 코드"
 python gui.py
 ```
 
-GUI가 열리면 설정 창에서 RTSP 사용을 선택하고 다음 형태의 주소를 입력합니다.
+GUI가 열리면 설정 창에서 RTSP 사용을 선택하고 다음 형식의 주소를 입력합니다.
 
 ```text
-rtsp://<라즈베리파이IP>:8554/live
+rtsp://라즈베리파이IP:8554/live
 ```
 
-예시는 다음과 같습니다.
+예시:
 
 ```text
 rtsp://192.168.137.2:8554/live
 ```
 
-라즈베리 파이 없이 윈도우 내장 카메라만 간단히 확인하려면 다음 파일을 사용할 수 있습니다.
+이 주소는 라즈베리 파이 스크립트가 출력하는 `rtsp://localhost:8554/live`에서 `localhost`만 라즈베리 파이 IP로 바꾼 것입니다.
+
+## 10. 윈도우에서 로컬 카메라만 테스트하기
+
+라즈베리 파이 없이 윈도우 데스크탑 자체 카메라만 확인하려면 다음을 실행합니다.
 
 ```powershell
+cd AI_CCTV
+.\venv311\Scripts\Activate.ps1
 cd "클라이언트 코드"
 python cctv_gui.py
 ```
 
-다만 `cctv_gui.py`는 RTSP 송수신 구조 전체를 검증하는 용도가 아니라 로컬 카메라 표시를 확인하는 단순 GUI에 가깝습니다.
+이 파일은 RTSP 송출, 복구 API, 라즈베리 파이 연동을 검증하는 용도가 아닙니다.
+단순히 윈도우 카메라와 GUI 표시가 가능한지 확인하는 용도입니다.
 
-## 7. 자원 모니터링 서버 실행
+## 11. 자원 모니터링 서버 실행
 
-자원 모니터링 서버는 FastAPI로 구현되어 있으며, 실행하면 `/monitor/top`에서 JSON을 반환합니다.
+자원 모니터링 기능을 확인하려면 다음 파일을 실행합니다.
 
 ```powershell
+cd AI_CCTV
+.\venv311\Scripts\Activate.ps1
 python "서버 코드\resource_monitor_server.py"
 ```
 
-기본 포트는 `8001`입니다.
-정상 실행 후 다음 주소로 확인할 수 있습니다.
+기본 주소는 다음과 같습니다.
 
 ```text
 http://127.0.0.1:8001/monitor/top
 ```
 
-다른 장치에서 접근하려면 방화벽과 네트워크 대역을 확인한 뒤 다음 형태로 접근합니다.
-
-```text
-http://<서버IP>:8001/monitor/top
-```
-
-반환되는 주요 값은 다음과 같습니다.
-
-| 필드 | 의미 |
-| --- | --- |
-| `cpu.total_percent` | 전체 CPU 사용률입니다. |
-| `memory.total_percent` | 전체 메모리 사용률입니다. |
-| `process.pid` | 현재 모니터링 대상 프로세스 ID입니다. |
-| `process.cpu_percent` | 대상 프로세스 CPU 사용률입니다. |
-| `process.memory_percent` | 대상 프로세스 메모리 사용률입니다. |
-
-## 8. 단독 RTSP 프로토타입 실행
-
-`rtsp/` 폴더는 기능 이해용 단순 RTSP 프로토타입입니다.
-
-라즈베리 파이 또는 리눅스 환경에서 서버를 실행하려면 다음 패키지가 필요합니다.
-
-```bash
-sudo apt update
-sudo apt install -y python3-gi python3-gi-cairo gir1.2-gtk-3.0
-sudo apt install -y gir1.2-gst-rtsp-server-1.0 \
-                    gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
-                    gstreamer1.0-plugins-ugly gstreamer1.0-libav
-```
-
-서버 실행:
-
-```bash
-cd ~/AI_CCTV/rtsp
-python3 sender.py
-```
-
-`sender.py`는 `/stream` 경로로 송출하므로 주소는 다음 형태입니다.
-
-```text
-rtsp://<송출장치IP>:8554/stream
-```
-
-수신 테스트는 `rtsp/receiver.py`의 `RTSP_URL` 값을 수정한 뒤 실행합니다.
-
-```bash
-python receiver.py
-```
-
-운용 검증 목적이라면 이 프로토타입보다 `rtspv1.0/stream_and_record.sh` 사용을 권장합니다.
-`rtspv1.0` 쪽이 MediaMTX 중계, 백업 저장, 장애 복구 흐름을 포함하기 때문입니다.
-
-## 9. 네트워크 확인 명령
-
-윈도우에서 라즈베리 파이까지 통신되는지 확인합니다.
+클라이언트 코드에서 요청을 보내 확인하려면 다음을 실행합니다.
 
 ```powershell
-ping <라즈베리파이IP>
-Test-NetConnection <라즈베리파이IP> -Port 8554
-Test-NetConnection <라즈베리파이IP> -Port 8002
+cd "클라이언트 코드"
+python resource_monitor_client.py
 ```
 
-라즈베리 파이에서 윈도우까지 통신되는지 확인합니다.
+다른 장치의 모니터링 서버를 조회하려면 환경변수로 서버 주소를 지정할 수 있습니다.
 
-```bash
-ping -c 3 <윈도우IP>
+```powershell
+$env:RESOURCE_MONITOR_SERVER_URL="http://서버IP:8001"
+python resource_monitor_client.py
 ```
 
-RTSP 포트 `8554`가 열려 있어야 윈도우 GUI가 영상을 받을 수 있습니다.
-백업 복구까지 테스트하려면 FastAPI 포트 `8002`도 열려 있어야 합니다.
+## 12. RTSP 단독 테스트
 
-## 10. 장애 상황별 점검
+GUI를 켜기 전에 RTSP 송출만 확인하고 싶다면 다음 방법을 사용할 수 있습니다.
 
-| 증상 | 확인할 내용 |
-| --- | --- |
-| `No cameras available` | 카메라 케이블 방향, 카메라 포트 체결, `rpicam-hello --list-cameras`, 카메라 설정을 확인합니다. |
-| GUI에서 영상이 안 나옴 | RTSP 주소의 IP와 경로가 맞는지 확인합니다. `rtsp://<라즈베리파이IP>:8554/live` 형식이어야 합니다. |
-| `Test-NetConnection` 실패 | 라즈베리 파이와 윈도우가 같은 네트워크인지, 방화벽이 포트를 막지 않는지 확인합니다. |
-| 복구 ZIP이 404 | 백업 `.ts` 파일이 있는지, 요청 시간이 파일 수정 시간과 겹치는지, `BACKUP_DIR` 경로가 실제 저장 경로와 같은지 확인합니다. |
-| OpenCV 수신이 멈춤 | 이 브랜치는 watchdog 재연결 로직이 있으므로 잠시 기다린 뒤 재연결 로그를 확인합니다. |
-| MediaMTX 다운로드 실패 | 라즈베리 파이의 인터넷 연결과 DNS를 먼저 확인합니다. 최초 1회 다운로드가 필요합니다. |
+### 12.1 라즈베리 파이 송출 확인
 
-## 11. refactor 브랜치와 다른 점
+윈도우에서 포트가 열려 있는지 확인합니다.
 
-| 항목 | rtsp-review | refactor |
+```powershell
+Test-NetConnection 라즈베리파이IP -Port 8554
+```
+
+`TcpTestSucceeded : True`가 나오면 RTSP 포트에 접근할 수 있습니다.
+
+### 12.2 OpenCV 수신 테스트
+
+`rtspv1.0/rtsp_receiver.py`의 `RTSP_URL` 값을 실제 주소로 바꾼 뒤 실행합니다.
+
+```powershell
+python rtspv1.0\rtsp_receiver.py
+```
+
+예시 주소:
+
+```text
+rtsp://192.168.137.2:8554/live
+```
+
+## 13. 실행 순서 요약
+
+처음 실행한다면 다음 순서대로 진행합니다.
+
+1. 라즈베리 파이와 윈도우 데스크탑을 같은 네트워크에 연결합니다.
+2. 라즈베리 파이에서 `rpicam-hello --list-cameras`로 카메라 인식을 확인합니다.
+3. 라즈베리 파이에서 `bash ~/AI_CCTV/rtspv1.0/stream_and_record.sh`를 실행합니다.
+4. 라즈베리 파이에 새 터미널을 열고 `python backup_api_server.py`를 실행합니다.
+5. 윈도우에서 `Test-NetConnection 라즈베리파이IP -Port 8554`로 RTSP 포트를 확인합니다.
+6. 윈도우에서 `클라이언트 코드/gui.py`를 실행합니다.
+7. GUI 설정에서 `rtsp://라즈베리파이IP:8554/live`를 입력합니다.
+8. 영상 표시와 AI 분석 동작을 확인합니다.
+
+## 14. 자주 발생하는 문제
+
+| 문제 | 원인 | 해결 |
 | --- | --- | --- |
-| 폴더 구조 | `클라이언트 코드`, `서버 코드`, `rtspv1.0`처럼 실험 단계 폴더명이 남아 있습니다. | `src/ai_cctv/edge_node`, `src/ai_cctv/ai_server` 중심으로 역할이 분리되어 있습니다. |
-| 실행 방식 | 개별 스크립트와 GUI 파일을 직접 실행합니다. | 패키지 진입점과 노드별 실행 흐름을 정리하는 방향입니다. |
-| RTSP 송출 | `stream_and_record.sh`가 GStreamer와 MediaMTX를 직접 실행합니다. | 구조화된 edge node 실행기로 흡수하는 방향이 적합합니다. |
-| 복구 API | FastAPI 서버가 별도 파일로 존재합니다. | edge node 내부 기능으로 통합하는 방향이 적합합니다. |
-| 문서 상태 | 기존 문서 일부가 인코딩 깨짐을 포함합니다. | 국문 주석과 구조 문서 갱신을 목표로 정리 중입니다. |
+| `rpicam-hello: command not found` | `rpicam-apps`가 설치되지 않음 | `sudo apt install -y rpicam-apps`를 실행합니다. |
+| `No cameras available!` | 카메라가 인식되지 않음 | 케이블 방향, 포트 체결, 카메라 설정, 재부팅을 확인합니다. |
+| MediaMTX 다운로드 실패 | 라즈베리 파이에 인터넷 연결이 없음 | DNS, 라우팅, 유선 또는 무선 인터넷 연결을 확인합니다. |
+| 윈도우 GUI에서 영상이 안 나옴 | RTSP 주소가 잘못됨 | `localhost`가 아니라 `라즈베리파이IP`를 넣었는지 확인합니다. |
+| `Test-NetConnection` 실패 | 네트워크 또는 방화벽 문제 | 같은 네트워크인지, 라즈베리 파이에서 스크립트가 실행 중인지, 포트 `8554`가 열려 있는지 확인합니다. |
+| 복구 API가 404 반환 | 해당 시간대 백업 파일이 없음 | 송출 스크립트 실행 위치와 `~/backups`에 `.ts` 파일이 생성되는지 확인합니다. |
+| 복구 병합 실패 | `ffmpeg`가 설치되지 않음 | 윈도우에서 `ffmpeg -version`이 동작하도록 설치하고 PATH를 설정합니다. |
+| PyTorch DLL 오류 | PyTorch, CUDA, 드라이버 조합 문제 | `python -c "import torch"`가 먼저 성공하는지 확인하고, CUDA에 맞는 PyTorch를 다시 설치합니다. |
 
-## 12. 권장 테스트 시나리오
+## 15. 처음 보는 사람이 기억해야 할 핵심
 
-가장 기본적인 RTSP 테스트는 다음 순서로 진행합니다.
+가장 중요한 실행 주소는 하나입니다.
 
-1. 라즈베리 파이에서 `rpicam-hello --list-cameras`로 카메라를 확인합니다.
-2. 라즈베리 파이에서 `rtspv1.0/stream_and_record.sh`를 실행합니다.
-3. 윈도우에서 `Test-NetConnection <라즈베리파이IP> -Port 8554`를 실행합니다.
-4. 윈도우에서 `클라이언트 코드/gui.py`를 실행합니다.
-5. GUI 설정에서 `rtsp://<라즈베리파이IP>:8554/live`를 입력합니다.
-6. 영상이 표시되는지 확인합니다.
+```text
+rtsp://라즈베리파이IP:8554/live
+```
 
-장애 복구까지 테스트하려면 다음을 추가합니다.
-
-1. 라즈베리 파이에서 `backup_api_server.py`를 실행합니다.
-2. 윈도우에서 RTSP 수신 중 네트워크를 잠시 끊습니다.
-3. 다시 네트워크를 연결합니다.
-4. GUI 로그 또는 복구 영상 저장 폴더를 확인합니다.
-
-## 13. 현재 브랜치 기준 평가
-
-잘된 점은 GStreamer, MediaMTX, RTSP 수신, 백업 복구 API가 기능 단위로 직접 검증 가능하다는 점입니다.
-특히 실시간 송출과 로컬 백업을 동시에 처리하는 구조는 네트워크 장애를 고려한 CCTV 프로젝트 방향에 맞습니다.
-
-부족한 점은 폴더 구조가 최신 프로젝트 구조와 다르고, `BACKUP_DIR` 같은 경로 설정이 파일마다 일관되지 않으며, 일부 IP와 URL 예시가 하드코딩되어 있다는 점입니다.
-따라서 이 브랜치는 최종 배포 구조라기보다 RTSP 송출과 장애 복구 기능을 검증하기 위한 참고 브랜치로 보는 것이 적절합니다.
+라즈베리 파이에서는 이 주소를 만들기 위해 `stream_and_record.sh`를 실행합니다.
+윈도우에서는 이 주소를 GUI 설정에 입력합니다.
+복구 기능까지 확인하려면 라즈베리 파이에서 `backup_api_server.py`도 같이 실행합니다.
