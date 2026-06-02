@@ -4,6 +4,7 @@
 # 자동 감지가 틀리면 AI_CCTV_EDGE_HOST 환경 변수로 값을 고정할 수 있습니다.
 
 from dataclasses import dataclass
+import os
 import socket
 import subprocess
 import sys
@@ -240,7 +241,7 @@ def _read_ssh_server_host():
         SSH_CONNECTION의 서버 IP 또는 None을 반환합니다.
     """
 
-    ssh_connection = get_env_value("SSH_CONNECTION", "")
+    ssh_connection = os.getenv("SSH_CONNECTION", "")
     parts = ssh_connection.split()
     if len(parts) >= 3 and not _is_loopback_host(parts[2]):
         return parts[2]

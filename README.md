@@ -6,6 +6,10 @@ Runtime settings are read from `.env`. Copy `.env.example` to `.env` and edit
 the values there. The application no longer reads AI CCTV settings from OS
 environment variables.
 
+System-provided runtime metadata, such as `SSH_CONNECTION`, is still read from
+the OS environment because it is created by the active shell/session, not by the
+project configuration.
+
 Raspberry Pi 기반 Edge node와 Windows 기반 AI server를 분리해 구성하는 AI CCTV 프로젝트입니다.
 
 ## 실행 묶음

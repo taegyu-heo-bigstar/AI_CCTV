@@ -73,7 +73,10 @@ from ai_cctv.edge_node.monitoring.resource_monitor_publisher import (
     MqttResourceMonitorConfig,
     SUPPORTED_MQTT_QOS_VALUES,
 )
-from ai_cctv.edge_node.startup_info import build_edge_connection_info
+from ai_cctv.edge_node.startup_info import (
+    _read_ssh_server_host,
+    build_edge_connection_info,
+)
 from ai_cctv.edge_node.streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
 from ai_cctv.edge_node.support_processes import EdgeSupportProcessConfig
 from tester.pseudo_edge_node.backup_recovery import build_pseudo_recovery_archive
@@ -1035,6 +1038,21 @@ class ProjectStructureTest(unittest.TestCase):
             '$env:AI_CCTV_RECOVERY_SERVER_URL="http://192.168.137.2:8002/recover"',
             terminal_text,
         )
+
+    def test_ssh_connection_is_read_from_system_environment(self):
+        """SSH_CONNECTION은 .env가 아니라 OS 세션 환경에서 읽는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        with patch.dict(
+            os.environ,
+            {"SSH_CONNECTION": "192.168.137.1 51000 192.168.137.2 22"},
+        ):
+            self.assertEqual(_read_ssh_server_host(), "192.168.137.2")
 
     def test_edge_node_os_guard_accepts_linux_debian_family(self):
         """Edge node OS guard가 Linux Debian 계열만 허용하는지 검증합니다.
