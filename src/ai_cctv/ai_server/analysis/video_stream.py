@@ -3,7 +3,7 @@
 # RTSP 입력은 별도 수신 thread를 사용해 단선 후 재연결을 시도합니다.
 # 복구 서버 URL이 설정되면 RTSP 장애 구간의 백업 영상 요청도 기록합니다.
 
-import cv2
+import threading
 
 from ..recovery import build_network_recovery_manager_from_env
 from .rtsp_receiver import RtspFrameReceiver, is_rtsp_source
@@ -15,16 +15,18 @@ class VideoStream:
     인자:
         source: OpenCV 카메라 번호 또는 RTSP URL입니다.
         recovery_manager: RTSP 복구 요청을 담당하는 객체입니다.
+        recovery_base_dir: 복구 파일을 저장할 AI_CCTV 저장 루트입니다.
     반환값:
         VideoStream 인스턴스를 반환합니다.
     """
 
-    def __init__(self, source=0, recovery_manager=None):
+    def __init__(self, source=0, recovery_manager=None, recovery_base_dir=""):
         """입력 소스와 RTSP 수신 상태를 초기화합니다.
 
         인자:
             source: OpenCV 카메라 번호 또는 RTSP URL입니다.
             recovery_manager: 네트워크 복구 요청 관리자이며 없으면 환경 변수에서 생성합니다.
+            recovery_base_dir: 복구 파일을 저장할 AI_CCTV 저장 루트입니다.
         반환값:
             없음.
         """
@@ -34,10 +36,15 @@ class VideoStream:
         self.receiver = None
         self.is_rtsp = is_rtsp_source(source)
         self.last_rtsp_sequence = 0
+        self.has_received_rtsp_frame = False
         self.recovery_manager = recovery_manager
         if self.is_rtsp and self.recovery_manager is None:
-            self.recovery_manager = build_network_recovery_manager_from_env()
+            self.recovery_manager = build_network_recovery_manager_from_env(
+                base_dir=recovery_base_dir
+            )
         self.last_recovery_result = None
+        self.recovery_thread = None
+        self.recovery_lock = threading.Lock()
 
     def open(self):
         """영상 입력을 엽니다.
@@ -53,7 +60,8 @@ class VideoStream:
             self.receiver.start()
             return True
 
-        self.cap = cv2.VideoCapture(self.source)
+        cv2_module = _load_cv2_module()
+        self.cap = cv2_module.VideoCapture(self.source)
         if not self.cap.isOpened():
             print("영상 스트림 연결 실패")
             return False
@@ -92,7 +100,8 @@ class VideoStream:
         if self.cap is None:
             return 30
 
-        fps = self.cap.get(cv2.CAP_PROP_FPS)
+        cv2_module = _load_cv2_module()
+        fps = self.cap.get(cv2_module.CAP_PROP_FPS)
         if fps <= 0:
             return 30
         return fps
@@ -114,8 +123,9 @@ class VideoStream:
         if self.cap is None:
             return 640, 480
 
-        width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        cv2_module = _load_cv2_module()
+        width = int(self.cap.get(cv2_module.CAP_PROP_FRAME_WIDTH))
+        height = int(self.cap.get(cv2_module.CAP_PROP_FRAME_HEIGHT))
         return width, height
 
     def is_recovering(self):
@@ -141,6 +151,20 @@ class VideoStream:
         """
 
         return self.last_recovery_result
+
+    def has_active_recovery_failure(self):
+        """현재 복구 관리자가 기록 중인 RTSP 장애 구간이 있는지 반환합니다.
+
+        인자:
+            없음.
+        반환값:
+            기록 중인 장애 구간이 있으면 True, 아니면 False를 반환합니다.
+        """
+
+        return (
+            self.recovery_manager is not None
+            and self.recovery_manager.has_active_failure()
+        )
 
     def release(self):
         """영상 입력 자원을 해제합니다.
@@ -173,11 +197,15 @@ class VideoStream:
 
         snapshot = self.receiver.read_new_frame(self.last_rtsp_sequence)
         if not snapshot.success:
-            self._record_rtsp_failure()
+            if self.has_received_rtsp_frame and not snapshot.connected:
+                self._record_rtsp_failure()
             return False, None
 
         self.last_rtsp_sequence = snapshot.sequence
-        self._record_rtsp_recovery()
+        had_previous_frame = self.has_received_rtsp_frame
+        self.has_received_rtsp_frame = True
+        if had_previous_frame:
+            self._record_rtsp_recovery()
         return True, snapshot.frame
 
     def _record_rtsp_failure(self):
@@ -205,4 +233,39 @@ class VideoStream:
             self.recovery_manager is not None
             and self.recovery_manager.has_active_failure()
         ):
+            if self.recovery_thread is not None and self.recovery_thread.is_alive():
+                return
+            self.recovery_thread = threading.Thread(
+                target=self._run_recovery_request,
+                name="NetworkRecoveryRequest",
+                daemon=True,
+            )
+            self.recovery_thread.start()
+
+    def _run_recovery_request(self):
+        """백그라운드에서 복구 요청과 MP4 병합을 수행합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        with self.recovery_lock:
+            if self.recovery_manager is None:
+                return
             self.last_recovery_result = self.recovery_manager.record_recovery()
+
+
+def _load_cv2_module():
+    """설치된 OpenCV 모듈을 지연 import로 반환합니다.
+
+    인자:
+        없음.
+    반환값:
+        cv2 모듈을 반환합니다.
+    """
+
+    import cv2
+
+    return cv2

@@ -71,8 +71,12 @@ class VideoWorker(QThread):
         self.use_yolo = use_yolo
         self.use_vlm = use_yolo and use_vlm
         self.tracker_model_path = tracker_model_path
+        self.ai_cctv_path = ai_cctv_path
 
-        self.stream = VideoStream(source=self.source)
+        self.stream = VideoStream(
+            source=self.source,
+            recovery_base_dir=self.ai_cctv_path,
+        )
         self.tracker = None
         self.tracker_load_error = None
         self.tracker_thread = None
@@ -80,7 +84,6 @@ class VideoWorker(QThread):
         self.full_body_checker = FullBodyChecker()
         self.crop_manager = CropManager()
         self.state_manager = PersonStateManager(disappear_timeout=3.0)
-        self.ai_cctv_path = ai_cctv_path
         self.original_segment_seconds = original_segment_seconds
         self.recording_manager = None
         self.clip_max_seconds = clip_max_seconds
@@ -146,6 +149,7 @@ class VideoWorker(QThread):
 
             if not ret:
                 if getattr(self.stream, "is_rtsp", False):
+                    self._stop_recording_for_active_rtsp_failure()
                     self._emit_stream_wait_status()
                     continue
                 self.event_ready.emit({
@@ -451,9 +455,11 @@ class VideoWorker(QThread):
 
         self.last_reported_recovery_result_id = result_id
         if result.get("success") and result.get("saved_file"):
+            message = result.get("message") or "누락 구간 복구 영상 저장 완료"
+            file_path = result.get("file_path")
             self.event_ready.emit({
                 "type": "status",
-                "message": f"누락 구간 복구 ZIP 저장 완료: {result.get('file_path')}",
+                "message": f"{message}: {file_path}",
             })
             return
 
@@ -462,6 +468,20 @@ class VideoWorker(QThread):
                 "type": "error",
                 "message": f"누락 구간 복구 요청 실패: {result.get('error') or result.get('reason')}",
             })
+
+    def _stop_recording_for_active_rtsp_failure(self):
+        """RTSP 장애가 확정되면 현재 원본 녹화 파일을 닫습니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        if self.recording_manager is None:
+            return
+        if self.stream.has_active_recovery_failure():
+            self.recording_manager.stop_recording()
 
     def stop(self):
         """영상 처리 루프를 중지하고 스레드 종료를 기다립니다.

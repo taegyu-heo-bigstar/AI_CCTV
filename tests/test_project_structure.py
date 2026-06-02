@@ -23,7 +23,13 @@ from ai_cctv.ai_server.analysis.anomaly.detector import (
 from ai_cctv.ai_server.monitoring.resource_monitor_client import (
     MqttResourceMonitorConfig as MqttResourceSubscriberConfig,
 )
-from ai_cctv.ai_server.analysis.rtsp_receiver import RtspFrameReceiver, is_rtsp_source
+from ai_cctv.ai_server.analysis import video_stream as video_stream_module
+from ai_cctv.ai_server.analysis.rtsp_receiver import (
+    RtspFrameReceiver,
+    RtspFrameSnapshot,
+    is_rtsp_source,
+)
+from ai_cctv.ai_server.analysis.video_stream import VideoStream
 from ai_cctv.ai_server.connection.edge_connection import (
     EdgeConnectionConfig,
     parse_edge_startup_text,
@@ -516,6 +522,58 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertFalse(is_rtsp_source(0))
         self.assertFalse(is_rtsp_source("http://127.0.0.1/video"))
 
+    def test_video_stream_local_fps_uses_lazy_cv2_constants(self):
+        """로컬 카메라 FPS 조회가 지연 import한 OpenCV 상수를 사용하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        class FakeCv2:
+            """OpenCV 상수를 흉내 내는 테스트용 객체입니다.
+
+            인자:
+                없음.
+            반환값:
+                FakeCv2 인스턴스를 반환합니다.
+            """
+
+            CAP_PROP_FPS = 5
+
+        class FakeCapture:
+            """OpenCV VideoCapture의 get 호출을 흉내 내는 테스트용 객체입니다.
+
+            인자:
+                없음.
+            반환값:
+                FakeCapture 인스턴스를 반환합니다.
+            """
+
+            def get(self, prop):
+                """요청된 속성 값을 반환합니다.
+
+                인자:
+                    prop: OpenCV 속성 상수입니다.
+                반환값:
+                    FPS 속성이면 24를 반환합니다.
+                """
+
+                if prop == FakeCv2.CAP_PROP_FPS:
+                    return 24
+                return 0
+
+        original_loader = video_stream_module._load_cv2_module
+        try:
+            video_stream_module._load_cv2_module = lambda: FakeCv2
+            stream = VideoStream(0)
+            stream.cap = FakeCapture()
+
+            self.assertEqual(stream.get_fps(), 24)
+        finally:
+            video_stream_module._load_cv2_module = original_loader
+
     def test_rtsp_receiver_watchdog_releases_active_capture(self):
         """RTSP watchdog이 활성 VideoCapture를 강제 해제하는지 검증합니다.
 
@@ -551,6 +609,181 @@ class ProjectStructureTest(unittest.TestCase):
 
         self.assertFalse(result["requested"])
         self.assertEqual(result["reason"], "server_url_not_configured")
+
+    def test_network_recovery_manager_merges_recovered_ts_segments_to_mp4(self):
+        """복구 ZIP의 TS 세그먼트를 원본 녹화 폴더의 MP4로 병합하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root_dir = Path(temp_dir)
+            recovery_dir = root_dir / "복구 영상"
+            recording_dir = root_dir / "original_records"
+            zip_path = root_dir / "recovered.zip"
+            merged_names = []
+
+            with zipfile.ZipFile(zip_path, "w") as zip_file:
+                zip_file.writestr("backup_20260531_100000_00002.ts", b"two")
+                zip_file.writestr("backup_20260531_100000_00001.ts", b"one")
+                zip_file.writestr("../escape.ts", b"skip")
+                zip_file.writestr("ignore.txt", b"skip")
+
+            manager = NetworkRecoveryManager(
+                NetworkRecoveryConfig(
+                    server_url="",
+                    recovery_dir=str(recovery_dir),
+                    recording_dir=str(recording_dir),
+                    settle_seconds=0,
+                )
+            )
+
+            def fake_merge_ts_files(ts_files, output_path, work_dir):
+                """테스트에서 ffmpeg 실행을 대체하고 병합 대상 순서를 기록합니다.
+
+                인자:
+                    ts_files: 병합할 TS 파일 목록입니다.
+                    output_path: 생성할 MP4 경로입니다.
+                    work_dir: 임시 작업 폴더입니다.
+                반환값:
+                    성공 결과 딕셔너리를 반환합니다.
+                """
+
+                del work_dir
+                merged_names.extend(path.name for path in ts_files)
+                Path(output_path).write_bytes(b"mp4")
+                return {"success": True}
+
+            manager._merge_ts_files = fake_merge_ts_files
+            payload = manager.build_payload(
+                datetime(2026, 5, 31, 10, 0, 0),
+                datetime(2026, 5, 31, 10, 0, 10),
+            )
+
+            result = manager._extract_and_merge(zip_path, payload)
+
+            self.assertTrue(result["success"])
+            self.assertEqual(result["ts_count"], 2)
+            self.assertEqual(
+                merged_names,
+                [
+                    "backup_20260531_100000_00001.ts",
+                    "backup_20260531_100000_00002.ts",
+                ],
+            )
+            output_path = Path(result["file_path"])
+            self.assertEqual(output_path.parent, recording_dir)
+            self.assertIn("장애복구파일", output_path.name)
+
+    def test_video_stream_waits_for_first_rtsp_frame_before_recording_failure(self):
+        """첫 RTSP 프레임 수신 전 대기 상태를 장애 복구 요청으로 오인하지 않는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        class FakeRecoveryManager:
+            """VideoStream 테스트용 복구 관리자입니다.
+
+            인자:
+                없음.
+            반환값:
+                FakeRecoveryManager 인스턴스를 반환합니다.
+            """
+
+            def __init__(self):
+                """기록된 장애 횟수를 초기화합니다.
+
+                인자:
+                    없음.
+                반환값:
+                    없음.
+                """
+
+                self.failure_count = 0
+
+            def record_failure(self):
+                """장애 기록 호출 횟수를 증가시킵니다.
+
+                인자:
+                    없음.
+                반환값:
+                    장애 시작 결과 딕셔너리를 반환합니다.
+                """
+
+                self.failure_count += 1
+                return {"started": True}
+
+            def has_active_failure(self):
+                """테스트용 활성 장애 상태를 반환합니다.
+
+                인자:
+                    없음.
+                반환값:
+                    활성 장애가 있으면 True를 반환합니다.
+                """
+
+                return self.failure_count > 0
+
+        class FakeReceiver:
+            """VideoStream 테스트용 RTSP 수신기입니다.
+
+            인자:
+                snapshots: 순서대로 반환할 수신 결과 목록입니다.
+            반환값:
+                FakeReceiver 인스턴스를 반환합니다.
+            """
+
+            def __init__(self, snapshots):
+                """수신 결과 목록을 초기화합니다.
+
+                인자:
+                    snapshots: read_new_frame이 반환할 결과 목록입니다.
+                반환값:
+                    없음.
+                """
+
+                self.snapshots = list(snapshots)
+                self.connected = False
+
+            def read_new_frame(self, last_sequence):
+                """준비된 RTSP 수신 결과를 하나 반환합니다.
+
+                인자:
+                    last_sequence: 호출자가 마지막으로 받은 프레임 순번입니다.
+                반환값:
+                    RtspFrameSnapshot 객체를 반환합니다.
+                """
+
+                del last_sequence
+                snapshot = self.snapshots.pop(0)
+                self.connected = snapshot.connected
+                return snapshot
+
+        manager = FakeRecoveryManager()
+        stream = VideoStream(
+            "rtsp://192.168.137.2:8554/live",
+            recovery_manager=manager,
+        )
+        stream.receiver = FakeReceiver([
+            RtspFrameSnapshot(False, None, 0, False, "initial wait"),
+            RtspFrameSnapshot(True, object(), 1, True, ""),
+            RtspFrameSnapshot(False, None, 1, False, "lost"),
+        ])
+
+        self.assertEqual(stream._read_rtsp_frame(), (False, None))
+        self.assertEqual(manager.failure_count, 0)
+
+        success, _frame = stream._read_rtsp_frame()
+        self.assertTrue(success)
+
+        self.assertEqual(stream._read_rtsp_frame(), (False, None))
+        self.assertEqual(manager.failure_count, 1)
 
     def test_backup_recovery_service_archives_overlapping_segments(self):
         """요청 시간대와 겹치는 TS 백업 파일을 ZIP으로 묶는지 검증합니다.
