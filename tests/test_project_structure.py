@@ -1159,6 +1159,26 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertNotIn("Qwen VLM 모델", yolo_names)
         self.assertNotIn("InsightFace", yolo_names)
 
+    def test_test_tools_are_separated_from_runtime_modules(self):
+        """테스트 보조 도구가 production 경로와 루트 경로를 오염시키지 않는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        self.assertFalse(Path("test_mqtt.py").exists())
+        self.assertTrue(Path("tools/mock_edge_mqtt_publisher.py").is_file())
+        self.assertFalse(
+            Path(
+                "src/ai_cctv/ai_server/analysis/vlm_person_analyzer_qwen_test.py"
+            ).exists()
+        )
+        self.assertTrue(
+            Path("src/ai_cctv/ai_server/analysis/qwen_person_analyzer.py").is_file()
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -261,7 +261,7 @@
 | `PersonAnalyzer.analyze` | analyze 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
 | `PersonAnalyzer._clean_result` | _clean_result 함수의 주요 기능을 수행합니다. | 일반 동작 | 없음 | 일반 동작 |
 
-## `src/ai_cctv/ai_server/analysis/vlm_person_analyzer_qwen_test.py`
+## `src/ai_cctv/ai_server/analysis/qwen_person_analyzer.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
@@ -802,7 +802,7 @@
 | `MediaMtxGStreamerCommandBuilder.build_command_args` | GStreamer 백업 및 송출 명령 인자 목록을 생성합니다. | list | 없음 | tee, splitmuxsink, rtmpsink 포함 |
 | `MediaMtxGStreamerCommandBuilder.build_shell_command_text` | 운영자가 확인할 수 있는 GStreamer 명령 문자열을 생성합니다. | 문자열 | 없음 | `--print-command`에서 사용 |
 
-## `test_mqtt.py`
+## `tools/mock_edge_mqtt_publisher.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|

@@ -1,10 +1,9 @@
-# Edge node 상태 조회 UI를 임시 검증하기 위한 모의 MQTT publisher 파일입니다.
-# 실제 Raspberry Pi 없이 상태 JSON을 MQTT broker로 주기 발행합니다.
-# AI server UI의 엣지 노드 상태 조회 창은 같은 topic을 구독해 값을 표시합니다.
-# 표와 꺾은선 그래프가 변하는지 확인할 수 있도록 사용률과 배터리 값을 바꿉니다.
-# 10번 정상 발행한 뒤에는 일부러 발행을 멈춰 연결 실패 UI를 확인합니다.
+# Edge node 상태 조회 UI를 수동 검증하기 위한 MQTT publisher 파일입니다.
+# 실제 Raspberry Pi 없이 AI server가 기대하는 상태 JSON을 주기적으로 발행합니다.
+# 기본값은 10회 정상 발행 후 침묵하여 UI의 조회중/연결실패 상태를 확인하게 합니다.
+# 외부 MQTT broker가 필요하며, 기본 broker 주소는 127.0.0.1:1883입니다.
 
-"""Edge node 모니터링 MQTT 모의 publisher입니다."""
+"""Edge node 상태 MQTT 메시지를 흉내 내는 수동 테스트 도구입니다."""
 
 import argparse
 from datetime import datetime
@@ -17,23 +16,25 @@ import time
 DEFAULT_MQTT_HOST = "127.0.0.1"
 DEFAULT_MQTT_PORT = 1883
 DEFAULT_MQTT_TOPIC = "ai-cctv/edge-node/status"
+DEFAULT_INTERVAL_SECONDS = 2.0
+DEFAULT_MAX_MESSAGES = 10
 
 
 class MockResourceState:
-    """모의 자원 사용률 값을 생성하고 보관합니다.
+    """Edge node의 자원 상태처럼 보이는 JSON payload를 생성합니다.
 
     인자:
-        process_id: 응답에 표시할 임시 프로세스 ID입니다.
-        max_successful_messages: 정상 JSON을 발행할 최대 횟수입니다.
+        process_id: JSON에 포함할 감시 대상 프로세스 ID입니다.
+        max_successful_messages: 정상 상태 메시지를 발행할 최대 횟수입니다.
     반환값:
         MockResourceState 인스턴스를 반환합니다.
     """
 
-    def __init__(self, process_id=None, max_successful_messages=10):
-        """모의 발행 상태를 초기화합니다.
+    def __init__(self, process_id=None, max_successful_messages=DEFAULT_MAX_MESSAGES):
+        """상태 생성 기준 시각과 발행 제한 횟수를 초기화합니다.
 
         인자:
-            process_id: 응답에 표시할 임시 프로세스 ID이며 없으면 현재 프로세스입니다.
+            process_id: 감시 대상 프로세스 ID이며 없으면 현재 프로세스 ID를 사용합니다.
             max_successful_messages: 정상 JSON을 발행할 최대 횟수입니다.
         반환값:
             없음.
@@ -45,23 +46,23 @@ class MockResourceState:
         self.successful_message_count = 0
 
     def can_publish(self):
-        """정상 JSON 메시지를 더 발행할 수 있는지 판단합니다.
+        """정상 상태 메시지를 추가로 발행할 수 있는지 판단합니다.
 
         인자:
             없음.
         반환값:
-            정상 발행 가능 여부를 bool로 반환합니다.
+            발행 가능하면 True, 발행 제한에 도달하면 False를 반환합니다.
         """
 
         return self.successful_message_count < self.max_successful_messages
 
     def build_message(self):
-        """현재 시점의 모의 자원 사용률 JSON을 생성합니다.
+        """현재 시점의 모의 Edge node 상태 JSON을 생성합니다.
 
         인자:
             없음.
         반환값:
-            Edge node MQTT publisher와 같은 구조의 딕셔너리를 반환합니다.
+            CPU, 메모리, 프로세스, 전원 상태를 담은 dict를 반환합니다.
         """
 
         self.successful_message_count += 1
@@ -72,8 +73,6 @@ class MockResourceState:
         process_memory = self._wave(elapsed, base=3.5, amplitude=2.0, speed=0.5)
         battery_remaining = self._wave(elapsed, base=62.0, amplitude=18.0, speed=0.2)
         external_power_connected = int(elapsed / 8) % 2 == 0
-        type_c_input_millivolt = 5100 if external_power_connected else 0
-        micro_usb_input_millivolt = 0
         return {
             "collected_at": datetime.now().isoformat(timespec="seconds"),
             "cpu": {"total_percent": round(cpu_total, 1)},
@@ -89,23 +88,23 @@ class MockResourceState:
                 "available": True,
                 "battery_remaining_percent": round(battery_remaining, 1),
                 "external_power_connected": external_power_connected,
-                "type_c_input_millivolt": type_c_input_millivolt,
-                "micro_usb_input_millivolt": micro_usb_input_millivolt,
+                "type_c_input_millivolt": 5100 if external_power_connected else 0,
+                "micro_usb_input_millivolt": 0,
                 "power_status_raw": 1,
                 "error": None,
             },
         }
 
     def _wave(self, elapsed, base, amplitude, speed):
-        """사인파 기반의 0~100 범위 모의 백분율 값을 계산합니다.
+        """사인파를 이용해 0부터 100 사이의 모의 백분율 값을 계산합니다.
 
         인자:
-            elapsed: publisher 시작 이후 지난 시간입니다.
+            elapsed: 도구 시작 이후 지난 시간입니다.
             base: 기준 백분율 값입니다.
-            amplitude: 변동 폭입니다.
-            speed: 변동 속도입니다.
+            amplitude: 값의 변동 폭입니다.
+            speed: 값의 변동 속도입니다.
         반환값:
-            0부터 100 사이의 float 값을 반환합니다.
+            0부터 100 사이로 제한된 float 값을 반환합니다.
         """
 
         value = base + amplitude * math.sin(elapsed * speed)
@@ -120,18 +119,27 @@ class MockMqttResourcePublisher:
         broker_port: MQTT broker 포트입니다.
         topic: 상태 JSON을 발행할 MQTT topic입니다.
         interval_seconds: 발행 주기입니다.
+        max_messages: 정상 메시지를 발행할 최대 횟수입니다.
     반환값:
         MockMqttResourcePublisher 인스턴스를 반환합니다.
     """
 
-    def __init__(self, broker_host, broker_port, topic, interval_seconds=2.0):
-        """모의 publisher 설정과 자원 상태 생성기를 초기화합니다.
+    def __init__(
+        self,
+        broker_host,
+        broker_port,
+        topic,
+        interval_seconds=DEFAULT_INTERVAL_SECONDS,
+        max_messages=DEFAULT_MAX_MESSAGES,
+    ):
+        """MQTT 접속 정보와 모의 상태 생성기를 초기화합니다.
 
         인자:
             broker_host: MQTT broker 호스트입니다.
             broker_port: MQTT broker 포트입니다.
             topic: 상태 JSON을 발행할 MQTT topic입니다.
             interval_seconds: 발행 주기입니다.
+            max_messages: 정상 메시지를 발행할 최대 횟수입니다.
         반환값:
             없음.
         """
@@ -140,16 +148,16 @@ class MockMqttResourcePublisher:
         self.broker_port = broker_port
         self.topic = topic
         self.interval_seconds = interval_seconds
-        self.resource_state = MockResourceState()
+        self.resource_state = MockResourceState(max_successful_messages=max_messages)
         self.client = _create_mqtt_client("ai-cctv-mock-edge-monitor")
 
     def run(self):
-        """MQTT broker에 연결한 뒤 모의 상태 메시지를 발행합니다.
+        """MQTT broker에 연결한 뒤 모의 상태 메시지를 반복 발행합니다.
 
         인자:
             없음.
         반환값:
-            정상적으로는 반환하지 않습니다.
+            정상적으로는 반환하지 않으며, 사용자가 Ctrl+C로 종료합니다.
         """
 
         self.client.connect(self.broker_host, self.broker_port, keepalive=60)
@@ -174,7 +182,7 @@ class MockMqttResourcePublisher:
 
 
 def build_argument_parser():
-    """명령행 인자 파서를 생성합니다.
+    """명령행 인자 parser를 생성합니다.
 
     인자:
         없음.
@@ -186,15 +194,26 @@ def build_argument_parser():
     parser.add_argument("--host", default=DEFAULT_MQTT_HOST, help="MQTT broker host.")
     parser.add_argument("--port", type=int, default=DEFAULT_MQTT_PORT, help="MQTT port.")
     parser.add_argument("--topic", default=DEFAULT_MQTT_TOPIC, help="MQTT status topic.")
-    parser.add_argument("--interval", type=float, default=2.0, help="Publish interval.")
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=DEFAULT_INTERVAL_SECONDS,
+        help="Publish interval seconds.",
+    )
+    parser.add_argument(
+        "--max-messages",
+        type=int,
+        default=DEFAULT_MAX_MESSAGES,
+        help="Normal messages to publish before staying silent.",
+    )
     return parser
 
 
 def _create_mqtt_client(client_id):
-    """설치된 paho-mqtt 버전에 맞는 MQTT 클라이언트를 생성합니다.
+    """설치된 paho-mqtt 버전에 맞는 MQTT client를 생성합니다.
 
     인자:
-        client_id: MQTT broker에 전달할 클라이언트 ID입니다.
+        client_id: MQTT broker에 전달할 client ID입니다.
     반환값:
         paho.mqtt.client.Client 인스턴스를 반환합니다.
     """
@@ -211,7 +230,7 @@ def _create_mqtt_client(client_id):
 
 
 def main():
-    """명령행 인자를 읽고 모의 MQTT publisher를 시작합니다.
+    """명령행 인자를 읽고 모의 MQTT publisher를 실행합니다.
 
     인자:
         없음.
@@ -225,9 +244,10 @@ def main():
         broker_port=args.port,
         topic=args.topic,
         interval_seconds=args.interval,
+        max_messages=args.max_messages,
     )
     print(f"Mock Edge node MQTT publisher: {args.host}:{args.port} topic={args.topic}")
-    print("Normal publishes: 10; then publisher stays silent.")
+    print(f"Normal publishes: {args.max_messages}; then publisher stays silent.")
     print("Stop: Ctrl+C")
     try:
         publisher.run()

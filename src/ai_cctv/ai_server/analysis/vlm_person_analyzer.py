@@ -2,7 +2,7 @@
 # 기존 Qwen 기반 분석 구현을 테스트 파일명이 아닌 안정적인 모듈명으로 제공합니다.
 # VLMWorker는 이 파일을 통해 인물 crop 이미지 분석 기능을 사용합니다.
 
-from .vlm_person_analyzer_qwen_test import PersonAnalyzer as QwenPersonAnalyzer
+from .qwen_person_analyzer import PersonAnalyzer as QwenPersonAnalyzer
 
 
 class PersonAnalyzer(QwenPersonAnalyzer):

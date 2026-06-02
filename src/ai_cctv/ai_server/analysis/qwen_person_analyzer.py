@@ -1,6 +1,6 @@
-# vlm_person_analyzer_qwen_test.py 파일입니다.
-# AI CCTV 프로젝트의 analysis 영역에서 사용하는 소스 코드입니다.
-# 이 파일의 클래스와 함수 책임은 각 국문 docstring에 정리되어 있습니다.
+# Qwen 기반 사람 속성 분석기 파일입니다.
+# AI server의 VLM 분석 단계에서 crop 이미지를 받아 사람 속성을 추론합니다.
+# 테스트용 파일이 아니라 production 분석 모듈이므로 별도 모듈명으로 관리합니다.
 
 import time
 import torch
