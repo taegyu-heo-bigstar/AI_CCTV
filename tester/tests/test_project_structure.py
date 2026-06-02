@@ -4,6 +4,7 @@
 
 import unittest
 import os
+import socket
 import tempfile
 import tomllib
 import zipfile
@@ -56,14 +57,20 @@ from ai_cctv.edge_node.local_backup import LocalBackupConfig
 from ai_cctv.edge_node.mediamtx import MediaMtxConfig, MediaMtxReleaseResolver
 from ai_cctv.edge_node.os_guard import ensure_supported_edge_os, is_supported_edge_os
 from ai_cctv.edge_node.monitoring.power_status import UpsPlusPowerReader
+from ai_cctv.edge_node.monitoring.mqtt_broker import (
+    MqttBrokerConfig,
+    TinyMqttBroker,
+    build_publish_packet,
+    read_mqtt_packet,
+)
 from ai_cctv.edge_node.monitoring.resource_monitor_publisher import (
     MqttResourceMonitorConfig,
 )
 from ai_cctv.edge_node.startup_info import build_edge_connection_info
 from ai_cctv.edge_node.streaming import EdgeStreamConfig, MediaMtxGStreamerCommandBuilder
+from ai_cctv.edge_node.support_processes import EdgeSupportProcessConfig
 from tester.pseudo_edge_node.backup_recovery import build_pseudo_recovery_archive
 from tester.pseudo_edge_node.config import PseudoEdgeNodeConfig
-from tester.pseudo_edge_node.mqtt_broker import build_publish_packet
 
 
 class FakeSmbus:
@@ -403,6 +410,10 @@ class ProjectStructureTest(unittest.TestCase):
 
         self.assertEqual(scripts["ai-cctv-edge"], "ai_cctv.edge_node.main:main")
         self.assertEqual(
+            scripts["ai-cctv-edge-mqtt-broker"],
+            "ai_cctv.edge_node.monitoring.mqtt_broker:main",
+        )
+        self.assertEqual(
             scripts["ai-cctv-edge-monitor"],
             "ai_cctv.edge_node.monitoring.resource_monitor_publisher:main",
         )
@@ -441,6 +452,9 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(Path("src/ai_cctv/edge_node/backup_recovery_server.py").is_file())
         self.assertTrue(Path("src/ai_cctv/edge_node/monitoring").is_dir())
         self.assertTrue(
+            Path("src/ai_cctv/edge_node/monitoring/mqtt_broker.py").is_file()
+        )
+        self.assertTrue(
             Path(
                 "src/ai_cctv/edge_node/monitoring/resource_monitor_publisher.py"
             ).is_file()
@@ -476,7 +490,8 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertFalse(Path("docs/rtsp_v1.md").exists())
         self.assertTrue(Path("docs/rtsp.md").is_file())
         self.assertFalse(Path(".proj_env").exists())
-        self.assertTrue(Path(".env").is_file())
+        self.assertTrue(Path(".env.example").is_file())
+        self.assertIn(".env", Path(".gitignore").read_text(encoding="utf-8"))
         self.assertTrue(Path("src/ai_cctv/ai_server").is_dir())
         self.assertTrue(Path("src/ai_cctv/ai_server/server_run.py").is_file())
         self.assertTrue(Path("src/ai_cctv/ai_server/connection").is_dir())
@@ -849,8 +864,8 @@ class ProjectStructureTest(unittest.TestCase):
             finally:
                 archive.path.unlink(missing_ok=True)
 
-    def test_resource_monitor_mqtt_defaults_match_between_nodes(self):
-        """Edge node와 AI server의 기본 MQTT topic이 같은지 검증합니다.
+    def test_resource_monitor_mqtt_defaults_use_edge_broker(self):
+        """Edge node 내장 broker와 MQTT 상태 발행 기본값을 검증합니다.
 
         인자:
             없음.
@@ -858,15 +873,20 @@ class ProjectStructureTest(unittest.TestCase):
             없음.
         """
 
+        broker_config = MqttBrokerConfig()
         edge_config = MqttResourceMonitorConfig()
         ai_server_config = MqttResourceSubscriberConfig()
+        support_config = EdgeSupportProcessConfig()
 
+        self.assertEqual(broker_config.host, "0.0.0.0")
+        self.assertEqual(broker_config.port, 1883)
         self.assertEqual(edge_config.broker_host, "127.0.0.1")
         self.assertEqual(edge_config.broker_port, 1883)
         self.assertEqual(edge_config.topic, "ai-cctv/edge-node/status")
-        self.assertEqual(ai_server_config.broker_host, edge_config.broker_host)
+        self.assertEqual(ai_server_config.broker_host, "127.0.0.1")
         self.assertEqual(ai_server_config.broker_port, edge_config.broker_port)
         self.assertEqual(ai_server_config.topic, edge_config.topic)
+        self.assertTrue(support_config.run_mqtt_broker)
 
     def test_edge_connection_info_prints_ai_server_settings(self):
         """Edge node 시작 정보가 AI server 설정값을 포함하는지 검증합니다.
@@ -879,7 +899,6 @@ class ProjectStructureTest(unittest.TestCase):
 
         connection_info = build_edge_connection_info(
             edge_host="192.168.137.2",
-            mqtt_host="192.168.137.1",
             mqtt_port=1883,
             mqtt_topic="ai-cctv/edge-node/status",
             backup_recovery_port=8002,
@@ -893,7 +912,7 @@ class ProjectStructureTest(unittest.TestCase):
             "http://192.168.137.2:8002/recover",
         )
         self.assertIn("EDGE_HOST=192.168.137.2", terminal_text)
-        self.assertIn("MQTT_BROKER=192.168.137.1:1883", terminal_text)
+        self.assertIn("MQTT_BROKER=192.168.137.2:1883", terminal_text)
         self.assertIn(
             '$env:AI_CCTV_RECOVERY_SERVER_URL="http://192.168.137.2:8002/recover"',
             terminal_text,
@@ -1002,8 +1021,8 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertNotIn("AI_CCTV_USE_PSEUDO_EDGE", terminal_text)
         self.assertIn("RTSP_URL=rtsp://127.0.0.1:8554/live", terminal_text)
 
-    def test_pseudo_mqtt_publish_packet_contains_topic_and_payload(self):
-        """pseudo MQTT broker가 publish packet을 생성하는지 검증합니다.
+    def test_mqtt_publish_packet_contains_topic_and_payload(self):
+        """MQTT broker helper가 publish packet을 생성하는지 검증합니다.
 
         인자:
             없음.
@@ -1016,6 +1035,55 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertTrue(packet.startswith(b"\x31"))
         self.assertIn(b"ai-cctv/edge-node/status", packet)
         self.assertIn(b'{"ok": true}', packet)
+
+    def test_edge_mqtt_broker_accepts_basic_subscribe_and_publish(self):
+        """Edge node 내장 MQTT broker가 기본 구독과 발행을 처리하는지 검증합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        topic = "ai-cctv/edge-node/status"
+        broker = TinyMqttBroker(MqttBrokerConfig(host="127.0.0.1", port=0))
+        broker.start()
+        port = broker.server_socket.getsockname()[1]
+
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=2) as client:
+                client.settimeout(2)
+                client.sendall(b"\x10\x0c\x00\x04MQTT\x04\x02\x00<\x00\x00")
+
+                fixed_header, payload = read_mqtt_packet(client)
+                self.assertEqual(fixed_header, 0x20)
+                self.assertEqual(payload, b"\x00\x00")
+
+                topic_bytes = topic.encode("utf-8")
+                subscribe_payload = (
+                    b"\x00\x01"
+                    + len(topic_bytes).to_bytes(2, "big")
+                    + topic_bytes
+                    + b"\x00"
+                )
+                client.sendall(
+                    b"\x82"
+                    + bytes([len(subscribe_payload)])
+                    + subscribe_payload
+                )
+
+                fixed_header, payload = read_mqtt_packet(client)
+                self.assertEqual(fixed_header, 0x90)
+                self.assertEqual(payload, b"\x00\x01\x00")
+
+                client.sendall(build_publish_packet(topic, '{"ok": true}', retain=True))
+                fixed_header, payload = read_mqtt_packet(client)
+
+                self.assertEqual(fixed_header, 0x31)
+                self.assertIn(topic_bytes, payload)
+                self.assertIn(b'{"ok": true}', payload)
+        finally:
+            broker.stop()
 
     def test_pseudo_backup_recovery_archive_contains_ts_segment(self):
         """pseudo 백업 복구 응답 ZIP에 TS segment가 포함되는지 검증합니다.

@@ -1,5 +1,5 @@
 # Edge node 실행 진입점 파일입니다.
-# MediaMTX 준비와 GStreamer 송출 프로세스를 Python 런타임으로 실행합니다.
+# MediaMTX, 내장 MQTT broker, GStreamer 송출 프로세스를 Python 런타임으로 실행합니다.
 # 운영자는 ai-cctv-edge 명령으로 Raspberry Pi 송출 노드를 시작합니다.
 
 import argparse
@@ -39,7 +39,7 @@ def build_argument_parser():
     parser.add_argument(
         "--no-support-services",
         action="store_true",
-        help="MQTT 상태 발행과 백업 복구 API 보조 프로세스를 실행하지 않습니다.",
+        help="MQTT broker, MQTT 상태 발행, 백업 복구 API 보조 프로세스를 실행하지 않습니다.",
     )
     return parser
 

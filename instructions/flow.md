@@ -21,9 +21,9 @@ AI_CCTV/
 |       |   |-- mediamtx.py         # MediaMTX 다운로드, 설치 확인, 프로세스 관리
 |       |   |-- streaming.py        # GStreamer 송출/로컬 백업 파이프라인 생성
 |       |   |-- local_backup.py     # 로컬 백업 세그먼트 파일명 정책
-|       |   |-- support_processes.py # MQTT publisher와 복구 API 보조 프로세스 관리
+|       |   |-- support_processes.py # MQTT broker, MQTT publisher, 복구 API 보조 프로세스 관리
 |       |   |-- backup_recovery_server.py # 누락 구간 로컬 백업 ZIP 제공
-|       |   |-- monitoring/         # Edge node 자원/전원 모니터링 MQTT publisher
+|       |   |-- monitoring/         # Edge node MQTT broker와 자원/전원 모니터링 publisher
 |       |   `-- failover.py         # 네트워크 장애 대응 정책
 |       `-- ai_server/              # Windows AI server 배포 단위
 |           |-- server_run.py       # AI server 실행 진입점
@@ -47,7 +47,7 @@ AI_CCTV/
 
 | 실행 묶음 | 설치 extras | console script | 주요 책임 |
 |---|---|---|---|
-| Edge node | `ai-cctv[edge-node]` | `ai-cctv-edge` | 카메라 송출, MediaMTX 실행, 로컬 백업, FastAPI 백업 복구 ZIP 제공, MQTT 자원/전원 상태 발행, 네트워크 장애 대응 정책 |
+| Edge node | `ai-cctv[edge-node]` | `ai-cctv-edge` | 카메라 송출, MediaMTX 실행, 로컬 백업, 내장 MQTT broker 실행, FastAPI 백업 복구 ZIP 제공, MQTT 자원/전원 상태 발행, 네트워크 장애 대응 정책 |
 | AI server | `ai-cctv[ai-server]` | `ai-cctv-ai-server` 또는 `ai-cctv` | RTSP 수신/재연결, OpenCV/YOLO 분석, MQTT 상태 구독, 이상 상황 판정, Discord 알림, GUI, requests 기반 누락 구간 복구 요청 |
 
 ## System Flow
@@ -64,6 +64,7 @@ flowchart LR
     EdgeRuntime --> MediaMtxManager["MediaMtxInstaller / MediaMtxProcessManager"]
     EdgeRuntime --> BackupConfig["LocalBackupConfig"]
     EdgeRuntime --> StreamBuilder["MediaMtxGStreamerCommandBuilder"]
+    SupportProcessManager --> EdgeMqttBroker["edge_node/monitoring/mqtt_broker.py"]
     SupportProcessManager --> MonitorPublisher["edge_node/monitoring/resource_monitor_publisher.py"]
     SupportProcessManager --> BackupRecoveryServer["FastAPI backup_recovery_server.py"]
     Pi --> Failover["EdgeNetworkFailoverPolicy"]
@@ -71,7 +72,8 @@ flowchart LR
     BackupRecoveryServer --> BackupFiles
     StreamBuilder --> MediaMTX["로컬 MediaMTX RTMP publish"]
     MediaMTX --> RTSP["RTSP Stream"]
-    MonitorPublisher --> MQTTBroker["MQTT Broker"]
+    EdgeMqttBroker --> MQTTBroker["Edge node MQTT Broker"]
+    MonitorPublisher --> MQTTBroker
     RTSP --> ServerRun["ai_cctv/ai_server/server_run.py"]
     ServerRun --> OsGuard["ensure_windows_os"]
     ServerRun --> PyQtBootstrap["ensure_pyqt5_available"]
@@ -356,14 +358,14 @@ pip install -e ".[edge-node]"
 ai-cctv-edge
 ```
 
-기본 `ai-cctv-edge`는 RTSP 송출과 함께 MQTT 상태 발행, 백업 복구 API를 보조 프로세스로 실행합니다. 송출 명령만 확인하려면 `ai-cctv-edge --print-command`, RTSP 단독 점검은 `ai-cctv-edge --no-support-services`를 사용합니다.
+기본 `ai-cctv-edge`는 RTSP 송출과 함께 내장 MQTT broker, MQTT 상태 발행, 백업 복구 API를 보조 프로세스로 실행합니다. 송출 명령만 확인하려면 `ai-cctv-edge --print-command`, RTSP 단독 점검은 `ai-cctv-edge --no-support-services`를 사용합니다.
 
 ```bash
 pip install -e ".[ai-server]"
 ai-cctv-ai-server
 ```
 
-MQTT 상태 발행을 단독 점검하려면 `ai-cctv-edge-monitor`와 `python -m ai_cctv.ai_server.monitoring.resource_monitor_client`를 별도로 실행할 수 있습니다.
+MQTT 상태 발행을 단독 점검하려면 Edge node에서 `ai-cctv-edge-mqtt-broker`, `ai-cctv-edge-monitor`를 별도 터미널로 실행하고 AI server에서 `python -m ai_cctv.ai_server.monitoring.resource_monitor_client`를 실행할 수 있습니다.
 
 네트워크 단절 구간 복구 서버 실행 예시는 다음과 같습니다.
 
@@ -384,7 +386,7 @@ SSH로 Edge node에 접속해 실행하는 경우 `ai-cctv-edge`는 시작 직�
 [AI_CCTV Edge Node Connection]
 EDGE_HOST=192.168.137.2
 RTSP_URL=rtsp://192.168.137.2:8554/live
-MQTT_BROKER=192.168.137.1:1883
+MQTT_BROKER=192.168.137.2:1883
 MQTT_TOPIC=ai-cctv/edge-node/status
 BACKUP_RECOVERY_URL=http://192.168.137.2:8002/recover
 BACKUP_DIR=~/backups
@@ -392,7 +394,7 @@ BACKUP_DIR=~/backups
 
 자동 감지가 SSH 서버 IP, 지정 인터페이스 IP, UDP 라우팅 결과 순서로 실패하면 `127.0.0.1`이 출력될 수 있습니다. 이때는 Edge node에서 `AI_CCTV_EDGE_HOST`를 유선 IP로 지정한 뒤 다시 실행합니다.
 
-Edge node의 `ai-cctv-edge`, `ai-cctv-edge-monitor`, `ai-cctv-edge-backup-recovery` 진입점은 실행 직후 `ensure_supported_edge_os`를 호출합니다. Windows나 macOS는 즉시 종료되며, `/etc/os-release`에서 배포판을 확인할 수 있는 Linux 환경은 Debian, Raspbian, Ubuntu 계열만 허용합니다. 배포판 정보를 읽을 수 없는 최소 Linux 환경은 Linux 커널 실행 환경으로 보고 허용합니다. 기본 `ai-cctv-edge` 실행은 MediaMTX와 GStreamer 외에도 MQTT 상태 publisher와 FastAPI 백업 복구 서버를 보조 프로세스로 함께 실행합니다. RTSP 송출만 단독 점검하려면 `ai-cctv-edge --no-support-services`를 사용합니다.
+Edge node의 `ai-cctv-edge`, `ai-cctv-edge-mqtt-broker`, `ai-cctv-edge-monitor`, `ai-cctv-edge-backup-recovery` 진입점은 실행 직후 `ensure_supported_edge_os`를 호출합니다. Windows나 macOS는 즉시 종료되며, `/etc/os-release`에서 배포판을 확인할 수 있는 Linux 환경은 Debian, Raspbian, Ubuntu 계열만 허용합니다. 배포판 정보를 읽을 수 없는 최소 Linux 환경은 Linux 커널 실행 환경으로 보고 허용합니다. 기본 `ai-cctv-edge` 실행은 MediaMTX와 GStreamer 외에도 MQTT broker, MQTT 상태 publisher, FastAPI 백업 복구 서버를 보조 프로세스로 함께 실행합니다. RTSP 송출만 단독 점검하려면 `ai-cctv-edge --no-support-services`를 사용합니다.
 
 AI server는 `server_run.main` 진입 직후 Windows OS 여부를 확인합니다. Windows가 아니면 한국어 오류 메시지를 표준 오류로 출력하고 종료합니다. Windows에서는 먼저 PyQt5가 있는지 확인하고, 없으면 표준 라이브러리 tkinter 창으로 PyQt5 설치 여부를 묻습니다. PyQt5가 준비되면 `EdgeConnectionDialog`가 먼저 표시됩니다. 연결 모드가 정해진 뒤 `RuntimeEnvironmentChecker`가 해당 모드에 필요한 최소 패키지만 점검합니다. YOLO, Qwen VLM, Discord 알림처럼 분석 시작 때 필요한 항목은 사용자가 영상 시작을 누를 때 선택된 옵션에 맞춰 다시 점검합니다. 누락 항목이 있으면 `RuntimeReadinessDialog`가 표시되고, 사용자가 `O - 자동 설치`를 누른 경우에만 `RuntimeInstaller`가 pip 설치와 모델 다운로드를 시도합니다.
 

@@ -6,7 +6,7 @@ Raspberry Pi 기반 Edge node와 Windows 기반 AI server를 분리해 구성하
 
 | 묶음 | 역할 | 실행 명령 |
 |---|---|---|
-| Edge node | 카메라 영상 송출, MediaMTX 실행, GStreamer 송출/로컬 백업, MQTT 상태 발행, 백업 복구 ZIP 제공, 네트워크 장애 대응 정책 | `ai-cctv-edge` |
+| Edge node | 카메라 영상 송출, MediaMTX 실행, GStreamer 송출/로컬 백업, MQTT broker 실행, MQTT 상태 발행, 백업 복구 ZIP 제공, 네트워크 장애 대응 정책 | `ai-cctv-edge` |
 | AI server | RTSP 수신/재연결, OpenCV/YOLO 분석, MQTT 상태 구독, 이상 상황 판정, Discord 알림, GUI, 누락 구간 복구 요청 | `ai-cctv-ai-server` |
 
 ## 설치
@@ -18,7 +18,7 @@ pip install -e ".[edge-node]"
 ai-cctv-edge
 ```
 
-`ai-cctv-edge`는 기본적으로 MediaMTX, GStreamer 송출, MQTT 상태 발행, 백업 복구 API를 같은 생명주기로 실행합니다. MQTT broker는 별도 실행 중이어야 하며, broker가 Windows AI server에 있으면 `AI_CCTV_MQTT_HOST`를 Windows 유선 IP로 지정합니다.
+`ai-cctv-edge`는 기본적으로 MediaMTX, GStreamer 송출, 내장 MQTT broker, MQTT 상태 발행, 백업 복구 API를 같은 생명주기로 실행합니다. 별도 MQTT broker는 필요하지 않습니다. 외부 broker를 사용할 때만 `AI_CCTV_EDGE_ENABLE_MQTT_BROKER=0`으로 내장 broker를 끄고 `AI_CCTV_MQTT_HOST`를 외부 broker 주소로 지정합니다.
 
 Edge node Python 의존성에는 Python GStreamer 바인딩을 포함하지 않습니다. 실제 송출은 `gst-launch-1.0` 외부 명령을 사용하므로 라즈베리 파이에는 `gstreamer1.0-tools`, libcamera/rpicam 관련 시스템 패키지가 별도로 설치되어 있어야 합니다.
 
@@ -41,12 +41,17 @@ pip install -e ".[ai-server]"
 ai-cctv-ai-server
 ```
 
-Edge node 상태 정보는 MQTT broker를 기준으로 주고받습니다. 기본 broker는 `127.0.0.1:1883`, 기본 topic은 `ai-cctv/edge-node/status`입니다. 통합 실행을 쓰지 않고 개별 프로세스를 점검할 때는 다음 명령을 직접 실행할 수 있습니다.
+Discord 알림을 사용하려면 `.env.example`을 `.env`로 복사한 뒤 `DISCORD_BOT_TOKEN`, `DISCORD_CHANNEL_ID`를 채우거나 같은 이름의 OS 환경 변수를 설정합니다.
+
+Edge node 상태 정보는 MQTT broker를 기준으로 주고받습니다. 통합 실행의 broker는 Edge node의 `1883` 포트에서 열리고, 기본 topic은 `ai-cctv/edge-node/status`입니다. 통합 실행을 쓰지 않고 개별 프로세스를 점검할 때는 다음 명령을 직접 실행할 수 있습니다.
 
 ```bash
+ai-cctv-edge-mqtt-broker
 ai-cctv-edge-monitor
 python -m ai_cctv.ai_server.monitoring.resource_monitor_client
 ```
+
+통합 실행에서는 broker가 Edge node 유선 IP의 `1883` 포트로 외부에 열리고, 상태 publisher는 같은 Edge node 내부의 `127.0.0.1:1883`로 접속합니다. AI server는 Edge node 표준 출력의 `MQTT_BROKER` 값을 그대로 사용합니다.
 
 네트워크 단절 후 누락 구간 영상을 복구하려면 Edge node에서 FastAPI 기반 백업 복구 서버를 실행합니다. 통합 실행에서는 자동으로 실행되며, 개별 점검 시에는 다음 명령을 직접 사용할 수 있습니다.
 
@@ -82,9 +87,9 @@ src/
     |   |-- runtime.py  # MediaMTX 준비와 GStreamer 실행 조율
     |   |-- mediamtx.py # MediaMTX 다운로드/프로세스 관리
     |   |-- streaming.py # GStreamer 송출/백업 파이프라인 생성
-    |   |-- support_processes.py # MQTT/복구 보조 프로세스 관리
+    |   |-- support_processes.py # MQTT broker, MQTT publisher, 복구 보조 프로세스 관리
     |   |-- backup_recovery_server.py # 누락 구간 백업 ZIP 제공
-    |   |-- monitoring/ # MQTT 자원/전원 상태 발행
+    |   |-- monitoring/ # MQTT broker와 자원/전원 상태 발행
     |   `-- local_backup.py # 백업 세그먼트 경로 정책
     `-- ai_server/      # Windows AI server 실행 코드
         |-- server_run.py
@@ -112,7 +117,6 @@ Edge node 진입점은 Linux에서만 실행됩니다. `/etc/os-release`로 배�
 
 ```bash
 export AI_CCTV_EDGE_HOST=192.168.137.2
-export AI_CCTV_MQTT_HOST=192.168.137.1
 ai-cctv-edge
 ```
 
@@ -120,7 +124,11 @@ ai-cctv-edge
 
 ```bash
 export AI_CCTV_EDGE_HOST=192.168.137.2
-export AI_CCTV_MQTT_HOST=192.168.137.1
+ai-cctv-edge-mqtt-broker
+```
+
+```bash
+export AI_CCTV_EDGE_HOST=192.168.137.2
 ai-cctv-edge-monitor
 ```
 
@@ -135,7 +143,7 @@ ai-cctv-edge-backup-recovery
 [AI_CCTV Edge Node Connection]
 EDGE_HOST=192.168.137.2
 RTSP_URL=rtsp://192.168.137.2:8554/live
-MQTT_BROKER=192.168.137.1:1883
+MQTT_BROKER=192.168.137.2:1883
 MQTT_TOPIC=ai-cctv/edge-node/status
 BACKUP_RECOVERY_URL=http://192.168.137.2:8002/recover
 BACKUP_DIR=~/backups

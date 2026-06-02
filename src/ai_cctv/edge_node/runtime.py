@@ -1,6 +1,6 @@
 # Edge node 실행 런타임 파일입니다.
-# MediaMTX 준비, 로컬 백업 폴더 생성, GStreamer 실행 순서를 조율합니다.
-# Raspberry Pi에서 ai-cctv-edge 명령이 실제 송출 프로세스를 실행하도록 합니다.
+# MediaMTX, 내장 MQTT broker, 로컬 백업 폴더, GStreamer 실행 순서를 조율합니다.
+# Raspberry Pi에서 ai-cctv-edge 명령이 송출과 보조 서비스를 함께 실행하도록 합니다.
 
 import signal
 import subprocess
@@ -39,7 +39,7 @@ class EdgeNodeRuntime:
             mediamtx_installer: MediaMTX 설치 보장 객체입니다.
             mediamtx_process_manager: MediaMTX 프로세스 관리 객체입니다.
             command_builder: GStreamer 명령 생성 객체입니다.
-            support_process_manager: MQTT/복구 보조 프로세스 관리 객체입니다.
+            support_process_manager: MQTT broker, MQTT publisher, 복구 보조 프로세스 관리 객체입니다.
         반환값:
             없음.
         """
@@ -71,7 +71,7 @@ class EdgeNodeRuntime:
         return self.command_builder.build_command_args()
 
     def run(self):
-        """MediaMTX와 GStreamer를 순서대로 실행하고 종료 시 정리합니다.
+        """MediaMTX, MQTT broker, GStreamer를 순서대로 실행하고 종료 시 정리합니다.
 
         인자:
             없음.
@@ -83,6 +83,7 @@ class EdgeNodeRuntime:
         self.backup_config.ensure_directory()
         self.mediamtx_installer.ensure_installed()
         self.mediamtx_process_manager.start()
+        self.support_process_manager.start_mqtt_broker()
         self.support_process_manager.start_backup_recovery(
             backup_dir=str(self.backup_config.directory)
         )

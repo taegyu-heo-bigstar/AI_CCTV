@@ -2,7 +2,6 @@
 # 화면 구성, 사용자 조작, VideoWorker 신호 연결을 담당합니다.
 # PyTorch는 server_run.py에서 PyQt보다 먼저 초기화하고 영상 작업자는 지연 import합니다.
 
-import os
 import sys
 
 from PyQt5.QtCore import Qt
@@ -23,10 +22,6 @@ from PyQt5.QtWidgets import (
 
 from .settings_window import SettingsWindow
 from .event_presenter import EventPresenter
-
-
-os.environ.setdefault("QT_QPA_PLATFORM_PLUGIN_PATH", r"C:\qt_plugins")
-os.environ.setdefault("QT_PLUGIN_PATH", r"C:\qt_plugins")
 
 
 class CCTVMainWindow(QMainWindow):

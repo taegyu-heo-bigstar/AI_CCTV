@@ -18,7 +18,9 @@
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `_read_env_value` | 루트의 .env 파일에서 지정한 값을 읽습니다. | '' | 없음 | 일반 동작 |
+| `_read_env_value` | 환경 변수 또는 루트의 .env 파일에서 지정한 값을 읽습니다. | 설정값 문자열 | 없음 | 환경 변수 우선 |
+| `_find_env_file` | 현재 실행 위치와 소스 상위 경로에서 .env 파일을 찾습니다. | Path 또는 None | 없음 | 루트 위치 변경 대응 |
+| `_iter_env_file_candidates` | 확인할 .env 후보 경로를 중복 없이 생성합니다. | Path iterator | 없음 | 내부 함수 |
 | `DiscordBotSender` | Discord 봇 로그인과 메시지 전송을 담당하는 클래스입니다. | DiscordBotSender 인스턴스 | RuntimeError, TimeoutError | 일반 동작 |
 | `DiscordBotSender.__init__` | Discord 전송 객체를 초기화합니다. | None | RuntimeError | 일반 동작 |
 | `DiscordBotSender.start` | Discord client를 시작하고 준비 완료까지 기다립니다. | None | RuntimeError, TimeoutError | 일반 동작 |
@@ -434,6 +436,33 @@
 | `_to_int_reason_code` | paho 연결 결과 코드를 정수로 변환합니다. | int | ValueError | v2 ReasonCode 대응 |
 | `main` | Edge node MQTT 상태 메시지를 한 번 수신해 콘솔에 출력합니다. | None | RuntimeError | `python -m` 실행 진입점 |
 
+## `src/ai_cctv/edge_node/monitoring/mqtt_broker.py`
+
+| 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
+|---|---|---|---|---|
+| `MqttBrokerConfig` | Edge node 내장 MQTT broker 실행 설정을 표현합니다. | MqttBrokerConfig 인스턴스 | 없음 | dataclass |
+| `MqttBrokerConfig.from_environment` | 환경 변수에서 MQTT broker 실행 설정을 생성합니다. | MqttBrokerConfig 인스턴스 | ValueError | `AI_CCTV_MQTT_BROKER_HOST`, `AI_CCTV_MQTT_PORT` 지원 |
+| `TinyMqttBroker` | Edge node 상태 발행과 AI server 구독을 위한 최소 MQTT broker입니다. | TinyMqttBroker 인스턴스 | OSError | MQTT QoS 0 중심 |
+| `TinyMqttBroker.__init__` | MQTT broker socket, 구독자 목록, retained packet 저장소를 초기화합니다. | None | 없음 | thread lock 사용 |
+| `TinyMqttBroker.start` | MQTT broker listen thread를 시작합니다. | None | OSError | 중복 시작 방지 |
+| `TinyMqttBroker.run_forever` | MQTT broker를 시작하고 종료 신호까지 대기합니다. | 반환 없음 | OSError | 단독 실행용 |
+| `TinyMqttBroker.stop` | MQTT broker와 연결된 client socket을 종료합니다. | None | 없음 | 종료 시 socket 정리 |
+| `TinyMqttBroker._accept_loop` | TCP client 연결을 받아 처리 thread를 생성합니다. | None | OSError | 내부 함수 |
+| `TinyMqttBroker._handle_client` | 단일 MQTT client의 CONNECT, SUBSCRIBE, PUBLISH, PINGREQ를 처리합니다. | None | OSError | 내부 함수 |
+| `TinyMqttBroker._handle_subscribe` | SUBSCRIBE topic을 등록하고 SUBACK 및 retained packet을 전송합니다. | None | OSError | exact topic 지원 |
+| `TinyMqttBroker._handle_publish` | PUBLISH payload를 topic과 메시지로 분리해 구독자에게 전달합니다. | None | OSError | retained packet 갱신 |
+| `TinyMqttBroker._publish_to_subscribers` | 지정 topic의 구독자 socket에 publish packet을 전송합니다. | 전달 client 수 | OSError | 실패 socket 정리 |
+| `TinyMqttBroker._remove_client` | 모든 구독 목록에서 지정 client socket을 제거합니다. | None | 없음 | 내부 함수 |
+| `read_mqtt_packet` | socket에서 MQTT fixed header와 payload를 읽습니다. | tuple | OSError | 패킷 파서 |
+| `read_exact` | socket에서 지정 바이트 수만큼 읽습니다. | bytes | OSError | 내부 I/O 함수 |
+| `read_remaining_length` | MQTT remaining length 필드를 정수로 읽습니다. | int | OSError | variable byte integer |
+| `parse_subscribe_topics` | SUBSCRIBE payload에서 packet id와 topic 목록을 추출합니다. | tuple | OSError | QoS 값 무시 |
+| `parse_publish_payload` | MQTT PUBLISH payload에서 topic과 메시지를 분리합니다. | tuple | OSError | QoS 0 payload 기준 |
+| `build_publish_packet` | QoS 0 MQTT PUBLISH packet을 생성합니다. | bytes | 없음 | retain 옵션 지원 |
+| `encode_remaining_length` | MQTT remaining length 정수를 variable byte 형식으로 인코딩합니다. | bytes | ValueError | MQTT 길이 제한 검증 |
+| `_close_socket` | socket 종료와 close를 예외 없이 수행합니다. | None | 없음 | 내부 함수 |
+| `main` | OS guard를 통과한 뒤 Edge node 내장 MQTT broker를 실행합니다. | 반환 없음 | SystemExit, OSError | `ai-cctv-edge-mqtt-broker` 진입점 |
+
 ## `src/ai_cctv/edge_node/monitoring/resource_monitor_publisher.py`
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
@@ -752,7 +781,7 @@
 | `EdgeNodeRuntime` | Edge node 송출 프로세스의 실행 흐름을 조율합니다. | EdgeNodeRuntime 객체 | 없음 | 의존 객체 주입 가능 |
 | `EdgeNodeRuntime.__init__` | Edge node 런타임 의존 객체를 초기화합니다. | None | 없음 | 기본 MediaMTX 설정 생성 |
 | `EdgeNodeRuntime.build_command_args` | 현재 런타임 설정으로 GStreamer 실행 인자를 생성합니다. | list | 없음 | 테스트 가능 |
-| `EdgeNodeRuntime.run` | 시작 연결 정보를 출력한 뒤 MediaMTX, 백업 복구 API, GStreamer, MQTT publisher를 실행합니다. | 종료 코드 | 하위 프로세스 오류 | 실제 실행 진입점 |
+| `EdgeNodeRuntime.run` | 시작 연결 정보를 출력한 뒤 MediaMTX, 내장 MQTT broker, 백업 복구 API, GStreamer, MQTT publisher를 실행합니다. | 종료 코드 | 하위 프로세스 오류 | 실제 실행 진입점 |
 | `EdgeNodeRuntime.stop` | GStreamer, 보조 프로세스, MediaMTX 프로세스를 종료합니다. | None | 프로세스 종료 오류 | finally에서 호출 |
 | `EdgeNodeRuntime._install_signal_handlers` | 운영체제 종료 신호를 정리 동작에 연결합니다. | None | signal 등록 오류 | 내부 함수 |
 | `EdgeNodeRuntime._handle_stop_signal` | 종료 신호를 받으면 하위 프로세스를 정리합니다. | None | SystemExit | 내부 함수 |
@@ -763,12 +792,14 @@
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
 | `EdgeSupportProcessConfig` | Edge node 보조 프로세스 실행 설정을 표현합니다. | EdgeSupportProcessConfig 객체 | 없음 | dataclass |
-| `EdgeSupportProcessManager` | MQTT 상태 publisher와 백업 복구 API 하위 프로세스를 관리합니다. | EdgeSupportProcessManager 객체 | 없음 | GStreamer와 같은 생명주기 |
+| `EdgeSupportProcessManager` | MQTT broker, MQTT 상태 publisher, 백업 복구 API 하위 프로세스를 관리합니다. | EdgeSupportProcessManager 객체 | 없음 | GStreamer와 같은 생명주기 |
 | `EdgeSupportProcessManager.__init__` | 보조 프로세스 관리자 상태를 초기화합니다. | None | 없음 | 설정 주입 가능 |
+| `EdgeSupportProcessManager.start_mqtt_broker` | Edge node 내장 MQTT broker를 하위 프로세스로 실행합니다. | Popen 또는 None | 실행 오류 | 포트 open 대기 |
 | `EdgeSupportProcessManager.start_backup_recovery` | 백업 복구 FastAPI 서버를 하위 프로세스로 실행합니다. | Popen 또는 None | 실행 오류 | 백업 경로 환경 변수 전달 |
 | `EdgeSupportProcessManager.start_resource_monitor` | MQTT 자원 상태 publisher를 하위 프로세스로 실행합니다. | Popen 또는 None | 실행 오류 | GStreamer PID를 감시 대상으로 전달 |
 | `EdgeSupportProcessManager.stop` | 실행한 보조 프로세스를 종료합니다. | None | 프로세스 종료 오류 | terminate 후 kill fallback |
 | `EdgeSupportProcessManager._start_module` | Python 모듈을 python -m 하위 프로세스로 실행합니다. | Popen | 실행 오류 | 내부 함수 |
+| `EdgeSupportProcessManager._wait_for_tcp_port` | 지정한 TCP 포트가 연결 가능한 상태가 될 때까지 대기합니다. | bool | 없음 | MQTT broker readiness 확인 |
 | `EdgeSupportProcessManager._build_environment` | 보조 프로세스용 환경 변수를 생성합니다. | dict | 없음 | 중복 시작 정보 출력 억제 |
 | `build_support_process_config_from_environment` | 환경 변수 기준으로 보조 프로세스 실행 설정을 생성합니다. | EdgeSupportProcessConfig | 없음 | 서비스별 on/off 지원 |
 | `build_support_process_manager_from_environment` | 환경 변수 기준으로 보조 프로세스 관리자를 생성합니다. | EdgeSupportProcessManager | 없음 | 런타임 기본값 |
@@ -848,7 +879,7 @@
 | `ProjectStructureTest.test_rtsp_receiver_watchdog_releases_active_capture` | RTSP watchdog이 활성 VideoCapture를 강제 해제하는지 검증합니다. | None | AssertionError | Mock capture 사용 |
 | `ProjectStructureTest.test_network_recovery_manager_skips_when_url_missing` | 복구 서버 URL이 없을 때 네트워크 요청 없이 실패 사유를 반환하는지 검증합니다. | None | AssertionError | 외부 네트워크 불필요 |
 | `ProjectStructureTest.test_backup_recovery_service_archives_overlapping_segments` | 요청 시간대와 겹치는 TS 백업 파일을 ZIP으로 묶는지 검증합니다. | None | AssertionError | 임시 파일 기반 |
-| `ProjectStructureTest.test_resource_monitor_mqtt_defaults_match_between_nodes` | Edge node와 AI server의 기본 MQTT 접속 설정이 일치하는지 검증합니다. | None | AssertionError | 상태 topic 불일치 방지 |
+| `ProjectStructureTest.test_resource_monitor_mqtt_defaults_use_edge_broker` | Edge node 내장 broker와 MQTT 상태 발행 기본값을 검증합니다. | None | AssertionError | broker 실행 위치 회귀 방지 |
 | `ProjectStructureTest.test_edge_connection_info_prints_ai_server_settings` | Edge node 시작 정보가 AI server 설정값을 포함하는지 검증합니다. | None | AssertionError | SSH 실행 안내 출력 회귀 방지 |
 | `ProjectStructureTest.test_edge_node_os_guard_accepts_linux_debian_family` | Edge node OS guard가 Linux Debian 계열을 허용하고 비지원 OS를 차단하는지 검증합니다. | None | AssertionError | Edge node 실행 환경 회귀 방지 |
 | `ProjectStructureTest.test_ai_server_parses_edge_startup_connection_text` | AI server 시작 UI가 Edge node 표준 출력값을 설정 객체로 해석하는지 검증합니다. | None | AssertionError | 연결 UI 붙여넣기 회귀 방지 |
@@ -858,3 +889,5 @@
 | `ProjectStructureTest.test_local_camera_connection_does_not_publish_edge_environment` | 로컬 카메라 모드가 Edge node 환경 변수를 남기지 않는지 검증합니다. | None | AssertionError | 로컬 테스트 분기 회귀 방지 |
 | `ProjectStructureTest.test_runtime_readiness_report_finds_missing_required_items` | 런타임 준비 보고서가 누락된 필수 요구사항을 찾는지 검증합니다. | None | AssertionError | 자동 설치 대상 산출 검증 |
 | `ProjectStructureTest.test_runtime_requirements_follow_selected_features` | 시작/분석 요구사항이 선택 기능에 맞게 분리되는지 검증합니다. | None | AssertionError | VLM/얼굴 식별 불필요 검사 방지 |
+| `ProjectStructureTest.test_mqtt_publish_packet_contains_topic_and_payload` | MQTT broker helper가 publish packet을 생성하는지 검증합니다. | None | AssertionError | production broker helper 검증 |
+| `ProjectStructureTest.test_edge_mqtt_broker_accepts_basic_subscribe_and_publish` | Edge node 내장 MQTT broker가 기본 구독과 발행을 처리하는지 검증합니다. | None | AssertionError | TCP socket 기반 최소 프로토콜 검증 |

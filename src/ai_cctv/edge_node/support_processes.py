@@ -3,8 +3,10 @@
 # GStreamer 송출 프로세스와 같은 생명주기로 보조 프로세스를 시작하고 정리합니다.
 
 import os
+import socket
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 
 
@@ -14,6 +16,7 @@ class EdgeSupportProcessConfig:
 
     인자:
         enabled: 보조 프로세스를 실행할지 여부입니다.
+        run_mqtt_broker: Edge node 내장 MQTT broker 실행 여부입니다.
         run_resource_monitor: MQTT 자원 상태 publisher 실행 여부입니다.
         run_backup_recovery: FastAPI 백업 복구 서버 실행 여부입니다.
         python_executable: 하위 Python 모듈 실행에 사용할 Python 경로입니다.
@@ -23,6 +26,7 @@ class EdgeSupportProcessConfig:
     """
 
     enabled: bool = True
+    run_mqtt_broker: bool = True
     run_resource_monitor: bool = True
     run_backup_recovery: bool = True
     python_executable: str = sys.executable
@@ -49,6 +53,28 @@ class EdgeSupportProcessManager:
 
         self.config = config or EdgeSupportProcessConfig()
         self.processes = []
+
+    def start_mqtt_broker(self):
+        """Edge node 내장 MQTT broker를 하위 프로세스로 실행합니다.
+
+        인자:
+            없음.
+        반환값:
+            실행한 subprocess.Popen 객체 또는 실행하지 않았을 때 None을 반환합니다.
+        """
+
+        if not self.config.enabled or not self.config.run_mqtt_broker:
+            return None
+
+        env = self._build_environment()
+        process = self._start_module("ai_cctv.edge_node.monitoring.mqtt_broker", env)
+        broker_port = int(env.get("AI_CCTV_MQTT_PORT", "1883"))
+        if self._wait_for_tcp_port("127.0.0.1", broker_port):
+            return process
+
+        if process.poll() is not None:
+            raise RuntimeError("Edge node MQTT broker 프로세스가 시작 직후 종료되었습니다.")
+        raise RuntimeError("Edge node MQTT broker 포트가 열리지 않았습니다.")
 
     def start_backup_recovery(self, backup_dir):
         """백업 복구 FastAPI 서버를 하위 프로세스로 실행합니다.
@@ -123,6 +149,26 @@ class EdgeSupportProcessManager:
         self.processes.append(process)
         return process
 
+    def _wait_for_tcp_port(self, host, port, timeout_seconds=3.0):
+        """지정한 TCP 포트가 연결 가능한 상태가 될 때까지 짧게 대기합니다.
+
+        인자:
+            host: 확인할 호스트 주소입니다.
+            port: 확인할 TCP 포트입니다.
+            timeout_seconds: 최대 대기 시간입니다.
+        반환값:
+            연결 가능하면 True, 제한 시간까지 실패하면 False를 반환합니다.
+        """
+
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            try:
+                with socket.create_connection((host, port), timeout=0.2):
+                    return True
+            except OSError:
+                time.sleep(0.1)
+        return False
+
     def _build_environment(self, extra_env=None):
         """보조 프로세스에 전달할 환경 변수를 생성합니다.
 
@@ -151,6 +197,7 @@ def build_support_process_config_from_environment():
 
     return EdgeSupportProcessConfig(
         enabled=_read_bool_env("AI_CCTV_EDGE_ENABLE_SUPPORT_SERVICES", True),
+        run_mqtt_broker=_read_bool_env("AI_CCTV_EDGE_ENABLE_MQTT_BROKER", True),
         run_resource_monitor=_read_bool_env("AI_CCTV_EDGE_ENABLE_MONITOR", True),
         run_backup_recovery=_read_bool_env("AI_CCTV_EDGE_ENABLE_RECOVERY", True),
     )

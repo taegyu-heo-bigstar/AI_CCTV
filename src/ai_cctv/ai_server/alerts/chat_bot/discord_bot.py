@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 from pathlib import Path
 import threading
 
@@ -28,8 +29,21 @@ _default_sender: DiscordBotSender | None = None
 
 
 def _read_env_value(key: str) -> str:
-    """루트의 .env 파일에서 지정한 값을 읽습니다."""
-    env_path = Path(__file__).resolve().parents[4] / ".env"
+    """환경 변수 또는 루트의 .env 파일에서 지정한 값을 읽습니다.
+
+    인자:
+        key: 읽을 환경 변수 이름입니다.
+    반환값:
+        찾은 설정값 문자열 또는 빈 문자열을 반환합니다.
+    """
+
+    environment_value = os.getenv(key)
+    if environment_value:
+        return environment_value.strip()
+
+    env_path = _find_env_file()
+    if env_path is None:
+        return ""
 
     try:
         for line in env_path.read_text(encoding="utf-8").splitlines():
@@ -51,6 +65,43 @@ def _read_env_value(key: str) -> str:
     return ""
 
 
+def _find_env_file() -> Path | None:
+    """현재 실행 위치와 소스 상위 경로에서 .env 파일을 찾습니다.
+
+    인자:
+        없음.
+    반환값:
+        발견한 .env 경로 또는 찾지 못했을 때 None을 반환합니다.
+    """
+
+    for candidate in _iter_env_file_candidates():
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _iter_env_file_candidates():
+    """확인할 .env 후보 경로를 중복 없이 순서대로 생성합니다.
+
+    인자:
+        없음.
+    반환값:
+        Path 객체 iterator를 반환합니다.
+    """
+
+    seen = set()
+    search_roots = [Path.cwd(), Path(__file__).resolve()]
+    for search_root in search_roots:
+        current_dir = search_root if search_root.is_dir() else search_root.parent
+        for directory in [current_dir, *current_dir.parents]:
+            candidate = directory / ".env"
+            normalized_candidate = candidate.resolve()
+            if normalized_candidate in seen:
+                continue
+            seen.add(normalized_candidate)
+            yield candidate
+
+
 class DiscordBotSender:
     """Discord 봇 로그인과 메시지 전송을 담당하는 클래스입니다."""
 
@@ -58,21 +109,21 @@ class DiscordBotSender:
         """Discord 전송 객체를 초기화합니다.
 
         Args:
-            token: Discord Bot Token입니다. 없으면 루트의 .env 파일을 사용합니다.
-            channel_id: 메시지를 보낼 Discord 채널 ID입니다. 없으면 루트의 .env 파일을 사용합니다.
+            token: Discord Bot Token입니다. 없으면 환경 변수 또는 루트의 .env 파일을 사용합니다.
+            channel_id: 메시지를 보낼 Discord 채널 ID입니다. 없으면 환경 변수 또는 루트의 .env 파일을 사용합니다.
         """
-        # 토큰은 코드에 직접 쓰지 않고 루트의 .env 파일에서 읽습니다.
+        # 토큰은 코드에 직접 쓰지 않고 환경 변수 또는 루트의 .env 파일에서 읽습니다.
         self.token = (token or _read_env_value("DISCORD_BOT_TOKEN")).strip()
 
-        # 채널 ID도 .env 파일에서만 읽습니다.
+        # 채널 ID도 코드에 직접 쓰지 않고 외부 설정에서 읽습니다.
         # Discord 개발자 모드에서 채널을 우클릭해 "ID 복사"로 얻은 값을 넣으면 됩니다.
         raw_channel_id = channel_id if channel_id is not None else _read_env_value("DISCORD_CHANNEL_ID")
 
         if not self.token:
-            raise RuntimeError("Discord 토큰이 .env 파일에 설정되어 있지 않습니다.")
+            raise RuntimeError("Discord 토큰이 환경 변수 또는 .env 파일에 설정되어 있지 않습니다.")
 
         if raw_channel_id is None or str(raw_channel_id).strip() == "":
-            raise RuntimeError("Discord 채널 ID가 .env 파일에 설정되어 있지 않습니다.")
+            raise RuntimeError("Discord 채널 ID가 환경 변수 또는 .env 파일에 설정되어 있지 않습니다.")
 
         try:
             # discord.py의 get_channel/fetch_channel은 int snowflake ID를 사용합니다.

@@ -10,7 +10,6 @@ import subprocess
 import sys
 
 from .monitoring.resource_monitor_publisher import (
-    DEFAULT_MQTT_HOST,
     DEFAULT_MQTT_PORT,
     DEFAULT_MQTT_TOPIC,
 )
@@ -74,7 +73,8 @@ class EdgeConnectionInfo:
                 "",
                 "[주의]",
                 "EDGE_HOST가 127.0.0.1이면 AI_CCTV_EDGE_HOST에 유선 IP를 지정한 뒤 다시 실행하세요.",
-                "MQTT broker를 Windows AI server에서 실행한다면 AI_CCTV_MQTT_HOST에 Windows 유선 IP를 지정하세요.",
+                "MQTT broker는 기본적으로 Edge node에서 실행됩니다.",
+                "외부 MQTT broker를 사용할 때만 AI_CCTV_MQTT_HOST를 별도로 지정하세요.",
             ]
         )
 
@@ -100,7 +100,7 @@ def build_edge_connection_info(
         EdgeConnectionInfo 인스턴스를 반환합니다.
     """
 
-    resolved_mqtt_host = mqtt_host or os.getenv("AI_CCTV_MQTT_HOST", DEFAULT_MQTT_HOST)
+    explicit_mqtt_host = mqtt_host or os.getenv("AI_CCTV_MQTT_HOST")
     resolved_mqtt_port = _resolve_int(
         mqtt_port,
         "AI_CCTV_MQTT_PORT",
@@ -116,7 +116,8 @@ def build_edge_connection_info(
         DEFAULT_BACKUP_RECOVERY_PORT,
     )
     resolved_backup_dir = backup_dir or os.getenv("AI_CCTV_BACKUP_DIR", DEFAULT_BACKUP_DIR)
-    resolved_edge_host = resolve_edge_host(edge_host, resolved_mqtt_host)
+    resolved_edge_host = resolve_edge_host(edge_host, explicit_mqtt_host)
+    resolved_mqtt_host = explicit_mqtt_host or resolved_edge_host
     rtsp_url = _build_rtsp_url(resolved_edge_host)
     backup_recovery_url = (
         f"http://{resolved_edge_host}:{resolved_recovery_port}/recover"
