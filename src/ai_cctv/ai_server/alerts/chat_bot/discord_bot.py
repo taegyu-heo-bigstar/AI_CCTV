@@ -27,12 +27,12 @@ _default_sender_lock = threading.Lock()
 _default_sender: DiscordBotSender | None = None
 
 
-def _read_proj_env_value(key: str) -> str:
-    """루트의 .proj_env 파일에서 지정한 값을 읽습니다."""
-    proj_env_path = Path(__file__).resolve().parents[4] / ".proj_env"
+def _read_env_value(key: str) -> str:
+    """루트의 .env 파일에서 지정한 값을 읽습니다."""
+    env_path = Path(__file__).resolve().parents[4] / ".env"
 
     try:
-        for line in proj_env_path.read_text(encoding="utf-8").splitlines():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
             value = line.strip()
             if not value or value.startswith("#"):
                 continue
@@ -58,21 +58,21 @@ class DiscordBotSender:
         """Discord 전송 객체를 초기화합니다.
 
         Args:
-            token: Discord Bot Token입니다. 없으면 루트의 .proj_env 파일을 사용합니다.
-            channel_id: 메시지를 보낼 Discord 채널 ID입니다. 없으면 루트의 .proj_env 파일을 사용합니다.
+            token: Discord Bot Token입니다. 없으면 루트의 .env 파일을 사용합니다.
+            channel_id: 메시지를 보낼 Discord 채널 ID입니다. 없으면 루트의 .env 파일을 사용합니다.
         """
-        # 토큰은 코드에 직접 쓰지 않고 루트의 .proj_env 파일에서 읽습니다.
-        self.token = (token or _read_proj_env_value("DISCORD_BOT_TOKEN")).strip()
+        # 토큰은 코드에 직접 쓰지 않고 루트의 .env 파일에서 읽습니다.
+        self.token = (token or _read_env_value("DISCORD_BOT_TOKEN")).strip()
 
-        # 채널 ID도 .proj_env 파일에서만 읽습니다.
+        # 채널 ID도 .env 파일에서만 읽습니다.
         # Discord 개발자 모드에서 채널을 우클릭해 "ID 복사"로 얻은 값을 넣으면 됩니다.
-        raw_channel_id = channel_id if channel_id is not None else _read_proj_env_value("DISCORD_CHANNEL_ID")
+        raw_channel_id = channel_id if channel_id is not None else _read_env_value("DISCORD_CHANNEL_ID")
 
         if not self.token:
-            raise RuntimeError("Discord 토큰이 .proj_env 파일에 설정되어 있지 않습니다.")
+            raise RuntimeError("Discord 토큰이 .env 파일에 설정되어 있지 않습니다.")
 
         if raw_channel_id is None or str(raw_channel_id).strip() == "":
-            raise RuntimeError("Discord 채널 ID가 .proj_env 파일에 설정되어 있지 않습니다.")
+            raise RuntimeError("Discord 채널 ID가 .env 파일에 설정되어 있지 않습니다.")
 
         try:
             # discord.py의 get_channel/fetch_channel은 int snowflake ID를 사용합니다.
@@ -255,7 +255,7 @@ def send_message(content: str) -> None:
 
     with _default_sender_lock:
         # sender는 첫 메시지 전송 시점에 생성합니다.
-        # 이렇게 하면 .proj_env가 없는 개발 환경에서도 import 자체는 실패하지 않습니다.
+        # 이렇게 하면 .env가 없는 개발 환경에서도 import 자체는 실패하지 않습니다.
         if _default_sender is None:
             _default_sender = DiscordBotSender()
 

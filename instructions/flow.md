@@ -9,7 +9,8 @@ AI_CCTV/
 |-- main.py                         # 로컬 개발용 AI server 실행 진입점
 |-- pyproject.toml                  # 패키지 메타데이터와 실행 명령
 |-- requirements/                   # 배포 환경별 requirements 파일
-|-- inst/                           # 구조, 흐름, 변경 설명 문서
+|-- instructions/                   # 구조, 흐름, 변경 설명 문서
+|-- legacy/                         # 과거 샘플, 학습 자료, 임시 archive 자료
 |-- src/
 |   `-- ai_cctv/
 |       |-- edge_node/              # Raspberry Pi Edge node 배포 단위

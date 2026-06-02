@@ -18,7 +18,7 @@
 
 | 이름 | 기능 | 정상값 | 에러값 | 기타 특징 |
 |---|---|---|---|---|
-| `_read_proj_env_value` | 루트의 .proj_env 파일에서 지정한 값을 읽습니다. | '' | 없음 | 일반 동작 |
+| `_read_env_value` | 루트의 .env 파일에서 지정한 값을 읽습니다. | '' | 없음 | 일반 동작 |
 | `DiscordBotSender` | Discord 봇 로그인과 메시지 전송을 담당하는 클래스입니다. | DiscordBotSender 인스턴스 | RuntimeError, TimeoutError | 일반 동작 |
 | `DiscordBotSender.__init__` | Discord 전송 객체를 초기화합니다. | None | RuntimeError | 일반 동작 |
 | `DiscordBotSender.start` | Discord client를 시작하고 준비 완료까지 기다립니다. | None | RuntimeError, TimeoutError | 일반 동작 |
