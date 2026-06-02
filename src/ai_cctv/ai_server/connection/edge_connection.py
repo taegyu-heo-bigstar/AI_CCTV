@@ -4,12 +4,17 @@
 # 실제 영상 분석은 연결 검증이 성공한 뒤 기존 메인 창에서 시작합니다.
 
 from dataclasses import dataclass
-import os
 import socket
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from ...config import (
+    clear_runtime_env_values,
+    get_env_int,
+    get_env_value,
+    set_runtime_env_values,
+)
 from ..analysis.rtsp_receiver import check_rtsp_port_open, is_rtsp_source
 from ..monitoring.resource_monitor_client import (
     DEFAULT_MQTT_HOST,
@@ -57,11 +62,11 @@ class EdgeConnectionConfig:
         """
 
         return cls(
-            rtsp_url=os.getenv("AI_CCTV_RTSP_URL", DEFAULT_RTSP_URL),
-            mqtt_host=os.getenv("AI_CCTV_MQTT_HOST", DEFAULT_MQTT_HOST),
-            mqtt_port=int(os.getenv("AI_CCTV_MQTT_PORT", DEFAULT_MQTT_PORT)),
-            mqtt_topic=os.getenv("AI_CCTV_MQTT_STATUS_TOPIC", DEFAULT_MQTT_TOPIC),
-            backup_recovery_url=os.getenv(
+            rtsp_url=get_env_value("AI_CCTV_RTSP_URL", DEFAULT_RTSP_URL),
+            mqtt_host=get_env_value("AI_CCTV_MQTT_HOST", DEFAULT_MQTT_HOST),
+            mqtt_port=get_env_int("AI_CCTV_MQTT_PORT", DEFAULT_MQTT_PORT),
+            mqtt_topic=get_env_value("AI_CCTV_MQTT_STATUS_TOPIC", DEFAULT_MQTT_TOPIC),
+            backup_recovery_url=get_env_value(
                 "AI_CCTV_RECOVERY_SERVER_URL",
                 DEFAULT_BACKUP_RECOVERY_URL,
             ),
@@ -77,22 +82,28 @@ class EdgeConnectionConfig:
         """
 
         if self.use_local_camera:
-            os.environ["AI_CCTV_USE_LOCAL_CAMERA"] = "1"
-            os.environ["AI_CCTV_LOCAL_CAMERA_INDEX"] = str(self.local_camera_index)
-            os.environ.pop("AI_CCTV_RTSP_URL", None)
-            os.environ.pop("AI_CCTV_MQTT_HOST", None)
-            os.environ.pop("AI_CCTV_MQTT_PORT", None)
-            os.environ.pop("AI_CCTV_MQTT_STATUS_TOPIC", None)
-            os.environ.pop("AI_CCTV_RECOVERY_SERVER_URL", None)
+            clear_runtime_env_values([
+                "AI_CCTV_RTSP_URL",
+                "AI_CCTV_MQTT_HOST",
+                "AI_CCTV_MQTT_PORT",
+                "AI_CCTV_MQTT_STATUS_TOPIC",
+                "AI_CCTV_RECOVERY_SERVER_URL",
+            ])
+            set_runtime_env_values({
+                "AI_CCTV_USE_LOCAL_CAMERA": "1",
+                "AI_CCTV_LOCAL_CAMERA_INDEX": self.local_camera_index,
+            })
             return
 
-        os.environ["AI_CCTV_USE_LOCAL_CAMERA"] = "0"
-        os.environ.pop("AI_CCTV_LOCAL_CAMERA_INDEX", None)
-        os.environ["AI_CCTV_RTSP_URL"] = self.rtsp_url
-        os.environ["AI_CCTV_MQTT_HOST"] = self.mqtt_host
-        os.environ["AI_CCTV_MQTT_PORT"] = str(self.mqtt_port)
-        os.environ["AI_CCTV_MQTT_STATUS_TOPIC"] = self.mqtt_topic
-        os.environ["AI_CCTV_RECOVERY_SERVER_URL"] = self.backup_recovery_url
+        clear_runtime_env_values(["AI_CCTV_LOCAL_CAMERA_INDEX"])
+        set_runtime_env_values({
+            "AI_CCTV_USE_LOCAL_CAMERA": "0",
+            "AI_CCTV_RTSP_URL": self.rtsp_url,
+            "AI_CCTV_MQTT_HOST": self.mqtt_host,
+            "AI_CCTV_MQTT_PORT": self.mqtt_port,
+            "AI_CCTV_MQTT_STATUS_TOPIC": self.mqtt_topic,
+            "AI_CCTV_RECOVERY_SERVER_URL": self.backup_recovery_url,
+        })
 
     def video_source(self):
         """메인 영상 입력에 사용할 OpenCV 소스 값을 반환합니다.

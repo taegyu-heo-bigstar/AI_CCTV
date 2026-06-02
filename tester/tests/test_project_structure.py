@@ -49,6 +49,11 @@ from ai_cctv.ai_server.runtime.environment_check import (
     build_startup_requirements,
 )
 from ai_cctv.ai_server.runtime.os_guard import ensure_windows_os, is_windows_os
+from ai_cctv.config import (
+    clear_runtime_env_values,
+    get_env_value,
+    set_runtime_env_values,
+)
 from ai_cctv.edge_node.backup_recovery_server import (
     BackupRecoveryService,
     BackupSegmentFinder,
@@ -990,8 +995,11 @@ class ProjectStructureTest(unittest.TestCase):
             없음.
         """
 
-        with patch.dict(os.environ, {"AI_CCTV_MQTT_QOS": "1"}):
+        set_runtime_env_values({"AI_CCTV_MQTT_QOS": "1"})
+        try:
             config = MqttResourceMonitorConfig.from_environment()
+        finally:
+            clear_runtime_env_values(["AI_CCTV_MQTT_QOS"])
 
         self.assertEqual(SUPPORTED_MQTT_QOS_VALUES, (0,))
         self.assertEqual(config.qos, 0)
@@ -1288,24 +1296,22 @@ class ProjectStructureTest(unittest.TestCase):
             "AI_CCTV_MQTT_STATUS_TOPIC",
             "AI_CCTV_RECOVERY_SERVER_URL",
         ]
-        original = {name: os.environ.get(name) for name in names}
+        runtime_names = [
+            *names,
+            "AI_CCTV_USE_LOCAL_CAMERA",
+            "AI_CCTV_LOCAL_CAMERA_INDEX",
+        ]
         try:
             for name in names:
-                os.environ[name] = "test"
+                set_runtime_env_values({name: "test"})
             EdgeConnectionConfig(use_local_camera=True, local_camera_index=2).apply_environment()
 
-            self.assertEqual(os.environ["AI_CCTV_USE_LOCAL_CAMERA"], "1")
-            self.assertEqual(os.environ["AI_CCTV_LOCAL_CAMERA_INDEX"], "2")
+            self.assertEqual(get_env_value("AI_CCTV_USE_LOCAL_CAMERA"), "1")
+            self.assertEqual(get_env_value("AI_CCTV_LOCAL_CAMERA_INDEX"), "2")
             for name in names:
-                self.assertNotIn(name, os.environ)
+                self.assertNotEqual(get_env_value(name, ""), "test")
         finally:
-            for name, value in original.items():
-                if value is None:
-                    os.environ.pop(name, None)
-                else:
-                    os.environ[name] = value
-            os.environ.pop("AI_CCTV_USE_LOCAL_CAMERA", None)
-            os.environ.pop("AI_CCTV_LOCAL_CAMERA_INDEX", None)
+            clear_runtime_env_values(runtime_names)
 
     def test_runtime_readiness_report_finds_missing_required_items(self):
         """런타임 준비 상태 결과가 누락된 필수 항목을 구분하는지 검증합니다.

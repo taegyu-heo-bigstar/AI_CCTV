@@ -3,7 +3,6 @@
 # TCP 포트 확인, FFmpeg timeout, watchdog, 재연결 루프를 묶어 OpenCV 장기 대기를 줄입니다.
 # VideoStream은 이 객체를 통해 최신 RTSP 프레임을 가져옵니다.
 
-import os
 import socket
 import threading
 import time
@@ -138,7 +137,6 @@ class RtspFrameReceiver:
         if self.thread is not None and self.thread.is_alive():
             return
 
-        os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", DEFAULT_FFMPEG_CAPTURE_OPTIONS)
         self.running = True
         self.last_frame_received_at = time.monotonic()
         self.thread = threading.Thread(

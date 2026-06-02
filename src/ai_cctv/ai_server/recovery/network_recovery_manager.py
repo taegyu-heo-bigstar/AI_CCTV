@@ -15,6 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import unquote
 
+from ...config import get_env_float, get_env_value
+
 
 @dataclass(frozen=True)
 class NetworkRecoveryConfig:
@@ -643,7 +645,7 @@ def build_network_recovery_manager_from_env(base_dir=""):
         URL이 설정되면 NetworkRecoveryManager를, 없으면 None을 반환합니다.
     """
 
-    server_url = os.getenv("AI_CCTV_RECOVERY_SERVER_URL", "").strip()
+    server_url = get_env_value("AI_CCTV_RECOVERY_SERVER_URL", "").strip()
     if not server_url:
         return None
 
@@ -658,16 +660,16 @@ def build_network_recovery_manager_from_env(base_dir=""):
     )
 
     config = NetworkRecoveryConfig(
-        camera_id=os.getenv("AI_CCTV_RECOVERY_CAMERA_ID", "cam01"),
+        camera_id=get_env_value("AI_CCTV_RECOVERY_CAMERA_ID", "cam01"),
         server_url=server_url,
-        recovery_dir=os.getenv("AI_CCTV_RECOVERY_DIR", str(default_recovery_dir)),
-        recording_dir=os.getenv(
+        recovery_dir=get_env_value("AI_CCTV_RECOVERY_DIR", str(default_recovery_dir)),
+        recording_dir=get_env_value(
             "AI_CCTV_RECOVERY_RECORDING_DIR",
             str(default_recording_dir),
         ),
-        min_failure_seconds=float(os.getenv("AI_CCTV_RECOVERY_MIN_FAILURE_SECONDS", "2.0")),
-        request_timeout_seconds=float(os.getenv("AI_CCTV_RECOVERY_TIMEOUT_SECONDS", "30.0")),
-        settle_seconds=float(os.getenv("AI_CCTV_RECOVERY_SETTLE_SECONDS", "2.0")),
-        ffmpeg_path=os.getenv("AI_CCTV_RECOVERY_FFMPEG_PATH", "ffmpeg"),
+        min_failure_seconds=get_env_float("AI_CCTV_RECOVERY_MIN_FAILURE_SECONDS", 2.0),
+        request_timeout_seconds=get_env_float("AI_CCTV_RECOVERY_TIMEOUT_SECONDS", 30.0),
+        settle_seconds=get_env_float("AI_CCTV_RECOVERY_SETTLE_SECONDS", 2.0),
+        ffmpeg_path=get_env_value("AI_CCTV_RECOVERY_FFMPEG_PATH", "ffmpeg"),
     )
     return NetworkRecoveryManager(config)

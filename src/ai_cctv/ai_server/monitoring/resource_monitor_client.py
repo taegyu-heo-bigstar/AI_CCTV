@@ -8,9 +8,10 @@
 from dataclasses import dataclass
 import copy
 import json
-import os
 import threading
 import time
+
+from ...config import get_env_float, get_env_int, get_env_value
 
 
 DEFAULT_MQTT_HOST = "127.0.0.1"
@@ -54,16 +55,18 @@ class MqttResourceMonitorConfig:
         """
 
         return cls(
-            broker_host=os.getenv("AI_CCTV_MQTT_HOST", DEFAULT_MQTT_HOST),
-            broker_port=int(os.getenv("AI_CCTV_MQTT_PORT", DEFAULT_MQTT_PORT)),
-            topic=os.getenv("AI_CCTV_MQTT_STATUS_TOPIC", DEFAULT_MQTT_TOPIC),
-            timeout_seconds=float(
-                os.getenv("AI_CCTV_MQTT_STATUS_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS)
+            broker_host=get_env_value("AI_CCTV_MQTT_HOST", DEFAULT_MQTT_HOST),
+            broker_port=get_env_int("AI_CCTV_MQTT_PORT", DEFAULT_MQTT_PORT),
+            topic=get_env_value("AI_CCTV_MQTT_STATUS_TOPIC", DEFAULT_MQTT_TOPIC),
+            timeout_seconds=get_env_float(
+                "AI_CCTV_MQTT_STATUS_TIMEOUT_SECONDS",
+                DEFAULT_TIMEOUT_SECONDS,
             ),
-            stale_seconds=float(
-                os.getenv("AI_CCTV_MQTT_STATUS_STALE_SECONDS", DEFAULT_STALE_SECONDS)
+            stale_seconds=get_env_float(
+                "AI_CCTV_MQTT_STATUS_STALE_SECONDS",
+                DEFAULT_STALE_SECONDS,
             ),
-            client_id=os.getenv("AI_CCTV_MQTT_AI_CLIENT_ID", DEFAULT_CLIENT_ID),
+            client_id=get_env_value("AI_CCTV_MQTT_AI_CLIENT_ID", DEFAULT_CLIENT_ID),
         )
 
 

@@ -2,8 +2,6 @@
 # MediaMTX로 송출된 Edge node 영상을 OpenCV 창으로 확인하는 보조 기능을 제공합니다.
 # 장기 분석 파이프라인은 VideoWorker가 담당하고, 이 파일은 수동 연결 점검에 집중합니다.
 
-import os
-
 import cv2
 
 
@@ -62,7 +60,7 @@ class RtspPreviewSession:
             없음.
         """
 
-        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "fflags;nobuffer|flags;low_delay"
+        return None
 
     def _show_frames(self, capture):
         """VideoCapture에서 프레임을 읽어 미리보기 창에 표시합니다.

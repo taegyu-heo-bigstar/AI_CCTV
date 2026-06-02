@@ -5,10 +5,11 @@
 from dataclasses import dataclass
 import importlib.metadata
 import importlib.util
-import os
 from pathlib import Path
 import subprocess
 import sys
+
+from ...config import get_env_value
 
 
 DEFAULT_YOLO_MODEL_PATH = "yolo26s.pt"
@@ -194,7 +195,7 @@ class RuntimeEnvironmentChecker:
             RuntimeRequirementResult 인스턴스를 반환합니다.
         """
 
-        model_path = Path(os.getenv("AI_CCTV_YOLO_MODEL_PATH", requirement.install_spec))
+        model_path = Path(get_env_value("AI_CCTV_YOLO_MODEL_PATH", requirement.install_spec))
         if not model_path.is_absolute():
             model_path = self.project_root / model_path
 
@@ -211,7 +212,7 @@ class RuntimeEnvironmentChecker:
             RuntimeRequirementResult 인스턴스를 반환합니다.
         """
 
-        model_id = os.getenv("AI_CCTV_QWEN_MODEL_ID", requirement.install_spec)
+        model_id = get_env_value("AI_CCTV_QWEN_MODEL_ID", requirement.install_spec)
         try:
             from transformers.utils import cached_file
 
@@ -372,8 +373,8 @@ def build_analysis_requirements(
         RuntimeRequirement 목록을 반환합니다.
     """
 
-    yolo_model = os.getenv("AI_CCTV_YOLO_MODEL_PATH", DEFAULT_YOLO_MODEL_PATH)
-    qwen_model = os.getenv("AI_CCTV_QWEN_MODEL_ID", DEFAULT_QWEN_MODEL_ID)
+    yolo_model = get_env_value("AI_CCTV_YOLO_MODEL_PATH", DEFAULT_YOLO_MODEL_PATH)
+    qwen_model = get_env_value("AI_CCTV_QWEN_MODEL_ID", DEFAULT_QWEN_MODEL_ID)
     requirements = []
     if use_yolo or use_vlm or include_face:
         requirements.append(

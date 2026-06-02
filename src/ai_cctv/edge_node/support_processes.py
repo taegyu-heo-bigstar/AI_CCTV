@@ -2,12 +2,13 @@
 # 기본 Edge 실행에서 상태 MQTT publisher와 백업 복구 API를 함께 실행합니다.
 # GStreamer 송출 프로세스와 같은 생명주기로 보조 프로세스를 시작하고 정리합니다.
 
-import os
 import socket
 import subprocess
 import sys
 import time
 from dataclasses import dataclass
+
+from ..config import get_env_bool, get_env_int
 
 
 @dataclass(frozen=True)
@@ -66,9 +67,8 @@ class EdgeSupportProcessManager:
         if not self.config.enabled or not self.config.run_mqtt_broker:
             return None
 
-        env = self._build_environment()
-        process = self._start_module("ai_cctv.edge_node.monitoring.mqtt_broker", env)
-        broker_port = int(env.get("AI_CCTV_MQTT_PORT", "1883"))
+        process = self._start_module("ai_cctv.edge_node.monitoring.mqtt_broker")
+        broker_port = get_env_int("AI_CCTV_MQTT_PORT", 1883)
         if self._wait_for_tcp_port("127.0.0.1", broker_port):
             return process
 
@@ -88,8 +88,10 @@ class EdgeSupportProcessManager:
         if not self.config.enabled or not self.config.run_backup_recovery:
             return None
 
-        env = self._build_environment({"AI_CCTV_BACKUP_DIR": str(backup_dir)})
-        return self._start_module("ai_cctv.edge_node.backup_recovery_server", env)
+        args = ["--backup-dir", str(backup_dir)]
+        if self.config.suppress_startup_info:
+            args.append("--no-startup-info")
+        return self._start_module("ai_cctv.edge_node.backup_recovery_server", args)
 
     def start_resource_monitor(self, monitored_process_id=None):
         """MQTT 자원 상태 publisher를 하위 프로세스로 실행합니다.
@@ -103,13 +105,14 @@ class EdgeSupportProcessManager:
         if not self.config.enabled or not self.config.run_resource_monitor:
             return None
 
-        extra_env = {}
+        args = []
         if monitored_process_id is not None:
-            extra_env["AI_CCTV_MONITOR_PROCESS_ID"] = str(monitored_process_id)
-        env = self._build_environment(extra_env)
+            args.extend(["--process-id", str(monitored_process_id)])
+        if self.config.suppress_startup_info:
+            args.append("--no-startup-info")
         return self._start_module(
             "ai_cctv.edge_node.monitoring.resource_monitor_publisher",
-            env,
+            args,
         )
 
     def stop(self):
@@ -132,7 +135,7 @@ class EdgeSupportProcessManager:
                 process.wait(timeout=5)
         self.processes.clear()
 
-    def _start_module(self, module_name, env):
+    def _start_module(self, module_name, args=None):
         """Python 모듈을 하위 프로세스로 실행하고 목록에 등록합니다.
 
         인자:
@@ -142,10 +145,10 @@ class EdgeSupportProcessManager:
             실행한 subprocess.Popen 객체를 반환합니다.
         """
 
-        process = subprocess.Popen(
-            [self.config.python_executable, "-m", module_name],
-            env=env,
-        )
+        command = [self.config.python_executable, "-m", module_name]
+        if args:
+            command.extend(args)
+        process = subprocess.Popen(command)
         self.processes.append(process)
         return process
 
@@ -178,12 +181,7 @@ class EdgeSupportProcessManager:
             하위 프로세스용 환경 변수 딕셔너리를 반환합니다.
         """
 
-        env = os.environ.copy()
-        if self.config.suppress_startup_info:
-            env["AI_CCTV_PRINT_STARTUP_INFO"] = "0"
-        if extra_env:
-            env.update(extra_env)
-        return env
+        return dict(extra_env or {})
 
 
 def build_support_process_config_from_environment():
@@ -196,10 +194,10 @@ def build_support_process_config_from_environment():
     """
 
     return EdgeSupportProcessConfig(
-        enabled=_read_bool_env("AI_CCTV_EDGE_ENABLE_SUPPORT_SERVICES", True),
-        run_mqtt_broker=_read_bool_env("AI_CCTV_EDGE_ENABLE_MQTT_BROKER", True),
-        run_resource_monitor=_read_bool_env("AI_CCTV_EDGE_ENABLE_MONITOR", True),
-        run_backup_recovery=_read_bool_env("AI_CCTV_EDGE_ENABLE_RECOVERY", True),
+        enabled=get_env_bool("AI_CCTV_EDGE_ENABLE_SUPPORT_SERVICES", True),
+        run_mqtt_broker=get_env_bool("AI_CCTV_EDGE_ENABLE_MQTT_BROKER", True),
+        run_resource_monitor=get_env_bool("AI_CCTV_EDGE_ENABLE_MONITOR", True),
+        run_backup_recovery=get_env_bool("AI_CCTV_EDGE_ENABLE_RECOVERY", True),
     )
 
 
@@ -225,7 +223,4 @@ def _read_bool_env(name, default):
         bool 값을 반환합니다.
     """
 
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return get_env_bool(name, default)

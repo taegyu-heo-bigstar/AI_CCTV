@@ -1,5 +1,11 @@
 # AI CCTV
 
+## Settings
+
+Runtime settings are read from `.env`. Copy `.env.example` to `.env` and edit
+the values there. The application no longer reads AI CCTV settings from OS
+environment variables.
+
 Raspberry Pi 기반 Edge node와 Windows 기반 AI server를 분리해 구성하는 AI CCTV 프로젝트입니다.
 
 ## 실행 묶음
@@ -41,7 +47,7 @@ pip install -e ".[ai-server]"
 ai-cctv-ai-server
 ```
 
-Discord 알림을 사용하려면 `.env.example`을 `.env`로 복사한 뒤 `DISCORD_BOT_TOKEN`, `DISCORD_CHANNEL_ID`를 채우거나 같은 이름의 OS 환경 변수를 설정합니다.
+Discord 알림을 사용하려면 `.env.example`을 `.env`로 복사한 뒤 `DISCORD_BOT_TOKEN`, `DISCORD_CHANNEL_ID`를 채웁니다.
 
 Edge node 상태 정보는 MQTT broker를 기준으로 주고받습니다. 통합 실행의 broker는 Edge node의 `1883` 포트에서 열리고, 기본 topic은 `ai-cctv/edge-node/status`입니다. 통합 실행을 쓰지 않고 개별 프로세스를 점검할 때는 다음 명령을 직접 실행할 수 있습니다.
 
@@ -59,8 +65,11 @@ python -m ai_cctv.ai_server.monitoring.resource_monitor_client
 ai-cctv-edge-backup-recovery
 ```
 
+```dotenv
+AI_CCTV_RECOVERY_SERVER_URL=http://192.168.137.2:8002/recover
+```
+
 ```powershell
-$env:AI_CCTV_RECOVERY_SERVER_URL="http://192.168.137.2:8002/recover"
 ai-cctv-ai-server
 ```
 
@@ -115,25 +124,25 @@ $env:PYTHONPATH="src;."; python -m unittest discover -s tester/tests -t .
 
 Edge node 진입점은 Linux에서만 실행됩니다. `/etc/os-release`로 배포판을 확인할 수 있는 경우 Debian, Raspbian, Ubuntu 계열만 허용하고, Windows나 macOS에서는 오류 메시지를 출력한 뒤 종료합니다.
 
+```dotenv
+AI_CCTV_EDGE_HOST=192.168.137.2
+```
+
 ```bash
-export AI_CCTV_EDGE_HOST=192.168.137.2
 ai-cctv-edge
 ```
 
 상태 모니터링과 누락 구간 복구는 기본 `ai-cctv-edge` 실행에서 함께 시작됩니다. 보조 프로세스를 별도 터미널에서 직접 점검해야 할 때만 다음 명령을 사용합니다.
 
 ```bash
-export AI_CCTV_EDGE_HOST=192.168.137.2
 ai-cctv-edge-mqtt-broker
 ```
 
 ```bash
-export AI_CCTV_EDGE_HOST=192.168.137.2
 ai-cctv-edge-monitor
 ```
 
 ```bash
-export AI_CCTV_EDGE_HOST=192.168.137.2
 ai-cctv-edge-backup-recovery
 ```
 

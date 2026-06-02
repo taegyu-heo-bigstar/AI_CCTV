@@ -3,8 +3,8 @@
 # 운영자는 ai-cctv-edge 명령으로 Raspberry Pi 송출 노드를 시작합니다.
 
 import argparse
-import os
 
+from ..config import set_runtime_env_values
 from .os_guard import ensure_supported_edge_os
 from .runtime import build_default_edge_runtime
 
@@ -56,7 +56,7 @@ def main(argv=None):
     ensure_supported_edge_os()
     args = build_argument_parser().parse_args(argv)
     if args.no_support_services:
-        os.environ["AI_CCTV_EDGE_ENABLE_SUPPORT_SERVICES"] = "0"
+        set_runtime_env_values({"AI_CCTV_EDGE_ENABLE_SUPPORT_SERVICES": "0"})
 
     runtime = build_default_edge_runtime()
     if args.print_command:

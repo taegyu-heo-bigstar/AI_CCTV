@@ -4,7 +4,8 @@
 # AI server가 테스트 여부를 알 필요 없도록 일반 Edge node 연결 블록만 출력합니다.
 
 from dataclasses import dataclass
-import os
+
+from ai_cctv.config import get_env_float, get_env_int, get_env_value
 
 
 DEFAULT_HOST = "127.0.0.1"
@@ -54,26 +55,22 @@ class PseudoEdgeNodeConfig:
         """
 
         return cls(
-            host=os.getenv("AI_CCTV_PSEUDO_EDGE_HOST", DEFAULT_HOST),
-            rtsp_port=int(os.getenv("AI_CCTV_PSEUDO_RTSP_PORT", DEFAULT_RTSP_PORT)),
-            rtsp_path=os.getenv("AI_CCTV_PSEUDO_RTSP_PATH", DEFAULT_RTSP_PATH),
-            mqtt_port=int(os.getenv("AI_CCTV_PSEUDO_MQTT_PORT", DEFAULT_MQTT_PORT)),
-            mqtt_topic=os.getenv(
+            host=get_env_value("AI_CCTV_PSEUDO_EDGE_HOST", DEFAULT_HOST),
+            rtsp_port=get_env_int("AI_CCTV_PSEUDO_RTSP_PORT", DEFAULT_RTSP_PORT),
+            rtsp_path=get_env_value("AI_CCTV_PSEUDO_RTSP_PATH", DEFAULT_RTSP_PATH),
+            mqtt_port=get_env_int("AI_CCTV_PSEUDO_MQTT_PORT", DEFAULT_MQTT_PORT),
+            mqtt_topic=get_env_value(
                 "AI_CCTV_PSEUDO_MQTT_TOPIC",
                 DEFAULT_MQTT_TOPIC,
             ),
-            backup_recovery_port=int(
-                os.getenv(
-                    "AI_CCTV_PSEUDO_BACKUP_RECOVERY_PORT",
-                    DEFAULT_BACKUP_RECOVERY_PORT,
-                )
+            backup_recovery_port=get_env_int(
+                "AI_CCTV_PSEUDO_BACKUP_RECOVERY_PORT",
+                DEFAULT_BACKUP_RECOVERY_PORT,
             ),
-            backup_dir=os.getenv("AI_CCTV_PSEUDO_BACKUP_DIR", DEFAULT_BACKUP_DIR),
-            status_interval_seconds=float(
-                os.getenv(
-                    "AI_CCTV_PSEUDO_STATUS_INTERVAL_SECONDS",
-                    DEFAULT_STATUS_INTERVAL_SECONDS,
-                )
+            backup_dir=get_env_value("AI_CCTV_PSEUDO_BACKUP_DIR", DEFAULT_BACKUP_DIR),
+            status_interval_seconds=get_env_float(
+                "AI_CCTV_PSEUDO_STATUS_INTERVAL_SECONDS",
+                DEFAULT_STATUS_INTERVAL_SECONDS,
             ),
         )
 

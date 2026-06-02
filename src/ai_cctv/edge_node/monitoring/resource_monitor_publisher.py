@@ -7,10 +7,12 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+import argparse
 import json
 import os
 import time
 
+from ...config import get_env_bool, get_env_float, get_env_int, get_env_value
 from .power_status import CachedPowerStatusProvider
 
 
@@ -74,18 +76,16 @@ class MqttResourceMonitorConfig:
         """
 
         return cls(
-            broker_host=os.getenv("AI_CCTV_MQTT_HOST", DEFAULT_MQTT_HOST),
-            broker_port=int(os.getenv("AI_CCTV_MQTT_PORT", DEFAULT_MQTT_PORT)),
-            topic=os.getenv("AI_CCTV_MQTT_STATUS_TOPIC", DEFAULT_MQTT_TOPIC),
-            publish_interval_seconds=float(
-                os.getenv(
-                    "AI_CCTV_MQTT_STATUS_INTERVAL_SECONDS",
-                    DEFAULT_PUBLISH_INTERVAL_SECONDS,
-                )
+            broker_host=get_env_value("AI_CCTV_MQTT_HOST", DEFAULT_MQTT_HOST),
+            broker_port=get_env_int("AI_CCTV_MQTT_PORT", DEFAULT_MQTT_PORT),
+            topic=get_env_value("AI_CCTV_MQTT_STATUS_TOPIC", DEFAULT_MQTT_TOPIC),
+            publish_interval_seconds=get_env_float(
+                "AI_CCTV_MQTT_STATUS_INTERVAL_SECONDS",
+                DEFAULT_PUBLISH_INTERVAL_SECONDS,
             ),
             qos=DEFAULT_MQTT_QOS,
-            retain=_read_bool_env("AI_CCTV_MQTT_RETAIN", DEFAULT_MQTT_RETAIN),
-            client_id=os.getenv("AI_CCTV_MQTT_EDGE_CLIENT_ID", DEFAULT_CLIENT_ID),
+            retain=get_env_bool("AI_CCTV_MQTT_RETAIN", DEFAULT_MQTT_RETAIN),
+            client_id=get_env_value("AI_CCTV_MQTT_EDGE_CLIENT_ID", DEFAULT_CLIENT_ID),
         )
 
 
@@ -258,7 +258,7 @@ class MqttResourceMonitorPublisher:
             self.mqtt_client.disconnect()
 
 
-def build_resource_usage_collector_from_environment():
+def build_resource_usage_collector_from_environment(process_id=None):
     """환경 변수 기준으로 자원 상태 수집기를 생성합니다.
 
     인자:
@@ -267,12 +267,13 @@ def build_resource_usage_collector_from_environment():
         ResourceUsageCollector 인스턴스를 반환합니다.
     """
 
-    process_id_text = os.getenv("AI_CCTV_MONITOR_PROCESS_ID")
-    process_id = int(process_id_text) if process_id_text else None
+    if process_id is None:
+        process_id_text = get_env_value("AI_CCTV_MONITOR_PROCESS_ID", "")
+        process_id = int(process_id_text) if process_id_text else None
     return ResourceUsageCollector(process_id=process_id)
 
 
-def build_resource_monitor_publisher():
+def build_resource_monitor_publisher(process_id=None):
     """환경 변수 기준으로 MQTT 자원 상태 발행자를 생성합니다.
 
     인자:
@@ -283,7 +284,7 @@ def build_resource_monitor_publisher():
 
     return MqttResourceMonitorPublisher(
         config=MqttResourceMonitorConfig.from_environment(),
-        collector=build_resource_usage_collector_from_environment(),
+        collector=build_resource_usage_collector_from_environment(process_id=process_id),
     )
 
 
@@ -331,13 +332,25 @@ def _read_bool_env(name, default):
         bool 값을 반환합니다.
     """
 
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return get_env_bool(name, default)
 
 
-def main():
+def build_argument_parser():
+    """리소스 모니터 publisher 명령행 인자 파서를 생성합니다.
+
+    인자:
+        없음.
+    반환값:
+        argparse.ArgumentParser 객체를 반환합니다.
+    """
+
+    parser = argparse.ArgumentParser(description="AI CCTV edge resource monitor")
+    parser.add_argument("--process-id", type=int, default=None)
+    parser.add_argument("--no-startup-info", action="store_true")
+    return parser
+
+
+def main(argv=None):
     """Edge node 자원 상태 MQTT 발행 루프를 실행합니다.
 
     인자:
@@ -350,12 +363,14 @@ def main():
     from ..startup_info import print_edge_connection_info
 
     ensure_supported_edge_os()
-    publisher = build_resource_monitor_publisher()
-    print_edge_connection_info(
-        mqtt_host=publisher.config.broker_host,
-        mqtt_port=publisher.config.broker_port,
-        mqtt_topic=publisher.config.topic,
-    )
+    args = build_argument_parser().parse_args(argv)
+    publisher = build_resource_monitor_publisher(process_id=args.process_id)
+    if not args.no_startup_info:
+        print_edge_connection_info(
+            mqtt_host=publisher.config.broker_host,
+            mqtt_port=publisher.config.broker_port,
+            mqtt_topic=publisher.config.topic,
+        )
     try:
         publisher.run_forever()
     except KeyboardInterrupt:

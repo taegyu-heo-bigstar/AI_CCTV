@@ -6,10 +6,11 @@
 """Edge node 내장 MQTT broker 모듈입니다."""
 
 from dataclasses import dataclass
-import os
 import socket
 import threading
 import time
+
+from ...config import get_env_int, get_env_value
 
 
 MQTT_CONNECT = 1
@@ -47,8 +48,8 @@ class MqttBrokerConfig:
         """
 
         return cls(
-            host=os.getenv("AI_CCTV_MQTT_BROKER_HOST", DEFAULT_BROKER_HOST),
-            port=int(os.getenv("AI_CCTV_MQTT_PORT", DEFAULT_BROKER_PORT)),
+            host=get_env_value("AI_CCTV_MQTT_BROKER_HOST", DEFAULT_BROKER_HOST),
+            port=get_env_int("AI_CCTV_MQTT_PORT", DEFAULT_BROKER_PORT),
         )
 
 

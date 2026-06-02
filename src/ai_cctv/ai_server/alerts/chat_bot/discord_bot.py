@@ -9,11 +9,11 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-import os
-from pathlib import Path
 import threading
 
 import discord
+
+from ....config import get_env_value
 
 
 # Discord 메시지 길이 제한에 걸리지 않도록 여유 있게 1900자 단위로 나눕니다.
@@ -37,32 +37,7 @@ def _read_env_value(key: str) -> str:
         찾은 설정값 문자열 또는 빈 문자열을 반환합니다.
     """
 
-    environment_value = os.getenv(key)
-    if environment_value:
-        return environment_value.strip()
-
-    env_path = _find_env_file()
-    if env_path is None:
-        return ""
-
-    try:
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            value = line.strip()
-            if not value or value.startswith("#"):
-                continue
-
-            if "=" in value:
-                current_key, current_value = value.split("=", 1)
-                if current_key.strip() == key:
-                    return current_value.strip()
-                continue
-
-            if key == "DISCORD_BOT_TOKEN":
-                return value
-    except FileNotFoundError:
-        pass
-
-    return ""
+    return get_env_value(key, "").strip()
 
 
 def _find_env_file() -> Path | None:
@@ -74,9 +49,6 @@ def _find_env_file() -> Path | None:
         발견한 .env 경로 또는 찾지 못했을 때 None을 반환합니다.
     """
 
-    for candidate in _iter_env_file_candidates():
-        if candidate.is_file():
-            return candidate
     return None
 
 
@@ -89,17 +61,7 @@ def _iter_env_file_candidates():
         Path 객체 iterator를 반환합니다.
     """
 
-    seen = set()
-    search_roots = [Path.cwd(), Path(__file__).resolve()]
-    for search_root in search_roots:
-        current_dir = search_root if search_root.is_dir() else search_root.parent
-        for directory in [current_dir, *current_dir.parents]:
-            candidate = directory / ".env"
-            normalized_candidate = candidate.resolve()
-            if normalized_candidate in seen:
-                continue
-            seen.add(normalized_candidate)
-            yield candidate
+    return iter(())
 
 
 class DiscordBotSender:

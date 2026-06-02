@@ -4,11 +4,11 @@
 # 자동 감지가 틀리면 AI_CCTV_EDGE_HOST 환경 변수로 값을 고정할 수 있습니다.
 
 from dataclasses import dataclass
-import os
 import socket
 import subprocess
 import sys
 
+from ..config import get_env_bool, get_env_int, get_env_value
 from .monitoring.resource_monitor_publisher import (
     DEFAULT_MQTT_PORT,
     DEFAULT_MQTT_TOPIC,
@@ -100,13 +100,13 @@ def build_edge_connection_info(
         EdgeConnectionInfo 인스턴스를 반환합니다.
     """
 
-    explicit_mqtt_host = mqtt_host or os.getenv("AI_CCTV_MQTT_HOST")
+    explicit_mqtt_host = mqtt_host or get_env_value("AI_CCTV_MQTT_HOST", "")
     resolved_mqtt_port = _resolve_int(
         mqtt_port,
         "AI_CCTV_MQTT_PORT",
         DEFAULT_MQTT_PORT,
     )
-    resolved_topic = mqtt_topic or os.getenv(
+    resolved_topic = mqtt_topic or get_env_value(
         "AI_CCTV_MQTT_STATUS_TOPIC",
         DEFAULT_MQTT_TOPIC,
     )
@@ -115,7 +115,7 @@ def build_edge_connection_info(
         "AI_CCTV_BACKUP_RECOVERY_PORT",
         DEFAULT_BACKUP_RECOVERY_PORT,
     )
-    resolved_backup_dir = backup_dir or os.getenv("AI_CCTV_BACKUP_DIR", DEFAULT_BACKUP_DIR)
+    resolved_backup_dir = backup_dir or get_env_value("AI_CCTV_BACKUP_DIR", DEFAULT_BACKUP_DIR)
     resolved_edge_host = resolve_edge_host(edge_host, explicit_mqtt_host)
     resolved_mqtt_host = explicit_mqtt_host or resolved_edge_host
     rtsp_url = _build_rtsp_url(resolved_edge_host)
@@ -164,7 +164,7 @@ def resolve_edge_host(edge_host=None, probe_host=None):
         감지된 IP 또는 호스트 문자열을 반환합니다.
     """
 
-    explicit_host = edge_host or os.getenv("AI_CCTV_EDGE_HOST")
+    explicit_host = edge_host or get_env_value("AI_CCTV_EDGE_HOST", "")
     if explicit_host:
         return explicit_host
 
@@ -172,7 +172,7 @@ def resolve_edge_host(edge_host=None, probe_host=None):
     if ssh_host:
         return ssh_host
 
-    interface_host = _read_interface_host(os.getenv("AI_CCTV_EDGE_INTERFACE"))
+    interface_host = _read_interface_host(get_env_value("AI_CCTV_EDGE_INTERFACE", ""))
     if interface_host:
         return interface_host
 
@@ -198,7 +198,7 @@ def _build_rtsp_url(edge_host):
     """
 
     port = _resolve_int(None, "AI_CCTV_RTSP_PORT", DEFAULT_RTSP_PORT)
-    path = os.getenv("AI_CCTV_RTSP_PATH", DEFAULT_RTSP_PATH).strip("/")
+    path = get_env_value("AI_CCTV_RTSP_PATH", DEFAULT_RTSP_PATH).strip("/")
     return f"rtsp://{edge_host}:{port}/{path}"
 
 
@@ -215,7 +215,7 @@ def _resolve_int(value, env_name, default):
 
     if value is not None:
         return int(value)
-    return int(os.getenv(env_name, default))
+    return get_env_int(env_name, default)
 
 
 def _read_bool_env(name, default):
@@ -228,10 +228,7 @@ def _read_bool_env(name, default):
         bool 값을 반환합니다.
     """
 
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return get_env_bool(name, default)
 
 
 def _read_ssh_server_host():
@@ -243,7 +240,7 @@ def _read_ssh_server_host():
         SSH_CONNECTION의 서버 IP 또는 None을 반환합니다.
     """
 
-    ssh_connection = os.getenv("SSH_CONNECTION", "")
+    ssh_connection = get_env_value("SSH_CONNECTION", "")
     parts = ssh_connection.split()
     if len(parts) >= 3 and not _is_loopback_host(parts[2]):
         return parts[2]

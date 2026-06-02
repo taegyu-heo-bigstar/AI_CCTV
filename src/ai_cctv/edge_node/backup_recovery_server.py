@@ -3,13 +3,15 @@
 # FastAPI 엔드포인트는 /recover이며 start/end 쿼리 값을 사용합니다.
 # 기본 포트는 8002이며 AI_CCTV_BACKUP_RECOVERY_PORT로 변경할 수 있습니다.
 
-import os
+import argparse
 import tempfile
 import time
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+
+from ..config import get_env_int, get_env_value
 
 
 @dataclass(frozen=True)
@@ -255,13 +257,30 @@ def build_backup_recovery_app(backup_dir="~/backups"):
 
 try:
     app = build_backup_recovery_app(
-        os.getenv("AI_CCTV_BACKUP_DIR", "~/backups")
+        get_env_value("AI_CCTV_BACKUP_DIR", "~/backups")
     )
 except ImportError:
     app = None
 
 
-def main():
+def build_argument_parser():
+    """백업 복구 서버 명령행 인자 파서를 생성합니다.
+
+    인자:
+        없음.
+    반환값:
+        argparse.ArgumentParser 객체를 반환합니다.
+    """
+
+    parser = argparse.ArgumentParser(description="AI CCTV edge backup recovery server")
+    parser.add_argument("--host", default=None)
+    parser.add_argument("--port", type=int, default=None)
+    parser.add_argument("--backup-dir", default=None)
+    parser.add_argument("--no-startup-info", action="store_true")
+    return parser
+
+
+def main(argv=None):
     """환경 변수 기준으로 Edge node 백업 복구 FastAPI 서버를 실행합니다.
 
     인자:
@@ -275,14 +294,16 @@ def main():
     from .startup_info import print_edge_connection_info
 
     ensure_supported_edge_os()
-    host = os.getenv("AI_CCTV_BACKUP_RECOVERY_HOST", "0.0.0.0")
-    port = int(os.getenv("AI_CCTV_BACKUP_RECOVERY_PORT", "8002"))
-    backup_dir = os.getenv("AI_CCTV_BACKUP_DIR", "~/backups")
+    args = build_argument_parser().parse_args(argv)
+    host = args.host or get_env_value("AI_CCTV_BACKUP_RECOVERY_HOST", "0.0.0.0")
+    port = args.port if args.port is not None else get_env_int("AI_CCTV_BACKUP_RECOVERY_PORT", 8002)
+    backup_dir = args.backup_dir or get_env_value("AI_CCTV_BACKUP_DIR", "~/backups")
     recovery_app = build_backup_recovery_app(backup_dir)
-    print_edge_connection_info(
-        backup_recovery_port=port,
-        backup_dir=backup_dir,
-    )
+    if not args.no_startup_info:
+        print_edge_connection_info(
+            backup_recovery_port=port,
+            backup_dir=backup_dir,
+        )
     uvicorn.run(recovery_app, host=host, port=port)
 
 
