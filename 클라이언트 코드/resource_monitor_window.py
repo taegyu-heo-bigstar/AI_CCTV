@@ -5,7 +5,7 @@ import time
 from ctypes import wintypes
 
 import psutil
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor, QPainter, QPen
 from PyQt5.QtWidgets import (
     QDialog,
@@ -19,6 +19,8 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from resource_monitor_client import request_edge_status
 
 
 class SparklineChart(QWidget):
@@ -186,10 +188,26 @@ class WindowsCpuUtilityCounter:
         self.enabled = False
 
 
+class EdgeStatusRequestWorker(QThread):
+    result_ready = pyqtSignal(dict)
+    error_ready = pyqtSignal(str)
+
+    def __init__(self, server_url="", parent=None):
+        super().__init__(parent)
+        self.server_url = server_url
+
+    def run(self):
+        try:
+            self.result_ready.emit(request_edge_status(self.server_url))
+        except Exception as error:
+            self.error_ready.emit(str(error))
+
+
 class ResourceMonitorWindow(QDialog):
-    def __init__(self, parent=None, storage_path=""):
+    def __init__(self, parent=None, storage_path="", edge_status_server_url=""):
         super().__init__(parent)
         self.storage_path = storage_path or os.getcwd()
+        self.edge_status_server_url = edge_status_server_url
         self.process = psutil.Process(os.getpid())
         self.last_net = psutil.net_io_counters()
         self.last_net_time = time.time()
@@ -197,6 +215,8 @@ class ResourceMonitorWindow(QDialog):
         self.gpu_cache = None
         self.cpu_utility_counter = WindowsCpuUtilityCounter()
         self.monitor_view = "pc"
+        self.edge_status_worker = None
+        self.edge_failure_count = 0
 
         self.setWindowTitle("리소스 모니터링")
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
@@ -248,23 +268,34 @@ class ResourceMonitorWindow(QDialog):
         grid.addWidget(self.disk_card, 2, 0)
         grid.addWidget(self.network_card, 2, 1)
 
-        smart_page = QFrame()
-        smart_page.setStyleSheet("background-color: #1e293b; border-radius: 8px;")
+        smart_page = QWidget()
         smart_layout = QVBoxLayout(smart_page)
-        smart_layout.setContentsMargins(24, 24, 24, 24)
-        smart_layout.setSpacing(10)
-        smart_layout.addStretch()
+        smart_layout.setContentsMargins(0, 0, 0, 0)
+        smart_layout.setSpacing(14)
 
-        smart_title = QLabel("스마트CCTV 모니터링 정보")
-        smart_title.setAlignment(Qt.AlignCenter)
-        smart_title.setStyleSheet("font-size: 24px; font-weight: bold;")
-        smart_layout.addWidget(smart_title)
+        self.smart_status_label = QLabel("스마트CCTV 리소스 정보 연결 대기")
+        self.smart_status_label.setStyleSheet("color: #94a3b8; font-size: 14px;")
+        smart_layout.addWidget(self.smart_status_label)
 
-        smart_status = QLabel("연결 대기")
-        smart_status.setAlignment(Qt.AlignCenter)
-        smart_status.setStyleSheet("color: #94a3b8; font-size: 16px;")
-        smart_layout.addWidget(smart_status)
-        smart_layout.addStretch()
+        smart_grid = QGridLayout()
+        smart_grid.setSpacing(14)
+        smart_grid.setContentsMargins(0, 0, 0, 0)
+
+        self.edge_cpu_card = ResourceCard("Edge CPU", "#22c55e")
+        self.edge_ram_card = ResourceCard("Edge RAM", "#38bdf8")
+        self.edge_process_cpu_card = ResourceCard("Edge Process CPU", "#facc15")
+        self.edge_process_memory_card = ResourceCard("Edge Process Memory", "#f97316")
+        self.edge_battery_card = ResourceCard("UPS Battery", "#a78bfa")
+        self.edge_power_card = ResourceCard("External Power", "#2dd4bf")
+
+        smart_grid.addWidget(self.edge_cpu_card, 0, 0)
+        smart_grid.addWidget(self.edge_ram_card, 0, 1)
+        smart_grid.addWidget(self.edge_process_cpu_card, 1, 0)
+        smart_grid.addWidget(self.edge_process_memory_card, 1, 1)
+        smart_grid.addWidget(self.edge_battery_card, 2, 0)
+        smart_grid.addWidget(self.edge_power_card, 2, 1)
+
+        smart_layout.addLayout(smart_grid)
 
         self.monitor_stack.addWidget(pc_page)
         self.monitor_stack.addWidget(smart_page)
@@ -305,7 +336,7 @@ class ResourceMonitorWindow(QDialog):
 
     def refresh(self):
         if self.monitor_view == "smart":
-            self.summary_label.setText("스마트CCTV 리소스 정보 연결 대기")
+            self._request_edge_status()
             return
 
         cpu = self._collect_cpu()
@@ -376,6 +407,126 @@ class ResourceMonitorWindow(QDialog):
             f"업데이트: {time.strftime('%H:%M:%S')} · "
             "수집 주기 1초 · GPU 정보는 약 3초마다 갱신"
         )
+
+    def _request_edge_status(self):
+        if self.edge_status_worker is not None and self.edge_status_worker.isRunning():
+            return
+
+        self.edge_status_worker = EdgeStatusRequestWorker(
+            self.edge_status_server_url,
+            self,
+        )
+        self.edge_status_worker.result_ready.connect(self._handle_edge_status_result)
+        self.edge_status_worker.error_ready.connect(self._handle_edge_status_error)
+        self.edge_status_worker.finished.connect(self._clear_edge_status_worker)
+        self.edge_status_worker.start()
+
+    def _handle_edge_status_result(self, status):
+        self.edge_failure_count = 0
+        node = status.get("node", {})
+        collected_at = node.get("collected_at", "-")
+        hostname = node.get("hostname", "-")
+        self.summary_label.setText(
+            f"스마트CCTV 연결됨 · {hostname} · 업데이트: {collected_at}"
+        )
+        self.smart_status_label.setText("상태: 연결됨")
+        self.smart_status_label.setStyleSheet("color: #22c55e; font-size: 14px;")
+        self._update_edge_cards(status)
+
+    def _handle_edge_status_error(self, message):
+        self.edge_failure_count += 1
+        if self.edge_failure_count >= 3:
+            status_text = "상태: 연결실패"
+            status_color = "#ef4444"
+            summary_text = f"스마트CCTV 연결실패 · {message}"
+        else:
+            status_text = "상태: 조회중"
+            status_color = "#facc15"
+            summary_text = f"스마트CCTV 조회중 · 실패 {self.edge_failure_count}회"
+
+        self.smart_status_label.setText(status_text)
+        self.smart_status_label.setStyleSheet(f"color: {status_color}; font-size: 14px;")
+        self.summary_label.setText(summary_text)
+
+    def _clear_edge_status_worker(self):
+        self.edge_status_worker = None
+
+    def _update_edge_cards(self, status):
+        resource = status.get("resource", {})
+        cpu = resource.get("cpu", {})
+        memory = resource.get("memory", {})
+        process = resource.get("process", {})
+        power = status.get("power", {})
+
+        cpu_total = cpu.get("total_percent")
+        memory_total = memory.get("total_percent")
+        process_cpu = process.get("cpu_percent")
+        process_memory = process.get("memory_percent")
+        battery = power.get("battery_remaining_percent")
+        external_power = power.get("external_power_connected")
+
+        self.edge_cpu_card.update_data(
+            cpu_total,
+            self._format_percent_text(cpu_total),
+            "라즈베리파이 전체 CPU 사용률",
+        )
+        self.edge_ram_card.update_data(
+            memory_total,
+            self._format_percent_text(memory_total),
+            "라즈베리파이 전체 메모리 사용률",
+        )
+        self.edge_process_cpu_card.update_data(
+            process_cpu,
+            self._format_percent_text(process_cpu),
+            f"PID {process.get('pid', '-')} · {process.get('name', '-')}",
+        )
+        self.edge_process_memory_card.update_data(
+            process_memory,
+            self._format_percent_text(process_memory),
+            f"PID {process.get('pid', '-')} · {process.get('name', '-')}",
+        )
+        self.edge_battery_card.update_data(
+            battery,
+            self._format_percent_text(battery),
+            self._format_power_status(power),
+        )
+        self.edge_power_card.update_data(
+            100 if external_power else 0,
+            self._format_external_power_text(external_power),
+            self._format_power_voltage_detail(power),
+        )
+
+    def _format_percent_text(self, value):
+        if value is None:
+            return "-"
+        return f"{float(value):.1f}%"
+
+    def _format_external_power_text(self, value):
+        if value is None:
+            return "-"
+        return "연결됨" if bool(value) else "미연결"
+
+    def _format_power_status(self, power):
+        if not power:
+            return "UPS 응답 없음"
+        if power.get("available"):
+            return "UPS 읽기 정상"
+        error_code = power.get("error_code") or "unknown"
+        error = power.get("error") or "알 수 없는 오류"
+        return f"UPS 읽기 실패 · {error_code} · {error}"
+
+    def _format_power_voltage_detail(self, power):
+        if not power:
+            return "전압 정보 없음"
+        type_c = power.get("type_c_input_millivolt")
+        micro_usb = power.get("micro_usb_input_millivolt")
+        raw = power.get("power_status_raw")
+        return f"USB-C {self._format_millivolt(type_c)} · MicroUSB {self._format_millivolt(micro_usb)} · RAW {raw}"
+
+    def _format_millivolt(self, value):
+        if value is None:
+            return "-"
+        return f"{int(value)}mV"
 
     def _collect_cpu(self):
         total_percent = self.cpu_utility_counter.read()
@@ -594,5 +745,7 @@ class ResourceMonitorWindow(QDialog):
 
     def closeEvent(self, event):
         self.timer.stop()
+        if self.edge_status_worker is not None and self.edge_status_worker.isRunning():
+            self.edge_status_worker.wait(3000)
         self.cpu_utility_counter.close()
         event.accept()

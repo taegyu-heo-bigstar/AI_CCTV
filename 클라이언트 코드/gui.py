@@ -443,6 +443,7 @@ class CCTVMainWindow(QMainWindow):
         self.ai_cctv_path = ""
         self.original_segment_seconds = 10
         self.clip_max_seconds = 10
+        self.edge_status_server_url = ""
         self.resource_monitor_window = None
 
         self.init_ui()
@@ -619,7 +620,8 @@ class CCTVMainWindow(QMainWindow):
             use_vlm=self.use_vlm,
             ai_cctv_path=self.ai_cctv_path,
             original_segment_seconds=self.original_segment_seconds,
-            clip_max_seconds=self.clip_max_seconds
+            clip_max_seconds=self.clip_max_seconds,
+            edge_status_server_url=self.edge_status_server_url
         )
         self.worker.frame_ready.connect(self.update_frame)
         self.worker.metrics_ready.connect(self.update_metrics)
@@ -668,6 +670,9 @@ class CCTVMainWindow(QMainWindow):
             self.ai_cctv_path = dialog.ai_cctv_path
             self.original_segment_seconds = dialog.original_segment_seconds
             self.clip_max_seconds = dialog.clip_max_seconds
+            self.edge_status_server_url = dialog.edge_status_server_url
+            if self.resource_monitor_window is not None:
+                self.resource_monitor_window.edge_status_server_url = self.edge_status_server_url
 
             self.cam_status.setText(
                 f"● CAM-01 · 입력 설정 완료: {self.video_source}"
@@ -692,7 +697,8 @@ class CCTVMainWindow(QMainWindow):
         if self.resource_monitor_window is None:
             self.resource_monitor_window = ResourceMonitorWindow(
                 self,
-                storage_path=self.ai_cctv_path or self.storage_root_path
+                storage_path=self.ai_cctv_path or self.storage_root_path,
+                edge_status_server_url=self.edge_status_server_url
             )
             self.resource_monitor_window.finished.connect(
                 self.handle_resource_monitor_closed

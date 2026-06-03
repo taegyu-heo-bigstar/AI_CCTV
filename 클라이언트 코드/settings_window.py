@@ -1,4 +1,5 @@
 import os
+from urllib.parse import urlparse
 
 from PyQt5.QtWidgets import (
     QDialog,
@@ -28,7 +29,8 @@ class SettingsWindow(QDialog):
         storage_root_path="",
         ai_cctv_path="",
         original_segment_seconds=10,
-        clip_max_seconds=10
+        clip_max_seconds=10,
+        edge_status_server_url=""
     ):
         super().__init__(parent)
 
@@ -39,10 +41,11 @@ class SettingsWindow(QDialog):
         self.ai_cctv_path = ai_cctv_path
         self.original_segment_seconds = original_segment_seconds
         self.clip_max_seconds = clip_max_seconds
+        self.edge_status_server_url = edge_status_server_url
 
         self.setWindowTitle("설정")
         self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
-        self.setFixedSize(1100, 650)
+        self.setFixedSize(1100, 720)
         self.setStyleSheet(
             "background-color: #0f172a; color: #f8fafc; font-family: Arial;"
         )
@@ -173,6 +176,23 @@ class SettingsWindow(QDialog):
         )
         input_layout.addWidget(self.rtsp_input)
 
+        edge_status_label = QLabel("엣지 상태 API 주소")
+        edge_status_label.setStyleSheet(
+            "font-size: 15px; font-weight: bold; padding-left: 24px;"
+        )
+        input_layout.addWidget(edge_status_label)
+
+        self.edge_status_input = QLineEdit()
+        self.edge_status_input.setMinimumHeight(40)
+        self.edge_status_input.setPlaceholderText("예: http://192.168.10.2:8003")
+        self.edge_status_input.setText(self.edge_status_server_url)
+        self.edge_status_input.setStyleSheet(
+            "background-color: #1e293b; color: #f8fafc; "
+            "border: 1px solid #334155; border-radius: 6px; "
+            "padding: 10px; font-size: 14px;"
+        )
+        input_layout.addWidget(self.edge_status_input)
+
         if isinstance(self.selected_source, int):
             self.radio_webcam.setChecked(True)
             self.camera_index_input.setText(str(self.selected_source))
@@ -270,11 +290,27 @@ class SettingsWindow(QDialog):
 
             source = rtsp_url
 
+        edge_status_url = self.edge_status_input.text().strip()
+        if edge_status_url and not edge_status_url.startswith(("http://", "https://")):
+            self.result_label.setStyleSheet("font-size: 14px; color: #ef4444;")
+            self.result_label.setText("엣지 상태 API 주소는 http:// 또는 https://로 시작해야 합니다.")
+            return
+
+        if not edge_status_url and not isinstance(source, int):
+            edge_status_url = self._build_default_edge_status_url(source)
+
         self.selected_source = source
         self.use_yolo = self.yolo_checkbox.isChecked()
         self.use_vlm = self.use_yolo and self.vlm_checkbox.isChecked()
+        self.edge_status_server_url = edge_status_url
 
         self.accept()
+
+    def _build_default_edge_status_url(self, rtsp_url):
+        parsed = urlparse(rtsp_url)
+        if not parsed.hostname:
+            return ""
+        return f"http://{parsed.hostname}:8003"
 
     def create_empty_page(self, title_text, desc_text):
         page = QWidget()

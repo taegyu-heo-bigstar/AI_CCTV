@@ -11,6 +11,7 @@
 | 리소스 모니터 API | `서버 코드/resource_monitor_server.py` | FastAPI로 CPU/메모리/프로세스 자원 사용률 JSON을 제공합니다. | 별도 서버 또는 테스트 PC |
 | RTSP 송출/백업 | `rtspv1.0/stream_and_record.sh` | 라즈베리파이 카메라 영상을 GStreamer로 캡처하고 MediaMTX를 통해 RTSP로 송출하며 10초 단위 백업을 저장합니다. | Raspberry Pi |
 | 백업 복구 API | `rtspv1.0/backup_api_server.py` | 네트워크 장애 구간의 라즈베리파이 백업 `.ts` 파일을 ZIP으로 반환합니다. | Raspberry Pi |
+| 엣지 상태 API | `rtspv1.0/edge_status_api_server.py` | FastAPI로 라즈베리파이 자원 상태와 UPS Plus 전원 상태를 제공합니다. | Raspberry Pi |
 | 구 RTSP 예제 | `rtsp/` | 학습/초기 테스트용 RTSP 예제입니다. 현재 메인 실행 경로는 아닙니다. | 참고용 |
 
 ## 2. Windows AI 서버 실행
@@ -124,7 +125,8 @@ sudo apt update
 sudo apt install -y gstreamer1.0-tools gstreamer1.0-plugins-base \
                     gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
                     gstreamer1.0-plugins-ugly gstreamer1.0-libav \
-                    gstreamer1.0-rtsp libcamera-v4l2 python3-pip wget tar
+                    gstreamer1.0-rtsp libcamera-v4l2 python3-pip wget tar \
+                    i2c-tools
 ```
 
 카메라 확인:
@@ -134,6 +136,16 @@ rpicam-hello --list-cameras
 ```
 
 카메라가 보이지 않으면 케이블 방향, 카메라 커넥터 체결, `/boot/firmware/config.txt`의 `camera_auto_detect=1` 설정, 재부팅 여부를 확인하십시오.
+
+UPS Plus 전원 상태를 읽으려면 I2C도 활성화되어 있어야 합니다.
+
+```bash
+sudo raspi-config
+ls /dev/i2c-*
+i2cdetect -y 1
+```
+
+`/dev/i2c-1`이 없으면 I2C가 꺼져 있거나 재부팅이 필요합니다. `i2cdetect -y 1`에서 `0x17` 주소가 보이면 52Pi EP-0136 UPS Plus 전력 모듈을 읽을 준비가 된 상태입니다.
 
 ### 3.2 RTSP 송출 시작
 
@@ -178,7 +190,45 @@ http://라즈베리파이IP:8002/recover
 
 백업 파일은 `rtspv1.0/backups` 아래의 `.ts` 파일을 대상으로 합니다.
 
-## 5. 리소스 모니터링 API 실행
+## 5. Raspberry Pi 엣지 상태 API 실행
+
+라즈베리파이의 CPU, 메모리, 송출 프로세스, UPS Plus 배터리/외부 전원 상태를 AI 서버 UI로 보내려면 엣지 상태 API 서버를 실행합니다.
+
+```bash
+cd ~/AI_CCTV
+source .rpi_api_env/bin/activate
+python -m pip install -r rtspv1.0/requirements.txt
+python rtspv1.0/edge_status_api_server.py
+```
+
+기본 포트는 `8003`입니다. 브라우저나 `curl`로 다음 주소를 확인할 수 있습니다.
+
+```bash
+curl http://127.0.0.1:8003/health
+curl http://127.0.0.1:8003/status
+```
+
+다른 포트를 사용하려면 다음 환경 변수를 지정합니다.
+
+```bash
+EDGE_STATUS_API_PORT=8003 python rtspv1.0/edge_status_api_server.py
+```
+
+송출 프로세스 사용률은 기본적으로 `gst-launch-1.0` 프로세스를 찾습니다. 특정 PID를 직접 지정하려면 다음처럼 실행합니다.
+
+```bash
+EDGE_MONITOR_PROCESS_ID=1234 python rtspv1.0/edge_status_api_server.py
+```
+
+AI 서버 설정창의 `엣지 상태 API 주소`에는 다음 형태의 값을 입력합니다.
+
+```text
+http://라즈베리파이IP:8003
+```
+
+RTSP 주소를 입력하고 엣지 상태 API 주소를 비워 두면 UI가 `http://RTSP호스트:8003`으로 자동 추정합니다.
+
+## 6. Windows 리소스 모니터링 API 실행
 
 FastAPI 기반 리소스 모니터링 서버는 다음과 같이 실행합니다.
 
@@ -199,19 +249,21 @@ $env:RESOURCE_MONITOR_SERVER_URL="http://서버IP:8001"
 python "클라이언트 코드\resource_monitor_client.py"
 ```
 
-현재 `클라이언트 코드/resource_monitor_window.py`의 기본 화면은 사용자 PC 자원 정보를 로컬에서 직접 수집합니다. 스마트 CCTV 쪽 모니터링 화면은 연결 대기 표시 중심입니다.
+현재 `클라이언트 코드/resource_monitor_window.py`의 기본 화면은 사용자 PC 자원 정보를 로컬에서 직접 수집합니다. 스마트CCTV 화면은 `엣지 상태 API 주소`로 HTTP 요청을 보내 엣지 노드 자원/전원 상태를 표시합니다.
 
-## 6. 권장 실행 순서
+## 7. 권장 실행 순서
 
 라즈베리파이와 Windows AI 서버를 함께 테스트할 때는 다음 순서가 가장 명확합니다.
 
 1. 라즈베리파이에서 `rtspv1.0/stream_and_record.sh` 실행
 2. 라즈베리파이에서 `rtspv1.0/backup_api_server.py` 실행
-3. Windows에서 `python "클라이언트 코드\gui.py"` 실행
-4. UI 설정에서 `RTSP 사용` 선택
-5. `rtsp://라즈베리파이IP:8554/live` 입력
-6. 저장 경로 선택
-7. `START` 실행
+3. 라즈베리파이에서 `rtspv1.0/edge_status_api_server.py` 실행
+4. Windows에서 `python "클라이언트 코드\gui.py"` 실행
+5. UI 설정에서 `RTSP 사용` 선택
+6. `rtsp://라즈베리파이IP:8554/live` 입력
+7. `엣지 상태 API 주소`에 `http://라즈베리파이IP:8003` 입력
+8. 저장 경로 선택
+9. `START` 실행
 
 PC 단독 테스트는 라즈베리파이 없이 다음만 실행하면 됩니다.
 
@@ -221,7 +273,58 @@ python "클라이언트 코드\gui.py"
 
 설정에서 `웹캠 사용`, 카메라 번호 `0`을 선택하십시오.
 
-## 7. 자주 발생하는 문제
+## 8. systemd 적용 방향
+
+라즈베리파이 현장 운용에서는 SSH 터미널 3개로 각각 실행하는 방식보다 `systemd` 서비스가 적합합니다. 다만 `develop`의 현재 구조에서는 즉시 하나의 서비스로 묶기보다 다음 3개 서비스로 분리하는 편이 안전합니다.
+
+| 서비스 | 역할 | 권장 실행 |
+|---|---|---|
+| `ai-cctv-stream.service` | MediaMTX와 GStreamer 송출/백업 실행 | `rtspv1.0/stream_and_record.sh` |
+| `ai-cctv-backup-api.service` | 장애 복구 ZIP API 제공 | `python rtspv1.0/backup_api_server.py` |
+| `ai-cctv-edge-status.service` | 자원/UPS 전원 상태 API 제공 | `python rtspv1.0/edge_status_api_server.py` |
+
+분리하는 이유는 장애 범위를 줄이기 위해서입니다. 예를 들어 UPS I2C 조회가 실패해도 영상 송출 서비스는 계속 살아 있어야 하고, 백업 복구 API 재시작이 GStreamer 송출을 끊으면 안 됩니다.
+
+`ai-cctv-edge-status.service` 예시는 다음과 같습니다.
+
+```ini
+[Unit]
+Description=AI CCTV Edge Status API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=phoenix
+WorkingDirectory=/home/phoenix/AI_CCTV
+Environment=EDGE_STATUS_API_PORT=8003
+ExecStart=/home/phoenix/AI_CCTV/.rpi_api_env/bin/python /home/phoenix/AI_CCTV/rtspv1.0/edge_status_api_server.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+적용 절차는 다음과 같습니다.
+
+```bash
+sudo nano /etc/systemd/system/ai-cctv-edge-status.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now ai-cctv-edge-status.service
+sudo systemctl status ai-cctv-edge-status.service
+journalctl -u ai-cctv-edge-status.service -f
+```
+
+I2C 권한 문제가 생기면 `User=phoenix` 계정이 I2C 접근 권한을 갖는지 확인해야 합니다.
+
+```bash
+groups phoenix
+sudo usermod -aG i2c phoenix
+sudo reboot
+```
+
+## 9. 자주 발생하는 문제
 
 ### `ai-cctv-*` 명령이 인식되지 않음
 
