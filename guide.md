@@ -39,17 +39,11 @@ python -m pip install --upgrade pip
 
 `python` 명령이 Microsoft Store alias로 잡혀 이상하게 동작한다면 `py` 명령을 사용하십시오.
 
-### 2.3 기본 패키지 설치
+### 2.3 PyTorch 설치
 
-```powershell
-python -m pip install -r requirements.txt
-```
+PyTorch는 PC의 CUDA/드라이버 상태에 맞는 버전을 먼저 설치하는 편이 안전합니다. `requirements.txt`를 먼저 설치하면 `ultralytics` 같은 패키지가 CPU용 또는 다른 CUDA 버전의 PyTorch를 끌고 올 수 있습니다.
 
-`requirements.txt`에는 PyQt5, OpenCV, Ultralytics, Transformers, FastAPI, psutil, Discord 관련 패키지가 포함되어 있습니다.
-
-### 2.4 PyTorch 설치
-
-PyTorch는 PC의 CUDA/드라이버 상태에 따라 별도 설치하는 편이 안전합니다. NVIDIA GPU와 CUDA 12.1 계열을 사용할 경우:
+NVIDIA GPU와 CUDA 12.1 계열을 사용할 경우:
 
 ```powershell
 python -m pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
@@ -66,6 +60,14 @@ python -m pip install torch torchvision torchaudio
 ```powershell
 python -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.version.cuda)"
 ```
+
+### 2.4 기본 패키지 설치
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+`requirements.txt`에는 PyQt5, OpenCV, Ultralytics, Transformers, FastAPI, psutil, Discord 관련 패키지가 포함되어 있습니다.
 
 ### 2.5 모델 및 설정 파일
 
@@ -125,7 +127,8 @@ sudo apt update
 sudo apt install -y gstreamer1.0-tools gstreamer1.0-plugins-base \
                     gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
                     gstreamer1.0-plugins-ugly gstreamer1.0-libav \
-                    gstreamer1.0-rtsp libcamera-v4l2 python3-pip wget tar \
+                    gstreamer1.0-rtsp gstreamer1.0-libcamera libcamera-v4l2 \
+                    python3-pip python3-venv wget tar \
                     i2c-tools
 ```
 
@@ -137,15 +140,21 @@ rpicam-hello --list-cameras
 
 카메라가 보이지 않으면 케이블 방향, 카메라 커넥터 체결, `/boot/firmware/config.txt`의 `camera_auto_detect=1` 설정, 재부팅 여부를 확인하십시오.
 
-UPS Plus 전원 상태를 읽으려면 I2C도 활성화되어 있어야 합니다.
+UPS Plus 전원 상태를 읽으려면 I2C도 활성화되어 있어야 합니다. `sudo raspi-config`를 실행한 뒤 `Interface Options` → `I2C` → `Enable`을 선택하고 재부팅하십시오.
 
 ```bash
 sudo raspi-config
+sudo reboot
+```
+
+재부팅 후 I2C 장치와 UPS Plus 주소를 확인합니다.
+
+```bash
 ls /dev/i2c-*
 i2cdetect -y 1
 ```
 
-`/dev/i2c-1`이 없으면 I2C가 꺼져 있거나 재부팅이 필요합니다. `i2cdetect -y 1`에서 `0x17` 주소가 보이면 52Pi EP-0136 UPS Plus 전력 모듈을 읽을 준비가 된 상태입니다.
+`/dev/i2c-1`이 없으면 I2C가 꺼져 있거나 재부팅이 필요합니다. `i2cdetect -y 1` 출력 표에서 `17`이 보이면 52Pi EP-0136 UPS Plus 전력 모듈을 읽을 준비가 된 상태입니다.
 
 ### 3.2 RTSP 송출 시작
 
@@ -178,7 +187,7 @@ cd ~/AI_CCTV
 python3 -m venv .rpi_api_env
 source .rpi_api_env/bin/activate
 python -m pip install --upgrade pip
-python -m pip install -r rtspv1.0/requirements.txt
+python -m pip install -r rtspv1.0/api_requirements.txt
 python rtspv1.0/backup_api_server.py
 ```
 
@@ -196,8 +205,10 @@ http://라즈베리파이IP:8002/recover
 
 ```bash
 cd ~/AI_CCTV
+python3 -m venv .rpi_api_env
 source .rpi_api_env/bin/activate
-python -m pip install -r rtspv1.0/requirements.txt
+python -m pip install --upgrade pip
+python -m pip install -r rtspv1.0/api_requirements.txt
 python rtspv1.0/edge_status_api_server.py
 ```
 
@@ -211,7 +222,7 @@ curl http://127.0.0.1:8003/status
 다른 포트를 사용하려면 다음 환경 변수를 지정합니다.
 
 ```bash
-EDGE_STATUS_API_PORT=8003 python rtspv1.0/edge_status_api_server.py
+EDGE_STATUS_API_PORT=8004 python rtspv1.0/edge_status_api_server.py
 ```
 
 송출 프로세스 사용률은 기본적으로 `gst-launch-1.0` 프로세스를 찾습니다. 특정 PID를 직접 지정하려면 다음처럼 실행합니다.
@@ -285,7 +296,49 @@ python "클라이언트 코드\gui.py"
 
 분리하는 이유는 장애 범위를 줄이기 위해서입니다. 예를 들어 UPS I2C 조회가 실패해도 영상 송출 서비스는 계속 살아 있어야 하고, 백업 복구 API 재시작이 GStreamer 송출을 끊으면 안 됩니다.
 
-`ai-cctv-edge-status.service` 예시는 다음과 같습니다.
+주의할 점은 백업 경로입니다. `stream_and_record.sh`는 실행 위치 기준 `./backups`에 저장하고, `backup_api_server.py`는 `rtspv1.0/backups`를 읽습니다. 따라서 송출 서비스의 `WorkingDirectory`는 반드시 `/home/phoenix/AI_CCTV/rtspv1.0`으로 잡아야 합니다.
+
+`/etc/systemd/system/ai-cctv-stream.service` 예시는 다음과 같습니다.
+
+```ini
+[Unit]
+Description=AI CCTV RTSP Stream and Local Backup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=phoenix
+WorkingDirectory=/home/phoenix/AI_CCTV/rtspv1.0
+ExecStart=/bin/bash /home/phoenix/AI_CCTV/rtspv1.0/stream_and_record.sh
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`/etc/systemd/system/ai-cctv-backup-api.service` 예시는 다음과 같습니다.
+
+```ini
+[Unit]
+Description=AI CCTV Backup Recovery API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=phoenix
+WorkingDirectory=/home/phoenix/AI_CCTV
+ExecStart=/home/phoenix/AI_CCTV/.rpi_api_env/bin/python /home/phoenix/AI_CCTV/rtspv1.0/backup_api_server.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`/etc/systemd/system/ai-cctv-edge-status.service` 예시는 다음과 같습니다.
 
 ```ini
 [Unit]
@@ -309,10 +362,23 @@ WantedBy=multi-user.target
 적용 절차는 다음과 같습니다.
 
 ```bash
+sudo nano /etc/systemd/system/ai-cctv-stream.service
+sudo nano /etc/systemd/system/ai-cctv-backup-api.service
 sudo nano /etc/systemd/system/ai-cctv-edge-status.service
 sudo systemctl daemon-reload
+sudo systemctl enable --now ai-cctv-stream.service
+sudo systemctl enable --now ai-cctv-backup-api.service
 sudo systemctl enable --now ai-cctv-edge-status.service
+sudo systemctl status ai-cctv-stream.service
+sudo systemctl status ai-cctv-backup-api.service
 sudo systemctl status ai-cctv-edge-status.service
+```
+
+로그는 서비스별로 따로 확인합니다.
+
+```bash
+journalctl -u ai-cctv-stream.service -f
+journalctl -u ai-cctv-backup-api.service -f
 journalctl -u ai-cctv-edge-status.service -f
 ```
 
