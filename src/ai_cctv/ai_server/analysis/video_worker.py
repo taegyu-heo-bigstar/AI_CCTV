@@ -109,6 +109,7 @@ class VideoWorker(QThread):
         )
         self.last_stream_status_at = 0.0
         self.last_reported_recovery_result_id = None
+        self.network_failure_reported = False
 
     def run(self):
         """스레드 메인 루프에서 프레임 처리와 신호 발행을 수행합니다.
@@ -154,6 +155,7 @@ class VideoWorker(QThread):
             if not ret:
                 if getattr(self.stream, "is_rtsp", False):
                     self._stop_recording_for_active_rtsp_failure()
+                    self._emit_network_failure_if_needed()
                     self._emit_stream_wait_status()
                     continue
                 self.event_ready.emit({
@@ -162,6 +164,7 @@ class VideoWorker(QThread):
                 })
                 continue
 
+            self._emit_network_recovered_if_needed()
             self._emit_recovery_result_if_needed()
 
             if self.recording_manager is not None:
@@ -438,6 +441,46 @@ class VideoWorker(QThread):
         self.event_ready.emit({
             "type": "status",
             "message": message,
+        })
+
+    def _emit_network_failure_if_needed(self):
+        """RTSP 장애가 확정되면 develop UI와 같은 네트워크 장애 이벤트를 발행합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        if self.network_failure_reported:
+            return
+        if not self.stream.has_active_recovery_failure():
+            return
+
+        self.network_failure_reported = True
+        self.event_ready.emit({
+            "type": "network_failure",
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "message": "네트워크 장애 감지: RTSP 프레임 수신이 중단되었습니다.",
+        })
+
+    def _emit_network_recovered_if_needed(self):
+        """RTSP 프레임이 다시 수신되면 네트워크 복구 이벤트를 발행합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        if not self.network_failure_reported:
+            return
+
+        self.network_failure_reported = False
+        self.event_ready.emit({
+            "type": "network_recovered",
+            "time": datetime.now().strftime("%H:%M:%S"),
+            "message": "네트워크 연결 복구",
         })
 
     def _emit_recovery_result_if_needed(self):

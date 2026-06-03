@@ -52,9 +52,23 @@ class EventPresenter:
             return EventDisplay(event.get("message", "Error"), "#ef4444", event_type)
         if event_type == "status":
             return EventDisplay(event.get("message", "Status"), "#38bdf8", event_type)
+        if event_type == "network_failure":
+            return EventDisplay(
+                event.get("message", "네트워크 장애 감지"),
+                "#facc15",
+                event_type,
+            )
+        if event_type == "network_recovered":
+            return EventDisplay(
+                event.get("message", "네트워크 연결 복구"),
+                "#38bdf8",
+                event_type,
+            )
         if event_type == "anomaly":
             message = event.get("message", "Anomaly detected")
             return EventDisplay(message, "#facc15", event_type)
+        if event_type == "vlm_queue":
+            return EventDisplay(f"ID {person_id} VLM 분석 대기열 등록", "#a855f7", event_type)
         if event_type == "vlm_done":
             message = event.get("message", "")
             return EventDisplay(f"ID {person_id} VLM 분석 완료\n{message}", "#a855f7", event_type)

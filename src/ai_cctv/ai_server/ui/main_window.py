@@ -62,6 +62,7 @@ class CCTVMainWindow(QMainWindow):
         self.clip_max_seconds = 10
         self.event_presenter = EventPresenter()
         self.edge_status_window = None
+        self.pc_resource_monitor_window = None
 
         self.init_ui()
 
@@ -113,6 +114,9 @@ class CCTVMainWindow(QMainWindow):
         self.btn_setting = self._create_button("Settings", "#334155")
         self.btn_setting.clicked.connect(self.open_settings)
 
+        self.btn_pc_resource_monitor = self._create_button("사용자 PC 모니터링", "#0e7490")
+        self.btn_pc_resource_monitor.clicked.connect(self.open_pc_resource_monitor)
+
         self.btn_edge_status = self._create_button("엣지 노드 상태 조회", "#0f766e")
         self.btn_edge_status.clicked.connect(self.open_edge_status)
         if (
@@ -126,6 +130,7 @@ class CCTVMainWindow(QMainWindow):
         header_layout.addStretch()
         header_layout.addWidget(self.btn_start)
         header_layout.addWidget(self.btn_stop)
+        header_layout.addWidget(self.btn_pc_resource_monitor)
         header_layout.addWidget(self.btn_edge_status)
         header_layout.addWidget(self.btn_setting)
         self._set_run_button_state(is_running=False)
@@ -451,6 +456,35 @@ class CCTVMainWindow(QMainWindow):
         self.edge_status_window.activateWindow()
         self.edge_status_window.start_monitoring()
 
+    def open_pc_resource_monitor(self):
+        """사용자 Windows PC 리소스 모니터링 창을 엽니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        if self.pc_resource_monitor_window is None:
+            from .pc_resource_monitor_window import PcResourceMonitorWindow
+
+            self.pc_resource_monitor_window = PcResourceMonitorWindow(
+                self,
+                storage_path=self.ai_cctv_path or self.storage_root_path,
+            )
+            self.pc_resource_monitor_window.finished.connect(
+                self._handle_pc_resource_monitor_closed
+            )
+
+        self.pc_resource_monitor_window.show()
+        self.pc_resource_monitor_window.raise_()
+        self.pc_resource_monitor_window.activateWindow()
+
+    def _handle_pc_resource_monitor_closed(self):
+        """사용자 PC 리소스 모니터링 창 참조를 정리합니다."""
+
+        self.pc_resource_monitor_window = None
+
     def _resolve_initial_video_source(self, edge_connection_config):
         """검증된 Edge node 연결 설정에서 초기 영상 입력 소스를 결정합니다.
 
@@ -537,6 +571,24 @@ class CCTVMainWindow(QMainWindow):
             "font-size: 24px; color: #334155; font-weight: bold;"
         )
 
+    def show_network_failure_screen(self):
+        """RTSP 네트워크 장애 상태를 영상 영역에 크게 표시합니다.
+
+        인자:
+            없음.
+        반환값:
+            없음.
+        """
+
+        self.video_label.clear()
+        self.video_label.setText("네트워크 연결 장애\n네트워크 연결 상태를 확인하세요.")
+        self.video_label.setAlignment(Qt.AlignCenter)
+        self.video_label.setStyleSheet(
+            "background-color: #000000; border: 1px solid #ef4444; "
+            "border-radius: 5px; font-size: 28px; color: #ef4444; "
+            "font-weight: bold;"
+        )
+
     def update_metrics(self, data):
         """영상 처리 지표를 화면에 반영합니다.
 
@@ -565,6 +617,13 @@ class CCTVMainWindow(QMainWindow):
         elif display.event_type == "disappear":
             self.disappear_count += 1
             self.metric_disappear["value"].setText(str(self.disappear_count))
+        elif display.event_type == "network_failure":
+            self.cam_status.setText("CAM-01 - NETWORK FAILURE")
+            self._set_camera_status_style("#facc15", "#facc15")
+            self.show_network_failure_screen()
+        elif display.event_type == "network_recovered":
+            self.cam_status.setText("CAM-01 - LIVE")
+            self._set_camera_status_style("#22c55e", "#22c55e")
 
         event_box = QFrame()
         event_box.setStyleSheet("background-color: #0f172a; border-radius: 5px;")
@@ -593,6 +652,8 @@ class CCTVMainWindow(QMainWindow):
         self.stop_video()
         if self.edge_status_window is not None:
             self.edge_status_window.close()
+        if self.pc_resource_monitor_window is not None:
+            self.pc_resource_monitor_window.close()
         event.accept()
 
     def _set_camera_status_style(self, border_color, text_color):
