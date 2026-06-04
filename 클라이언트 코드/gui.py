@@ -620,8 +620,7 @@ class CCTVMainWindow(QMainWindow):
             use_vlm=self.use_vlm,
             ai_cctv_path=self.ai_cctv_path,
             original_segment_seconds=self.original_segment_seconds,
-            clip_max_seconds=self.clip_max_seconds,
-            edge_status_server_url=self.edge_status_server_url
+            clip_max_seconds=self.clip_max_seconds
         )
         self.worker.frame_ready.connect(self.update_frame)
         self.worker.metrics_ready.connect(self.update_metrics)
@@ -658,7 +657,8 @@ class CCTVMainWindow(QMainWindow):
             storage_root_path=self.storage_root_path,
             ai_cctv_path=self.ai_cctv_path,
             original_segment_seconds=self.original_segment_seconds,
-            clip_max_seconds=self.clip_max_seconds
+            clip_max_seconds=self.clip_max_seconds,
+            edge_status_server_url=self.edge_status_server_url
         )
 
         if dialog.exec_():
